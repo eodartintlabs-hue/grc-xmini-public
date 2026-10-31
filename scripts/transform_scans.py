@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.3.2 — Sasebo) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.3.3 — Sasebo) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -377,6 +377,20 @@ def parse_any_date(val: str, fallback: Optional[datetime.date] = None) -> Option
 def format_date_iso(d: Optional[datetime.date]) -> str:
     """Format date as YYYY-MM-DD or empty string."""
     return d.strftime("%Y-%m-%d") if d else ""
+
+
+MONTH_ABBRS = (
+    "", "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+)
+
+
+def format_poam_id(date_obj: datetime.date, seq: int) -> str:
+    """
+    Format POA&M ID following dynamic FedRAMP standard YYYY-MMM-##### (e.g., 2026-SEP-00347).
+    """
+    month_abbr = MONTH_ABBRS[date_obj.month] if 1 <= date_obj.month <= 12 else "GEN"
+    return f"{date_obj.year:04d}-{month_abbr}-{seq:05d}"
 
 
 def normalize_risk(raw_risk: str) -> Optional[str]:
@@ -1211,9 +1225,16 @@ def reconcile_poam_entries(
             max_by_prefix[pfx] = max(max_by_prefix.get(pfx, 0), seq_num)
             max_poam_seq = max(max_poam_seq, seq_num)
         else:
-            m_seq = re.search(r"(\d+)$", pid)
-            if m_seq:
-                max_poam_seq = max(max_poam_seq, int(m_seq.group(1)))
+            m_dyn = re.match(r"^\d{4}-[A-Za-z]{3}-(\d+)$", pid)
+            m_leg = re.match(r"^POAM-\d{4}-(\d+)$", pid, flags=re.IGNORECASE)
+            if m_dyn:
+                max_poam_seq = max(max_poam_seq, int(m_dyn.group(1)))
+            elif m_leg:
+                max_poam_seq = max(max_poam_seq, int(m_leg.group(1)))
+            else:
+                m_seq = re.search(r"(\d+)$", pid)
+                if m_seq:
+                    max_poam_seq = max(max_poam_seq, int(m_seq.group(1)))
 
     for p in prev_open_entries:
         k = p["_dedup_key"]
@@ -1289,7 +1310,7 @@ def reconcile_poam_entries(
                 new_item["poam_id"] = f"{pfx}-{max_by_prefix[pfx]:05d}"
             else:
                 max_poam_seq += 1
-                new_item["poam_id"] = f"POAM-{today.year}-{max_poam_seq:04d}"
+                new_item["poam_id"] = format_poam_id(today, max_poam_seq)
             new_item["_is_carry_over"] = False
             new_item["_unverified_host"] = False
             final_open.append(new_item)
@@ -1403,9 +1424,16 @@ def reconcile_poam_entries_legacy(
             max_by_prefix[pfx] = max(max_by_prefix.get(pfx, 0), seq_num)
             max_poam_seq = max(max_poam_seq, seq_num)
         else:
-            m_seq = re.search(r"(\d+)$", pid)
-            if m_seq:
-                max_poam_seq = max(max_poam_seq, int(m_seq.group(1)))
+            m_dyn = re.match(r"^\d{4}-[A-Za-z]{3}-(\d+)$", pid)
+            m_leg = re.match(r"^POAM-\d{4}-(\d+)$", pid, flags=re.IGNORECASE)
+            if m_dyn:
+                max_poam_seq = max(max_poam_seq, int(m_dyn.group(1)))
+            elif m_leg:
+                max_poam_seq = max(max_poam_seq, int(m_leg.group(1)))
+            else:
+                m_seq = re.search(r"(\d+)$", pid)
+                if m_seq:
+                    max_poam_seq = max(max_poam_seq, int(m_seq.group(1)))
 
     scan_by_key: Dict[str, List[Dict[str, object]]] = {}
     for se in new_scan_entries:
@@ -1468,7 +1496,7 @@ def reconcile_poam_entries_legacy(
                 new_item["poam_id"] = f"{pfx}-{max_by_prefix[pfx]:05d}"
             else:
                 max_poam_seq += 1
-                new_item["poam_id"] = f"POAM-{today.year}-{max_poam_seq:04d}"
+                new_item["poam_id"] = format_poam_id(today, max_poam_seq)
             new_item["_is_carry_over"] = False
             new_item["_unverified_host"] = False
             final_open.append(new_item)
@@ -1915,7 +1943,7 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRCx (v1.3.2 — Sasebo) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRCx (v1.3.3 — Sasebo) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:
@@ -2536,7 +2564,7 @@ def main() -> int:
     else:
         print(
             "[WARNING] No previous OPEN FedRAMP POA&M provided! Treating this run as an initial baseline: "
-            "POA&M IDs will start at 0001 (unless --previous-closed is supplied) and no Open -> Closed "
+            f"POA&M IDs will start at {format_poam_id(today, 1)} (unless --previous-closed is supplied) and no Open -> Closed "
             "reconciliation will occur. Pass -p <filename> to reconcile against an existing POA&M."
         )
 

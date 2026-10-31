@@ -19,7 +19,7 @@
 </p>
 
 > **Engine**: [`scripts/transform_scans.py`](../scripts/transform_scans.py) · **CLI Command**: `./grc transform`  
-> **Release Series**: `v1.3.2 — Sasebo` *(Introduced in `v1.2.0 — Misawa`, enhanced with `scans/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`)*  
+> **Release Series**: `v1.3.3 — Sasebo` *(Introduced in `v1.2.0 — Misawa`, enhanced with `scans/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`)*  
 > **Execution Mode**: **100% Standalone** *(Requires only Python 3.9+ Standard Library — no Docker container, no `.bundle` file, and no `pip install` needed)*
 
 ---
@@ -173,7 +173,7 @@ Each unique `(Vulnerability Source ID + Asset Identifier)` combination is normal
 ### 3.2 Open $\rightarrow$ Closed POA&M Reconciliation
 When a previously filled-out `OPEN FedRAMP-POAM.xlsx` is supplied:
 * **Carried-Over Open Items**: Findings present in both the previous OPEN POA&M and the new scan retain their original `POAM ID`, **never-changing `Original Detection Date` (`Column L`)**, and analyst-curated fields (`Controls`, `Point of Contact`, existing `Remediation Plan`, `Risk Adjustment`, `Deviation Rationale`), while updating `Status Date` (`Column N`).
-* **Newly Detected Open Items**: Findings present in the new scan that were not in the previous OPEN POA&M receive the next sequential `POAM ID` (`POAM-YYYY-XXXX`) and a new `Original Detection Date`.
+* **Newly Detected Open Items**: Findings present in the new scan that were not in the previous OPEN POA&M receive the next sequential dynamic `POAM ID` following the FedRAMP `YYYY-MMM-#####` convention (e.g. `2026-SEP-00347` or `2026-OCT-00001`) and a new `Original Detection Date`.
 * **Remediated $\rightarrow$ Moved to Closed**: Findings from the previous OPEN POA&M that are **no longer present in the new scan** (or have `False Positive` set to `Yes`) are automatically removed from the `OPEN` workbook and written into `CLOSED FedRAMP-POAM.xlsx` (`Columns A..AA`), with `Status Date` updated to the closure date and a verification timestamp appended to `Comments`.
 
 ---
@@ -196,7 +196,7 @@ Try running the bundled sample Tenable reconciliation right now:
 [+] Drafted 5 Remediation Plans with official TENABLE remediation URLs.
 
 ================================================================================================
-  GRCx (v1.3.2 — Sasebo) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
+  GRCx (v1.3.3 — Sasebo) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
 ================================================================================================
   Analysis Reference Date : 2026-10-20
   Finished OPEN POA&M     : evidence/poam-tenable_monthly_scan/OPEN FedRAMP-POAM.xlsx

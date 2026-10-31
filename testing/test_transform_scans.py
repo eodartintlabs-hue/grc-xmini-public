@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRCx (v1.3.2 — Sasebo) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRCx (v1.3.3 — Sasebo) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:
@@ -303,8 +303,8 @@ class TestTransformScansEngine(unittest.TestCase):
         self.assertIn("was not observed in the latest scan", open_by_id["POAM-2026-0002"]["comments"])
         self.assertEqual(stats["unverified_unscanned_open"], 1)
 
-        # New finding on 10.42.10.14 must receive POAM-2026-0011 (continuing past CLOSED POAM-2026-0010)
-        self.assertIn("POAM-2026-0011", open_by_id)
+        # New finding on 10.42.10.14 must receive 2026-OCT-00011 (continuing past CLOSED POAM-2026-0010)
+        self.assertIn("2026-OCT-00011", open_by_id)
 
     def test_ip_to_dns_alias_reconciles_and_backup_name_match_does_not_duplicate_ids(self) -> None:
         # Previous OPEN has POAM-2026-0001 tracked by IP 10.42.10.50 without source_identifier
@@ -372,8 +372,68 @@ class TestTransformScansEngine(unittest.TestCase):
         self.assertEqual(len(newly_closed), 0)
         self.assertEqual(len(final_open), 2)
         poam_ids = [e["poam_id"] for e in final_open]
-        # Must NOT assign POAM-2026-0001 to both items! One gets 0001, the second gets 0002.
-        self.assertEqual(sorted(poam_ids), ["POAM-2026-0001", "POAM-2026-0002"])
+        # Must NOT assign duplicate IDs! One carries over POAM-2026-0001, second gets 2026-OCT-00002.
+        self.assertEqual(sorted(poam_ids), ["2026-OCT-00002", "POAM-2026-0001"])
+
+    def test_poam_id_dynamic_nomenclature_year_month_sequence(self) -> None:
+        """Verify dynamic FedRAMP POA&M ID nomenclature YYYY-MMM-##### (e.g. 2026-SEP-00347)."""
+        # Test direct format helper
+        sept_date = datetime.date(2026, 9, 15)
+        self.assertEqual(ts.format_poam_id(sept_date, 347), "2026-SEP-00347")
+        self.assertEqual(ts.format_poam_id(sept_date, 1), "2026-SEP-00001")
+
+        oct_date = datetime.date(2026, 10, 31)
+        self.assertEqual(ts.format_poam_id(oct_date, 1), "2026-OCT-00001")
+        self.assertEqual(ts.format_poam_id(oct_date, 99999), "2026-OCT-99999")
+
+        # Test reconciliation baseline assigns YYYY-MMM-00001, 00002, etc.
+        raw_records = [
+            {
+                "Plugin ID": "10001",
+                "CVE": "CVE-2026-1111",
+                "Risk": "High",
+                "Host": "10.0.0.1",
+                "Name": "Finding 1",
+            },
+            {
+                "Plugin ID": "10002",
+                "CVE": "CVE-2026-2222",
+                "Risk": "Critical",
+                "Host": "10.0.0.2",
+                "Name": "Finding 2",
+            },
+        ]
+        scanned_assets, alias_map = ts.collect_scanned_assets(raw_records)
+        new_scan_entries = ts.normalize_scan_rows(
+            records=raw_records,
+            scanner_type="tenable",
+            scan_filename="scan.csv",
+            today=sept_date,
+            default_poc="SecOps",
+            kev_catalog={},
+        )
+        final_open, _, _ = ts.reconcile_poam_entries(
+            prev_open_entries=[],
+            new_scan_entries=new_scan_entries,
+            today=sept_date,
+            scanned_assets=scanned_assets,
+            asset_alias_map=alias_map,
+        )
+        ids = [e["poam_id"] for e in final_open]
+        self.assertEqual(ids, ["2026-SEP-00001", "2026-SEP-00002"])
+
+        # Test continuing past existing YYYY-MMM-##### in previous closed workbook
+        prev_closed = [{"poam_id": "2026-SEP-00346"}]
+        final_open_cont, _, _ = ts.reconcile_poam_entries(
+            prev_open_entries=[],
+            new_scan_entries=new_scan_entries,
+            today=sept_date,
+            prev_closed_entries=prev_closed,
+            scanned_assets=scanned_assets,
+            asset_alias_map=alias_map,
+        )
+        ids_cont = [e["poam_id"] for e in final_open_cont]
+        self.assertEqual(ids_cont, ["2026-SEP-00347", "2026-SEP-00348"])
 
     # -----------------------------------------------------------------------
     # 5. OpenXML Template Round-Trip, Namespace Preservation & fullCalcOnLoad

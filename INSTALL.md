@@ -56,11 +56,11 @@ git clone https://github.com/eodartintlabs-hue/grc-test-dummies.git GRC-Test-Dum
 ```
 
 ### Option B: Clone from a Portable `.bundle` File (Self-Hosted / Air-Gapped Transfer)
-If you received **GRCx** as a portable Git bundle file (e.g., `grcx-v1.3.2.bundle`), verify and clone directly from the file with zero network access:
+If you received **GRCx** as a portable Git bundle file (e.g., `grcx-v1.3.3.bundle`), verify and clone directly from the file with zero network access:
 
 ```bash
-git bundle verify grcx-v1.3.2.bundle
-git clone grcx-v1.3.2.bundle GRC-x
+git bundle verify grcx-v1.3.3.bundle
+git clone grcx-v1.3.3.bundle GRC-x
 ```
 
 ---

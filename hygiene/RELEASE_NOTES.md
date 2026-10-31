@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.3.2 — Sasebo` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.3.3 — Sasebo` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner ([`@eodartintlabs-hue`](https://github.com/eodartintlabs-hue))  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.3.3`](#v133--sasebo) | Sasebo | 2026-10-31 | Bug fix | _Pending_ | Dynamic POA&M ID nomenclature (`YYYY-MMM-#####`), backward-compatible ID parsing, and unit test suite expansion |
 | [`v1.3.2`](#v132--sasebo) | Sasebo | 2026-10-31 | Bug fix | `3a041cd` | Multi-scan POA&M transformation (up to 5 scans), finding consolidation, and tri-ledger patch logs (`BUG`, `MINOR`, `MAJOR`) |
 | [`v1.3.0`](#v130--sasebo) | Sasebo | 2026-10-29 | Minor | `3398d69` | `scans/` drop-in folder and file picker; POA&M engine data-integrity hardening; unit tests |
 | [`v1.2.0`](#v120--misawa) | Misawa | 2026-10-20 | Minor | `c510bc3` | Standalone Tenable / AWS Inspector scan-to-FedRAMP POA&M transformer |
@@ -39,6 +40,24 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.3.3 — Sasebo
+
+**Bug fix** · October 31, 2026 · Tag `v1.3.3`
+
+### Dynamic POA&M ID nomenclature (`YYYY-MMM-#####`)
+
+- **Standardized dynamic POA&M naming convention**: Replaced the static year-based `POAM-2026-####` nomenclature for newly detected POA&M items with the dynamic FedRAMP standard:
+  ```text
+  YYYY-MMM-#####
+  ```
+  *(Example: `2026-SEP-00347` or `2026-OCT-00001`)*
+- **Deterministic month abbreviations (`MONTH_ABBRS`)**: Utilized an explicit English lookup table (`JAN` .. `DEC`) ensuring deterministic 3-letter uppercase month abbreviations regardless of host OS language or locale settings.
+- **5-digit zero-padded sequence**: Padded sequence numbers to 5 digits (`00001` .. `99999`) while maintaining strictly monotonic ID sequence progression across both OPEN and CLOSED workbooks.
+- **Backward-compatible ID parsing**: Updated sequence parsing in `reconcile_poam_entries` and `reconcile_poam_entries_legacy` to seamlessly recognize both the new `YYYY-MMM-#####` convention and legacy `POAM-YYYY-####` formats when reconciling against previous workbooks.
+- **Unit test suite expansion**: Added `test_poam_id_dynamic_nomenclature_year_month_sequence` in `testing/test_transform_scans.py` verifying direct formatting and end-to-end reconciliation numbering (16 unit tests passing).
 
 ---
 

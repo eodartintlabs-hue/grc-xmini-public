@@ -21,7 +21,7 @@ print_grcfetch() {
     echo -e "  ${P}        .--.          .--.          .--.                       ${R}"
     echo -e "  ${P}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${M}eodartintlabs-hue/grcx${R}"
     echo -e "  ${P} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}----------------------${R}"
-    echo -e "  ${P} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}App:${W} GRCx v1.3.2 (Sasebo)${R}"
+    echo -e "  ${P} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}App:${W} GRCx v1.3.3 (Sasebo)${R}"
     echo -e "  ${P} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
     echo -e "  ${P}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
     echo -e "  ${P} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${G}Isolation:${W} Air-Gapped (--network none, :ro)${R}"
