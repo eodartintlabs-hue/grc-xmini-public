@@ -43,6 +43,12 @@ GRCx uses Semantic Versioning: `v<MAJOR>.<MINOR>.<PATCH>`.
 | Security / container | Patch | Rebuilding `grc-scanner:local` for new offline CVE databases or base image packages |
 | Docs | Patch | Documentation, diagrams, file naming, `.gitignore`, formatting |
 
+### Companion Repository Synchronization (`GRC-xTEST`)
+
+The companion test corpus **`GRC-xTEST`** ([`https://github.com/eodartintlabs-hue/grc-xtest.git`](https://github.com/eodartintlabs-hue/grc-xtest.git)) is maintained on the **same Minor Release Schedule** as `GRC-x`:
+* **Minor Alignment (`v<MAJOR>.<MINOR>.x`)**: Both repositories advance together across minor feature baselines (e.g., `v1.1.0 Kadena`, `v1.2.0 Misawa`, `v1.3.x Sasebo`, `v2.0.0 Pearl Harbor`).
+* **Decoupled Patch Cadence**: `GRC-xTEST` does **not** need to sync down to individual patch releases. When `GRC-x` increments for bug fixes, documentation hygiene, or patch updates (e.g., `v1.3.1`, `v1.3.2`, `v1.3.3`, `v1.3.4`), `GRC-xTEST` remains stable on the active minor series (`v1.3.x`) unless new synthetic bundles, scan schemas, or negative test fixtures are specifically introduced.
+
 ---
 
 ## 2. Codenames
