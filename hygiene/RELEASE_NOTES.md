@@ -28,7 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| [`v1.3.4`](#v134--sasebo) | Sasebo | 2026-11-01 | Hygiene / Docs | `*Pending*` | Documentation hygiene, GRC-xTEST rebranding, dual desktop navigation fork, and patch log restructuring |
+| [`v1.3.4`](#v134--sasebo) | Sasebo | 2026-11-01 | Hygiene / Docs | `802bdc9` | Documentation hygiene, GRC-xTEST rebranding, dual desktop navigation fork, and patch log restructuring |
 | [`v1.3.3`](#v133--sasebo) | Sasebo | 2026-10-31 | Bug fix | `f4b9075` | Dynamic POA&M ID nomenclature (`YYYY-MMM-#####`), backward-compatible ID parsing, and unit test suite expansion |
 | [`v1.3.2`](#v132--sasebo) | Sasebo | 2026-10-31 | Bug fix | `3a041cd` | Multi-scan POA&M transformation (up to 5 scans), finding consolidation, and tri-ledger patch logs (`BUG`, `MINOR`, `MAJOR`) |
 | [`v1.3.0`](#v130--sasebo) | Sasebo | 2026-10-29 | Minor | `3398d69` | `scans/` drop-in folder and file picker; POA&M engine data-integrity hardening; unit tests |
