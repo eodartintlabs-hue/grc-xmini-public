@@ -1,4 +1,4 @@
-# End-to-End Git Bundle Review Scenario (`docs/grc-bundle-use-case.md`)
+# End-to-End Git Bundle Review Scenario (`docs/grc_bundle-guide.md`)
 
 <p align="center">
   <a href="../README.md"><b>📖 README</b></a> &nbsp;·&nbsp;
@@ -9,10 +9,12 @@
   <a href="../testing/TESTING.md"><b>🧪 Verification Plan</b></a> &nbsp;·&nbsp;
   <a href="../testing/live-demo.md"><b>🎬 Live Demo</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
-  <a href="../hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
+  <a href="../hygiene/PATCH_LOG.md"><b>🩹 Patch Log Index</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="grc-bundle-use-case.md"><b>📑 Use Case Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../hygiene/RELEASING.md"><b>🏷️ Releasing</b></a> &nbsp;·&nbsp;
+  <a href="transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Classification**: Internal DevSecOps & Security Compliance Walkthrough  

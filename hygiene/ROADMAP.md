@@ -12,12 +12,12 @@
   <a href="PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
   <a href="RELEASING.md"><b>🏷️ Releasing</b></a> &nbsp;·&nbsp;
-  <a href="../docs/scan-transform-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
-  <a href="../docs/grc-bundle-use-case.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="../docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
-> **Current release**: `v1.3.3 — Sasebo` (Restricted Beta)  
+> **Current release**: `v1.3.4 — Sasebo` (Restricted Beta)  
 > This file covers **planned** work only. For what has already shipped, see [`RELEASE_NOTES.md`](RELEASE_NOTES.md) and [`PATCH_LOG.md`](PATCH_LOG.md). Versioning and codename rules are in [`RELEASING.md`](RELEASING.md).  
 > Plans may change. A feature is only considered delivered once it appears in the release notes.
 
@@ -25,25 +25,25 @@
 
 ## Where things stand
 
-GRCx `v1.3.3` provides the 5-phase bundle and AMI review pipeline with nine scanning engines, plus the standalone multi-scan Tenable / AWS Inspector scan-to-FedRAMP POA&M transformer (`./grc transform`) supporting dynamic `YYYY-MMM-#####` POA&M ID numbering (e.g. `2026-SEP-00347`), up to 5 scans with interactive addition prompting, automated finding consolidation, and dedicated category patch ledgers (`PATCH_LOG_BUG.md`, `PATCH_LOG_MINOR.md`, `PATCH_LOG_MAJOR.md`). The remaining `v1.x` beta work focuses on making GRCx run reliably on any workstation. `v2.0.0` marks general availability.
+GRCx `v1.3.4` provides the 5-phase bundle and AMI review pipeline with nine scanning engines, plus the standalone multi-scan Tenable / AWS Inspector scan-to-FedRAMP POA&M transformer (`./grc transform`) supporting dynamic `YYYY-MMM-#####` POA&M ID numbering (e.g. `2026-SEP-00347`), up to 5 scans with interactive addition prompting, automated finding consolidation, comprehensive repository hygiene, GRC-xTEST integration fixtures, and dual desktop navigation pathways. The remaining `v1.x` beta work focuses on making GRCx run reliably on any workstation. `v2.0.0` marks general availability.
 
 ```mermaid
 flowchart LR
-    A["v1.3.4 — Sasebo<br/>Workstation portability"] --> B["v2.0.0 — Pearl Harbor<br/>GA + Helm auditing"]
+    A["v1.3.5 — Sasebo<br/>Workstation portability"] --> B["v2.0.0 — Pearl Harbor<br/>GA + Helm auditing"]
     B --> C["v2.1.0 — Kaneohe<br/>Cloud lift, local LLM, OSCAL"]
     C --> D["v2.2.0 — Wahiawa<br/>Supply-chain attestation"]
 ```
 
 | Version | Codename | Focus | Status |
 | :--- | :--- | :--- | :--- |
-| `v1.3.4` | Sasebo | Workstation portability and `./grc doctor` | Next |
+| `v1.3.5` | Sasebo | Workstation portability and `./grc doctor` | Next |
 | `v2.0.0` | Pearl Harbor | General availability; Helm chart compliance engine | Planned |
 | `v2.1.0` | Kaneohe | Cloud execution, air-gapped local LLM, NIST OSCAL export, `./grc diff` | Backlog |
 | `v2.2.0` | Wahiawa | Cosign / Sigstore and SLSA provenance checks; container image auditing | Backlog |
 
 ---
 
-## v1.3.3 — Sasebo: Workstation Portability
+## v1.3.5 — Sasebo: Workstation Portability
 
 **Problem.** Some defaults in `./grc` and the scanner container assume a specific workstation setup, which causes friction when moving between macOS, Linux, and Windows (WSL2).
 

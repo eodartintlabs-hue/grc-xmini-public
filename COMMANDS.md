@@ -13,9 +13,9 @@
   <a href="hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
   <a href="hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="docs/scan-transform-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
-  <a href="docs/grc-bundle-use-case.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Purpose**: A quick-lookup reference of every command accepted by the **`./grc`** CLI dispatcher and a concise explanation of what each command does.
@@ -27,7 +27,7 @@
 > [!TIP]
 > * **Drop-In `scans/` Folder (No Path Copy-Pasting)**: Drop your Tenable / AWS Inspector scan exports (`.csv` or `.xlsx`) and your previous OPEN FedRAMP POA&M (`.xlsx`) into the **`scans/`** folder at the repository root. When you run `./grc transform`, **GRCx** automatically lists detected files with numbers (`[1]`, `[2]`, ...) and lets you pick by number or type just the filename (with or without extension)!
 > * **Does NOT Require Docker**: Unlike Phase 3 bundle/AMI scanners (`./grc scan`), **`transform_scans.py`** is written in **100% Python 3 Standard Library** (`csv`, `zipfile`, `xml.etree.ElementTree`) and runs directly on the host machine. You do **not** need to start or install the `grc-scanner:local` Docker container to use it.
-> * **Native Windows Support (No WSL2 Required)**: Windows users can run the transform engine directly in **Windows PowerShell**, **Command Prompt (`cmd.exe`)**, **Git Bash**, or **WSL2**. See the Windows command examples below and **[`docs/scan-transform-guide.md`](docs/scan-transform-guide.md)**.
+> * **Native Windows Support (No WSL2 Required)**: Windows users can run the transform engine directly in **Windows PowerShell**, **Command Prompt (`cmd.exe`)**, **Git Bash**, or **WSL2**. See the Windows command examples below and **[`docs/transform_scans-guide.md`](docs/transform_scans-guide.md)**.
 
 ### `./grc transform [scan_filename...] [--scan <filename>...] [--previous-open <open_poam_filename>] [--draft-remediations <ask|y|n>] [-o <output_dir>]` *(macOS / Linux / WSL2)*
 ### `python .\scripts\transform_scans.py [scan_filename...] [--scan <filename>...] [--previous-open <open_poam_filename>]` *(Windows PowerShell & Command Prompt)*
@@ -55,7 +55,7 @@ Because `scripts/transform_scans.py` relies only on built-in Python 3 modules an
 Displays the **GRCx** ASCII system banner along with a summary of all available top-level subcommands. Use this any time you want a quick reminder of the CLI syntax right in your terminal.
 
 ### `./grc fetch` *(Aliases: `./grc info`, `./grc --version`, `./grc -v`)*
-Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.3.3 — Sasebo`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
+Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.3.4 — Sasebo`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
 
 ### `./grc docker-build`
 Builds the local `grc-scanner:local` Docker container image from `docker/Dockerfile.scanner`. This packages all containerized security scanners (Semgrep, Gitleaks, Checkov, Syft, Grype, Trivy, and OpenSCAP) along with pre-cached vulnerability databases so that all subsequent scans execute completely offline with zero network egress.

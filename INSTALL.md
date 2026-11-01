@@ -13,9 +13,9 @@
   <a href="hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
   <a href="hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="docs/scan-transform-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
-  <a href="docs/grc-bundle-use-case.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Purpose**: A step-by-step onboarding guide for new users—from downloading **GRCx** (*The GRC eXperience*) off GitHub and building the local scanner container, all the way to running your first audit and inspecting the compliance reports in **Cursor**.
@@ -48,19 +48,19 @@ cd ~/Desktop
 ```
 
 ### Option A: Clone Directly from GitHub (Standard Network)
-Clone the **GRCx** repository (and optionally the companion **GRC-Test-Dummies** repository if you want synthetic test bundles to practice with):
+Clone the **GRCx** repository (and optionally the companion **GRC-xTEST** repository if you want synthetic test bundles and scan fixtures to practice with):
 
 ```bash
 git clone https://github.com/eodartintlabs-hue/grc-x.git GRC-x
-git clone https://github.com/eodartintlabs-hue/grc-test-dummies.git GRC-Test-Dummies
+git clone https://github.com/eodartintlabs-hue/grc-xtest.git GRC-xTEST
 ```
 
 ### Option B: Clone from a Portable `.bundle` File (Self-Hosted / Air-Gapped Transfer)
-If you received **GRCx** as a portable Git bundle file (e.g., `grcx-v1.3.3.bundle`), verify and clone directly from the file with zero network access:
+If you received **GRCx** as a portable Git bundle file (e.g., `grcx-v1.3.4.bundle`), verify and clone directly from the file with zero network access:
 
 ```bash
-git bundle verify grcx-v1.3.3.bundle
-git clone grcx-v1.3.3.bundle GRC-x
+git bundle verify grcx-v1.3.4.bundle
+git clone grcx-v1.3.4.bundle GRC-x
 ```
 
 ---
@@ -124,17 +124,17 @@ Because `./grc` is a Bash script, native Windows users in **PowerShell** or **Co
   python scripts/transform_scans.py --scan tenable_monthly_scan.csv --previous-open previous_open_poam.xlsx --draft-remediations y
   ```
 
-This generates `OPEN FedRAMP-POAM.xlsx`, `CLOSED FedRAMP-POAM.xlsx`, and `poam_transform_summary.md` inside `./evidence/poam-tenable_monthly_scan/` while printing an itemized SLA Breach & Finding Age report to your terminal. *(See **[`docs/scan-transform-guide.md`](docs/scan-transform-guide.md)** for full details).*
+This generates `OPEN FedRAMP-POAM.xlsx`, `CLOSED FedRAMP-POAM.xlsx`, and `poam_transform_summary.md` inside `./evidence/poam-tenable_monthly_scan/` while printing an itemized SLA Breach & Finding Age report to your terminal. *(See **[`docs/transform_scans-guide.md`](docs/transform_scans-guide.md)** for full details).*
 
 ### Workflow B: 5-Phase Git `.bundle` Compliance Audit (`./grc bundle` + `./grc scan`)
-Follow the 5-phase **GRCx** workflow to audit a `.bundle` file (the example below uses the 4-in-1 synthetic test bundle from `../GRC-Test-Dummies`, or you can substitute `/path/to/your-release.bundle`):
+Follow the 5-phase **GRCx** workflow to audit a `.bundle` file (the example below uses the 4-in-1 synthetic test bundle from `../GRC-xTEST`, or you can substitute `/path/to/your-release.bundle`):
 
 ```bash
 # 1. Verify bundle integrity and record its SHA-256 hash
-./grc bundle verify ../GRC-Test-Dummies/bundles/aoc-combo-4x.bundle
+./grc bundle verify ../GRC-xTEST/bundles/aoc-combo-4x.bundle
 
 # 2. Restore the bundle into an isolated, read-only ephemeral workspace
-./grc bundle restore ../GRC-Test-Dummies/bundles/aoc-combo-4x.bundle \
+./grc bundle restore ../GRC-xTEST/bundles/aoc-combo-4x.bundle \
   --workspace ./ephemeral_workspace \
   --read-only \
   --force

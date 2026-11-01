@@ -11,8 +11,9 @@
   <a href="hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
   <a href="hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="docs/grc-bundle-use-case.md"><b>📑 Use Case Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
@@ -202,5 +203,5 @@ Inside [`docker/scan_orchestrator.sh`](docker/scan_orchestrator.sh), each tool i
 
 If you discover a security vulnerability, isolation bypass, or rule evasion technique within **GRCx**:
 1. **Do not** open a public issue containing sensitive exploit payloads against production systems.
-2. Submit a reproductive test case using a synthetic fixture in the companion **[`grc-test-dummies`](https://github.com/eodartintlabs-hue/grc-test-dummies)** repository.
+2. Submit a reproductive test case using a synthetic fixture in the companion **[`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)** repository.
 3. Contact the internal **DevSecOps & GRC Engineering Team** to coordinate rule and container updates.

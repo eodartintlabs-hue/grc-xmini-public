@@ -12,9 +12,9 @@
   <a href="PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
   <a href="RELEASING.md"><b>🏷️ Releasing</b></a> &nbsp;·&nbsp;
-  <a href="../docs/scan-transform-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
-  <a href="../docs/grc-bundle-use-case.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="../docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 This file explains how versions and codenames work and how to cut a release. What shipped is recorded in [`RELEASE_NOTES.md`](RELEASE_NOTES.md), commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md), and planned work is in [`ROADMAP.md`](ROADMAP.md).
@@ -68,7 +68,7 @@ The example below cuts `v1.3.1 — Sasebo`. Replace the version, codename, and s
    grep -rn "v1\.3\.0" --include="*.md" --include="*.py" --include="grc" .
    ```
 
-   At minimum, check `./grc` (the `grcfetch` banner), `README.md`, `COMMANDS.md`, `INSTALL.md`, `docs/scan-transform-guide.md`, and `scripts/transform_scans.py` (its docstring and the report banner). Don't change historical mentions in `RELEASE_NOTES.md` or `PATCH_LOG.md`.
+   At minimum, check `./grc` (the `grcfetch` banner), `README.md`, `COMMANDS.md`, `INSTALL.md`, `docs/transform_scans-guide.md`, and `scripts/transform_scans.py` (its docstring and the report banner). Don't change historical mentions in `RELEASE_NOTES.md` or `PATCH_LOG.md`.
 
 2. **Update the docs in `hygiene/`:**
    - In [`RELEASE_NOTES.md`](RELEASE_NOTES.md), add a row at the top of the summary table with `_TBD after tagging_` in the Commit column. Add a section for the release that describes only what actually shipped.

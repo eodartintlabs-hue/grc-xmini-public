@@ -11,8 +11,9 @@
   <a href="../hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="../docs/grc-bundle-use-case.md"><b>📑 Use Case Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="../docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Classification**: Internal DevSecOps & Compliance Specification  
@@ -27,7 +28,7 @@ This document outlines the end-to-end verification and testing procedures for **
 
 > [!TIP]
 > **Fast-Track Testing with Pre-Built Test Bundles**:  
-> If you are verifying the pipeline using the companion [`grc-test-dummies`](https://github.com/eodartintlabs-hue/grc-test-dummies) (`../GRC-Test-Dummies`) repository, refer to the **[Negative Testing & Scanner Verification Help Guide (docs/test-dummies-guide.md)](../docs/test-dummies-guide.md)** for an interactive cheat sheet and copy-pasteable scan commands for all 12 test bundles (`aoc-02` through `aoc-combo-4x`).
+> If you are verifying the pipeline using the companion [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest) (`../GRC-xTEST`) repository, refer to the **[Negative Testing & Scanner Verification Help Guide (docs/grc-xtest-guide.md)](../docs/grc-xtest-guide.md)** for an interactive cheat sheet and copy-pasteable scan commands for all 12 test bundles (`aoc-02` through `aoc-combo-4x`).
 
 ```mermaid
 flowchart TD
@@ -94,7 +95,7 @@ chmod +x ./grc ./scripts/grc_bundle.py ./scripts/sbom_analyzer.py ./scripts/cryp
 ## 4. Stage 2: Synthetic Test Bundle Generation
 
 To safely test detection capabilities without risking proprietary source code, you can either:
-1. **Use Pre-Built Dummies (Recommended)**: Use the companion [`grc-test-dummies`](https://github.com/eodartintlabs-hue/grc-test-dummies) (`../GRC-Test-Dummies`) repository and follow the **[Negative Testing & Scanner Verification Help Guide (docs/test-dummies-guide.md)](../docs/test-dummies-guide.md)**.
+1. **Use Pre-Built Dummies (Recommended)**: Use the companion [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest) (`../GRC-xTEST`) repository and follow the **[Negative Testing & Scanner Verification Help Guide (docs/grc-xtest-guide.md)](../docs/grc-xtest-guide.md)**.
 2. **Generate Manually in `/tmp`**: Follow the steps below to construct a synthetic scratch bundle from scratch:
 
 ```bash

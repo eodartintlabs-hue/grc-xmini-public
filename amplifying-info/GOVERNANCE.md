@@ -11,8 +11,9 @@
   <a href="../hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="../docs/grc-bundle-use-case.md"><b>📑 Use Case Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="../docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Classification**: Internal DevSecOps & Security Compliance Governance Specification  
@@ -39,14 +40,14 @@
 5. [Presidential Executive Orders & OMB Memoranda](#5-presidential-executive-orders--omb-memoranda)
    * [5.1 Executive Order (EO) 14028: Improving the Nation's Cybersecurity](#51-executive-order-eo-14028-improving-the-nations-cybersecurity)
    * [5.2 OMB Memoranda M-22-18 & M-23-16: Software Supply Chain Attestation](#52-omb-memoranda-m-22-18--m-23-16-software-supply-chain-attestation)
-6. [Companion Negative Testing: How `GRC-Test-Dummies` Proves Compliance Assurance](#6-companion-negative-testing-how-grc-test-dummies-proves-compliance-assurance)
+6. [Companion Negative Testing: How GRC-xTEST Proves Compliance Assurance](#6-companion-negative-testing-how-grc-xtest-proves-compliance-assurance)
 7. [Authorizing Official (AO) & Auditor Artifact Handoff Package](#7-authorizing-official-ao--auditor-artifact-handoff-package)
 
 ---
 
 ## 1. Executive Governance Charter
 
-**GRCx** (*The GRC eXperience*) and its companion test harness **`GRC-Test-Dummies`** establish an automated, mathematically verifiable governance system for releasing software into federal, defense, and national security environments. 
+**GRCx** (*The GRC eXperience*) and its companion test harness **`GRC-xTEST`** establish an automated, mathematically verifiable governance system for releasing software into federal, defense, and national security environments. 
 
 Traditional compliance frameworks rely on self-attestation questionnaires and manual auditor sampling, which introduce latency, human error, and security blind spots. This pipeline replaces subjective assertions with **cryptographic provenance, air-gapped static analysis, automated STIG mapping, and programmatic FedRAMP/DoD deliverable generation**.
 
@@ -230,13 +231,13 @@ Office of Management and Budget (OMB) Memoranda **M-22-18** and **M-23-16** requ
 
 ---
 
-## 6. Companion Negative Testing: How `GRC-Test-Dummies` Proves Compliance Assurance
+## 6. Companion Negative Testing: How GRC-xTEST Proves Compliance Assurance
 
 In federal compliance assessments, an automated scanner that outputs zero findings cannot be trusted until its detection accuracy is rigorously verified. 
 
 **NIST SP 800-53 Control `SA-11(1)` (Developer Security Testing | Static Code Analysis)** and **DoDI 8510.01 (Assessor Verification)** require proof that security inspection tools reliably detect targeted defects.
 
-The companion repository **[`GRC-Test-Dummies`](https://github.com/eodartintlabs-hue/grc-test-dummies)** provides synthetic, pre-compiled release bundles engineered to intentionally trigger every compliance rule in the pipeline:
+The companion repository **[`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)** provides synthetic, pre-compiled release bundles engineered to intentionally trigger every compliance rule in the pipeline:
 
 | Synthetic Test Bundle | Targeted Area of Concern (AOC) | NIST SP 800-53 Control Tested | Expected Failure Behavior Verified |
 | :--- | :--- | :--- | :--- |
@@ -252,7 +253,7 @@ The companion repository **[`GRC-Test-Dummies`](https://github.com/eodartintlabs
 | **`aoc-11-docker-root.bundle`** | AOC-11 (Insecure Dockerfile & Root Execution) | `AC-6`, `CM-6` | Checkov flags missing non-root `USER` directive in container images. |
 | **`aoc-12-hardcoded-keys.bundle`** | AOC-12 (Exposed Private RSA / SSH Keys) | `IA-5`, `SC-12` | Gitleaks flags unencrypted RSA private key blocks committed to repo. |
 
-> 🧪 **Assessor Verification Walkthrough**: See [`docs/test-dummies-guide.md`](../docs/test-dummies-guide.md) for the batch verification test runner and instructions for executing the complete negative testing suite.
+> 🧪 **Assessor Verification Walkthrough**: See [`docs/grc-xtest-guide.md`](../docs/grc-xtest-guide.md) for the batch verification test runner and instructions for executing the complete negative testing suite.
 
 ---
 

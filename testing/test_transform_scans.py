@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRCx (v1.3.3 — Sasebo) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRCx (v1.3.4 — Sasebo) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:

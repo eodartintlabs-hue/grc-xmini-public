@@ -11,8 +11,9 @@
   <a href="../hygiene/RELEASE_NOTES.md"><b>🚀 Release Notes</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="../hygiene/ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
-  <a href="../docs/grc-bundle-use-case.md"><b>📑 Use Case Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="../docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Classification**: Internal DevSecOps & Security Compliance Architecture Specification  
@@ -95,7 +96,7 @@
 
 #### GitHub (Remote VCS & Release Repository)
 * **Classification**: `[Third-Party Service]`
-* **General Purpose**: The central upstream code repository hosting the **GRCx** source, compliance documentation, and the companion `grc-test-dummies` repository. It provides release distribution, issue tracking, and collaborative governance.
+* **General Purpose**: The central upstream code repository hosting the **GRCx** source, compliance documentation, and the companion **`GRC-xTEST`** repository (`https://github.com/eodartintlabs-hue/grc-xtest`). It provides release distribution, issue tracking, and collaborative governance.
 * **Item Produced**: Hosted Git remote endpoints (`origin`), version-tagged release archives, and companion synthetic test bundle fixtures.
 * **Individual Cost**: **$0** (GitHub Free Tier for public and private repositories).
 

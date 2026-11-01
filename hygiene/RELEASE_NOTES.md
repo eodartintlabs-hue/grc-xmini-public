@@ -12,13 +12,13 @@
   <a href="PATCH_LOG.md"><b>🩹 v1 Patch Log</b></a> &nbsp;·&nbsp;
   <a href="ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;·&nbsp;
   <a href="RELEASING.md"><b>🏷️ Releasing</b></a> &nbsp;·&nbsp;
-  <a href="../docs/scan-transform-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
-  <a href="../docs/grc-bundle-use-case.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
-  <a href="../docs/test-dummies-guide.md"><b>🎯 Test Dummies Guide</b></a>
+  <a href="../docs/transform_scans-guide.md"><b>📊 Scan-to-POA&M Guide</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc_bundle-guide.md"><b>📑 Bundle Walkthrough</b></a> &nbsp;·&nbsp;
+  <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.3.3 — Sasebo` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.3.4 — Sasebo` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner ([`@eodartintlabs-hue`](https://github.com/eodartintlabs-hue))  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.3.4`](#v134--sasebo) | Sasebo | 2026-11-01 | Hygiene / Docs | `*Pending*` | Documentation hygiene, GRC-xTEST rebranding, dual desktop navigation fork, and patch log restructuring |
 | [`v1.3.3`](#v133--sasebo) | Sasebo | 2026-10-31 | Bug fix | `f4b9075` | Dynamic POA&M ID nomenclature (`YYYY-MMM-#####`), backward-compatible ID parsing, and unit test suite expansion |
 | [`v1.3.2`](#v132--sasebo) | Sasebo | 2026-10-31 | Bug fix | `3a041cd` | Multi-scan POA&M transformation (up to 5 scans), finding consolidation, and tri-ledger patch logs (`BUG`, `MINOR`, `MAJOR`) |
 | [`v1.3.0`](#v130--sasebo) | Sasebo | 2026-10-29 | Minor | `3398d69` | `scans/` drop-in folder and file picker; POA&M engine data-integrity hardening; unit tests |
@@ -40,6 +41,24 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.3.4 — Sasebo
+
+**Hygiene & Documentation Update** · November 01, 2026 · Tag `v1.3.4`
+
+### Repository Hygiene, GRC-xTEST Rebranding, and Navigation Fork
+
+- **Section 2 reverse-chronological order in `PATCH_LOG.md`**: Inverted Section 2 of `hygiene/PATCH_LOG.md` so that the newest releases (`v1.3.4`, `v1.3.3`, etc.) display at the top and older releases (`v1.0.0`) at the bottom.
+- **Separation of planned releases from patch logs**: Removed all future/planned release entries from running patch logs (`hygiene/PATCH_LOG.md`, `PATCH_LOG_BUG.md`, `PATCH_LOG_MINOR.md`, `PATCH_LOG_MAJOR.md`). All future and planned work is now consolidated exclusively in [`hygiene/ROADMAP.md`](ROADMAP.md).
+- **Zero personal email policy**: Conducted repository-wide audit and verified zero instances of personal email addresses (`eodartintlabs@gmail.com`) across tracked code, documentation, and metadata.
+- **Rebranded test repository to `GRC-xTEST`**: Rebranded the synthetic testing repository from `grc-test-dummies` to `GRC-xTEST` ([`https://github.com/eodartintlabs-hue/grc-xtest.git`](https://github.com/eodartintlabs-hue/grc-xtest.git)). In addition to synthetic test bundles (`bundles/*.bundle`), `GRC-xTEST` now provides synthetic Tenable and AWS Inspector scan fixtures (`scans/*.csv`, `scans/*.xlsx`) for testing `scripts/transform_scans.py`.
+- **Documentation renamed & restructured**:
+  - `docs/test-dummies-guide.md` $\rightarrow$ [`docs/grc-xtest-guide.md`](../docs/grc-xtest-guide.md): Added Table of Contents, dual-platform desktop navigation instructions (`%USERPROFILE%\Desktop\GRC-x` and `~/Desktop/GRC-x`), testing pathways for bundles, and scan transform testing with `GRC-xTEST` fixtures.
+  - `docs/scan-transform-guide.md` $\rightarrow$ [`docs/transform_scans-guide.md`](../docs/transform_scans-guide.md): Added Table of Contents and dual desktop pathways. Structured into 7 standard sections: Section 3 (Windows Command Prompt / PowerShell usage), Section 4 (macOS Terminal usage), Section 5 (Under the hood engine mechanics), Section 6 (Sample terminal outputs), and Section 7 (Expected output files & locations).
+  - `docs/grc-bundle-use-case.md` $\rightarrow$ [`docs/grc_bundle-guide.md`](../docs/grc_bundle-guide.md): Updated title and links.
+- **`README.md` Section 10 Product Roadmap focused**: Streamlined Section 10 of `README.md` to highlight the latest pushed release (`v1.3.4 — Sasebo`) with comprehensive links to the `hygiene/` directory (`ROADMAP.md`, `RELEASE_NOTES.md`, `PATCH_LOG.md`, `RELEASING.md`).
 
 ---
 
