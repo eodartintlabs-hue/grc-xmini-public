@@ -28,7 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| [`v1.4.1`](#v141--yokota) | Yokota | 2026-11-01 | Bug fix | `e723b32` | Code Review Phase 1 (P0/P1 security & compliance integrity fixes across all 7 engines, `grc_common.py`, `grc_fixtures.py`, and 29 regression tests) |
+| [`v1.4.1`](#v141--yokota) | Yokota | 2026-11-01 | Bug fix | `c8c629f` | Code Review Phase 1 (P0/P1 security & compliance integrity fixes across all 7 engines, `grc_common.py`, `grc_fixtures.py`, and 29 regression tests) |
 | [`v1.4.0`](#v140--yokota) | Yokota | 2026-11-01 | Minor | `4e88635` | GRC-xMINI rebrand under GRC-x Initiative, grc_test engine #7, artifacts drop-off/pick-up, and purple MINI logo |
 | [`v1.3.4`](#v134--sasebo) | Sasebo | 2026-11-01 | Hygiene / Docs | `802bdc9` | Documentation hygiene, GRC-xTEST rebranding, dual desktop navigation fork, and patch log restructuring |
 | [`v1.3.3`](#v133--sasebo) | Sasebo | 2026-10-31 | Bug fix | `f4b9075` | Dynamic POA&M ID nomenclature (`YYYY-MMM-#####`), backward-compatible ID parsing, and unit test suite expansion |
