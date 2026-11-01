@@ -94,6 +94,7 @@ class TestEngine:
             res.returncode == 0
             and "Consolidated into" in out
             and "Loaded 100 existing entries" in out
+            and "51 Carried Over, 64 Newly Detected" in out
         )
         return self._record(
             "transform_scans",
