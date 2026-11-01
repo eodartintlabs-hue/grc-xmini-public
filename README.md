@@ -30,21 +30,21 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  eodartintlabs-hue/grc-x (Initiative)
- {GGG'     `G# {GGG     `GGG {GGG'     `G#                   ------------------------------------
- @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   App: GRC-xMINI v1.4.0 (Yokota)
- 'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      OS: Darwin ARM64 / Linux Bookworm
-  GGG   ""`GGG @GGG   `GGG,   GGG             `GGGGG'        Model: Out-of-Band (OOB) / Fail-Open
- ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        Assurance: Pure Python Stdlib (Host-Native)
-  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG"  ,GGG' `GGG,      Engines: (7) Transform, Bundle, Crypto, AMI,
-   `@GGGG###G# @GGG     `GGG   `@GGGG###G" dGGG'   `GGGb                  SBOM, Reporter, Test Engine
-     `"%N>"`    `"%NW" `"%NW"    `"%N>"`   `"%N"   "%N"`     Companion: GRC-xTEST (v1.3.x+ Synchronized)
-   ███╗   ███╗   ██╗   ███╗   ██╗   ██╗                    Frameworks: DISA STIG, NIST 800-53 R5, FedRAMP
-   ████╗ ████║   ██║   ████╗  ██║   ██║                    Artifacts: artifacts/drop-off & pick-up
-   ██╔████╔██║   ██║   ██╔██╗ ██║   ██║                    Output: Timestamps (YYYY-MM-DD_HHMMSS)
-   ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║                    Ruleset: 37 AST Rules (AOC 02–140)
-   ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║                    Status: Agile & Nimble Architecture
-   ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝                    Deliverables: Sealed with sha256sum
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  App: GRC-xMINI v1.4.0 (Yokota Series)
+ {GGG'     `G# {GGG     `GGG {GGG'     `G#                   ---------------------------------------
+ @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
+ 'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
+  GGG   ""`GGG @GGG   `GGG,   GGG             `GGGGG'        Assurance: Pure Python Stdlib (Host-Native)
+ ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        Companion: GRC-xTEST (v1.3.x+ Synchronized)
+  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG"  ,GGG' `GGG,      Frameworks: DISA STIG, NIST 800-53 R5, FedRAMP
+   `@GGGG###G# @GGG     `GGG   `@GGGG###G" dGGG'   `GGGb     Output: Timestamps (YYYY-MM-DD_HHMMSS)
+     `"%N>"`    `"%NW" `"%NW"    `"%N>"`   `"%N"   "%N"`     Deliverables: Sealed with sha256sum
+  ███╗   ███╗   ██╗   ███╗   ██╗   ██╗                        Engines: (7) Transform, Bundle, Crypto, AMI,
+  ████╗ ████║   ██║   ████╗  ██║   ██║                                 SBOM, Reporter, Test Engine
+  ██╔████╔██║   ██║   ██╔██╗ ██║   ██║                        
+  ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║                        
+  ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║                        
+  ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝                        
 
                                                                ███ ███ ███ ███ ███ ███ ███ ███
                                                                ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄
