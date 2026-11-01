@@ -34,6 +34,6 @@
 
 This ledger tracks the foundational lifecycle baselines and major generation milestones across **GRCx** (*The GRC eXperience*), maintaining full commit, architecture-scope, and **Author / POC** accountability.
 
-| Version | Commit | Date | Category | Subsystem / Files Affected | Summary of Changes | Author / POC |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`v1.0.0`** | `9bc27c3` | `2026-10-18` | `Beta Baseline` | `./grc`, `scripts/*`, `docker/*`, `rules/*`, `docs/*` | Initial Restricted Beta baseline (for designated integration testing) of the 5-phase GRC Bundle & AMI Review Pipeline, 7-engine air-gapped Docker scanner suite, 37 custom Semgrep AOC rules, and Phase 4 SCR/SCN compliance reporting engine. | Byron Turner |
+| Version / Commit | Date | Category | Subsystem / Files Affected | Summary of Changes | Author / POC |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`v1.0.0`**<br/>`9bc27c3` | `2026-10-18` | `Beta Baseline` | `./grc`, `scripts/*`, `docker/*`, `rules/*`, `docs/*` | Initial Restricted Beta baseline (for designated integration testing) of the 5-phase GRC Bundle & AMI Review Pipeline, 7-engine air-gapped Docker scanner suite, 37 custom Semgrep AOC rules, and Phase 4 SCR/SCN compliance reporting engine. | Byron Turner |
