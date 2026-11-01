@@ -12,7 +12,7 @@ export PATH="${HOME}/.docker/bin:/usr/local/bin:/opt/homebrew/bin:/Applications/
 print_grcfetch() {
     local BK="\033[1;30m"      # Bold Black for "GRCx"
     local P="\033[38;5;135m"   # Purple for "MINI"
-    local M="\033[1;95m"       # Bright Magenta title
+    local HP="\033[38;5;198m"  # Hot Pink for title
     local G="\033[1;32m"       # Bright Green keys
     local W="\033[0;37m"       # White values
     local D="\033[38;5;240m"   # Dim divider
@@ -20,8 +20,8 @@ print_grcfetch() {
 
     echo -e ""
     echo -e "  ${BK}        .--.          .--.          .--.                       ${R}"
-    echo -e "  ${BK}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${G}App:${W} GRC-xMINI v1.4.0 (Yokota Series)${R}"
-    echo -e "  ${BK} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}---------------------------------------${R}"
+    echo -e "  ${BK}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.4.0 (Yokota Series)${R}"
+    echo -e "  ${BK} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}--------------------------------${R}"
     echo -e "  ${BK} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
     echo -e "  ${BK} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
     echo -e "  ${BK}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Assurance:${W} Pure Python Stdlib (Host-Native)${R}"
@@ -29,12 +29,12 @@ print_grcfetch() {
     echo -e "  ${BK}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${G}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
     echo -e "  ${BK}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${G}Output:${W} Timestamps (YYYY-MM-DD_HHMMSS)${R}"
     echo -e "  ${BK}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${G}Deliverables:${W} Sealed with sha256sum${R}"
-    echo -e "  ${P} ███╗   ███╗   ██╗   ███╗   ██╗   ██╗                        ${G}Engines:${W} (7) Transform, Bundle, Crypto, AMI,${R}"
-    echo -e "  ${P} ████╗ ████║   ██║   ████╗  ██║   ██║                        ${W}         SBOM, Reporter, Test Engine${R}"
-    echo -e "  ${P} ██╔████╔██║   ██║   ██╔██╗ ██║   ██║                        ${R}"
-    echo -e "  ${P} ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║                        ${R}"
-    echo -e "  ${P} ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║                        ${R}"
-    echo -e "  ${P} ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝                        ${R}"
+    echo -e "  ${P}                      ███╗   ███╗   ██╗   ███╗   ██╗   ██╗    ${G}Engines:${W} (7) Transform, Bundle, Crypto, AMI,${R}"
+    echo -e "  ${P}                      ████╗ ████║   ██║   ████╗  ██║   ██║    ${W}         SBOM, Reporter, Test Engine${R}"
+    echo -e "  ${P}                      ██╔████╔██║   ██║   ██╔██╗ ██║   ██║    ${R}"
+    echo -e "  ${P}                      ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║    ${R}"
+    echo -e "  ${P}                      ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║    ${R}"
+    echo -e "  ${P}                      ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝    ${R}"
     echo -e ""
     echo -e "                                                               \033[40m   \033[41m   \033[42m   \033[43m   \033[44m   \033[45m   \033[46m   \033[47m   ${R}"
     echo -e "                                                               \033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \033[106m   \033[107m   ${R}"

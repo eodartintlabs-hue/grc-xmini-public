@@ -30,8 +30,8 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  App: GRC-xMINI v1.4.0 (Yokota Series)
- {GGG'     `G# {GGG     `GGG {GGG'     `G#                   ---------------------------------------
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.0 (Yokota Series)
+ {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
   GGG   ""`GGG @GGG   `GGG,   GGG             `GGGGG'        Assurance: Pure Python Stdlib (Host-Native)
@@ -39,12 +39,12 @@
   @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG"  ,GGG' `GGG,      Frameworks: DISA STIG, NIST 800-53 R5, FedRAMP
    `@GGGG###G# @GGG     `GGG   `@GGGG###G" dGGG'   `GGGb     Output: Timestamps (YYYY-MM-DD_HHMMSS)
      `"%N>"`    `"%NW" `"%NW"    `"%N>"`   `"%N"   "%N"`     Deliverables: Sealed with sha256sum
-  ███╗   ███╗   ██╗   ███╗   ██╗   ██╗                        Engines: (7) Transform, Bundle, Crypto, AMI,
-  ████╗ ████║   ██║   ████╗  ██║   ██║                                 SBOM, Reporter, Test Engine
-  ██╔████╔██║   ██║   ██╔██╗ ██║   ██║                        
-  ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║                        
-  ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║                        
-  ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝                        
+                      ███╗   ███╗   ██╗   ███╗   ██╗   ██╗    Engines: (7) Transform, Bundle, Crypto, AMI,
+                      ████╗ ████║   ██║   ████╗  ██║   ██║             SBOM, Reporter, Test Engine
+                      ██╔████╔██║   ██║   ██╔██╗ ██║   ██║    
+                      ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║    
+                      ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║    
+                      ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝    
 
                                                                ███ ███ ███ ███ ███ ███ ███ ███
                                                                ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄
