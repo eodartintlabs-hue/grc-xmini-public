@@ -1,4 +1,4 @@
-# GRCx — CLI Command Reference (`COMMANDS.md`)
+# GRC-xMINI — CLI Command Reference (`COMMANDS.md`)
 
 <p align="center">
   <a href="README.md"><b>📖 README</b></a> &nbsp;·&nbsp;
@@ -25,23 +25,23 @@
 ## 1. Standalone GRC Analyst Workflow: Scan-to-FedRAMP POA&M Transformation
 
 > [!TIP]
-> * **Drop-In `scans/` Folder (No Path Copy-Pasting)**: Drop your Tenable / AWS Inspector scan exports (`.csv` or `.xlsx`) and your previous OPEN FedRAMP POA&M (`.xlsx`) into the **`scans/`** folder at the repository root. When you run `./grc transform`, **GRCx** automatically lists detected files with numbers (`[1]`, `[2]`, ...) and lets you pick by number or type just the filename (with or without extension)!
+> * **Drop-In `artifacts/drop-off/` Folder (No Path Copy-Pasting)**: Drop your Tenable / AWS Inspector scan exports (`.csv` or `.xlsx`) and your previous OPEN FedRAMP POA&M (`.xlsx`) into the **`artifacts/drop-off/`** folder at the repository root. When you run `./grc transform`, **GRCx** automatically lists detected files with numbers (`[1]`, `[2]`, ...) and lets you pick by number or type just the filename (with or without extension)!
 > * **Does NOT Require Docker**: Unlike Phase 3 bundle/AMI scanners (`./grc scan`), **`transform_scans.py`** is written in **100% Python 3 Standard Library** (`csv`, `zipfile`, `xml.etree.ElementTree`) and runs directly on the host machine. You do **not** need to start or install the `grc-scanner:local` Docker container to use it.
 > * **Native Windows Support (No WSL2 Required)**: Windows users can run the transform engine directly in **Windows PowerShell**, **Command Prompt (`cmd.exe`)**, **Git Bash**, or **WSL2**. See the Windows command examples below and **[`docs/transform_scans-guide.md`](docs/transform_scans-guide.md)**.
 
 ### `./grc transform [scan_filename...] [--scan <filename>...] [--previous-open <open_poam_filename>] [--draft-remediations <ask|y|n>] [-o <output_dir>]` *(macOS / Linux / WSL2)*
 ### `python .\scripts\transform_scans.py [scan_filename...] [--scan <filename>...] [--previous-open <open_poam_filename>]` *(Windows PowerShell & Command Prompt)*
-Ingests up to **5 Tenable or AWS Inspector** vulnerability scan exports in `.csv` or `.xlsx` format from the designated **`scans/`** drop-in folder (or direct paths) into the same POA&M tracker. In interactive mode, GRCx prompts after each scan selection if you'd like to add another scan file (up to 5 scans). Findings are normalized and deduplicated into the official **`OPEN FedRAMP-POAM-Template.xlsx`** and **`CLOSED LEGACY FedRAMP-POAM-Template.xlsx`** workbooks (1 row per unique `Vulnerability + Asset` pair). During execution, it performs four automated GRC functions:
-1. **Open $\rightarrow$ Closed POA&M Reconciliation**: Prompts for (or accepts via `--previous-open`) your previously filled-out OPEN FedRAMP POA&M form from `scans/`. Entries still present in the new scan carry over into the new OPEN POA&M with their original `POAM ID` and immutable `Original Detection Date`; entries no longer present in the new scan (or marked `False Positive = Yes`) are automatically moved to the **CLOSED FedRAMP POA&M** workbook.
+Ingests up to **5 Tenable or AWS Inspector** vulnerability scan exports in `.csv` or `.xlsx` format from the designated **`artifacts/drop-off/`** drop-in folder (or direct paths) into the same POA&M tracker. In interactive mode, GRCx prompts after each scan selection if you'd like to add another scan file (up to 5 scans). Findings are normalized and deduplicated into the official **`OPEN FedRAMP-POAM-Template.xlsx`** and **`CLOSED LEGACY FedRAMP-POAM-Template.xlsx`** workbooks (1 row per unique `Vulnerability + Asset` pair). During execution, it performs four automated GRC functions:
+1. **Open $\rightarrow$ Closed POA&M Reconciliation**: Prompts for (or accepts via `--previous-open`) your previously filled-out OPEN FedRAMP POA&M form from `artifacts/drop-off/`. Entries still present in the new scan carry over into the new OPEN POA&M with their original `POAM ID` and immutable `Original Detection Date`; entries no longer present in the new scan (or marked `False Positive = Yes`) are automatically moved to the **CLOSED FedRAMP POA&M** workbook.
 2. **Interactive Missing Remediation Plan Drafter (`[y/n]`)**: Detects any OPEN POA&M entries missing a `Remediation Plan` (`Column K`) and asks if you want **GRCx** to draft them. Entering `y` populates `Column K` with the recommended fix and official remediation URLs (`https://www.tenable.com/plugins/nessus/<Plugin_ID>`, `https://explore.alas.aws.amazon.com/<ALAS_ID>.html`, AWS Inspector docs, and `https://nvd.nist.gov/vuln/detail/<CVE>`).
 3. **SLA Breach & Finding Age Reporting**: Prints an itemized terminal report (and saves `poam_transform_summary.md` for viewing in Cursor) telling you **exactly how many OPEN POA&M entries have a `Scheduled Completion Date` (SLA) that has passed** and **how many days old every entry is from its `Original Detection Date`**.
 4. **Pure Standard-Library `.xlsx` Output**: Writes `OPEN FedRAMP-POAM.xlsx` (with live Excel SLA formulas supporting `Critical` 30d, `High` 30d, `Moderate` 90d, and `Low` 180d) and `CLOSED FedRAMP-POAM.xlsx` into the output directory.
 
 #### How Windows Users Run `transform_scans.py`
-Because `scripts/transform_scans.py` relies only on built-in Python 3 modules and automatically checks the **`scans\`** folder, Windows users can drop their files into `scans\` and run it in three ways without Docker:
+Because `scripts/transform_scans.py` relies only on built-in Python 3 modules and automatically checks the **`artifacts\drop-off\`** folder, Windows users can drop their files into `artifacts\drop-off\` and run it in three ways without Docker:
 * **Windows PowerShell or Command Prompt (`cmd.exe`)**:
-  * Interactive Drop-In Mode (lists files in `scans\` by number): `python .\scripts\transform_scans.py` *(or `py -3 .\scripts\transform_scans.py`)*
-  * Direct CLI Mode (using filenames in `scans\`): `python .\scripts\transform_scans.py --scan tenable_scan.csv --previous-open "OPEN FedRAMP-POAM.xlsx" --draft-remediations y`
+  * Interactive Drop-In Mode (lists files in `artifacts\drop-off\` by number): `python .\scripts\transform_scans.py` *(or `py -3 .\scripts\transform_scans.py`)*
+  * Direct CLI Mode (using filenames in `artifacts\drop-off\`): `python .\scripts\transform_scans.py --scan tenable_scan.csv --previous-open "OPEN FedRAMP-POAM.xlsx" --draft-remediations y`
 * **Git Bash on Windows**:
   * `python scripts/transform_scans.py --scan tenable_scan.csv`
 * **Windows Subsystem for Linux (WSL2)**:
@@ -49,20 +49,34 @@ Because `scripts/transform_scans.py` relies only on built-in Python 3 modules an
 
 ---
 
-## 2. System & Environment Commands
+## 2. Testing & Compliance Invariant Engine (Engine #7)
+
+### `./grc test [suite] [--verbose]` *(Aliases: `python3 scripts/grc_test.py`)*
+Executes unified invariant verification across all compliance engines without requiring external dependencies (100% Python Standard Library).
+- `./grc test` / `./grc test all`: Executes comprehensive multi-engine validation across all 7 compliance engines plus the unit test suite.
+- `./grc test unit`: Executes test discovery across `testing/test_*.py`.
+- `./grc test transform`: Validates the scan-to-POA&M transformation engine against synthetic scan fixtures.
+- `./grc test bundle`: Validates Git bundle packaging, cryptographic integrity checking, extraction, and teardown.
+- `./grc test crypto`: Validates the static deprecated & EOL cryptographic library scanner against synthetic code.
+- `./grc test ami`: Validates AMI cold-mount mock metadata and synthetic rootfs generators.
+- `./grc test sbom`: Validates CycloneDX SBOM parsing and DISA STIG mapping.
+
+---
+
+## 3. System & Environment Commands
 
 ### `./grc`
 Displays the **GRCx** ASCII system banner along with a summary of all available top-level subcommands. Use this any time you want a quick reminder of the CLI syntax right in your terminal.
 
 ### `./grc fetch` *(Aliases: `./grc info`, `./grc --version`, `./grc -v`)*
-Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.3.4 — Sasebo`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
+Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.4.0 — Yokota`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
 
 ### `./grc docker-build`
 Builds the local `grc-scanner:local` Docker container image from `docker/Dockerfile.scanner`. This packages all containerized security scanners (Semgrep, Gitleaks, Checkov, Syft, Grype, Trivy, and OpenSCAP) along with pre-cached vulnerability databases so that all subsequent scans execute completely offline with zero network egress.
 
 ---
 
-## 3. Git Bundle Lifecycle Commands (Phases 1, 2 & 5)
+## 4. Git Bundle Lifecycle Commands (Phases 1, 2 & 5)
 
 ### `./grc bundle verify <file.bundle> [--sha256 <expected_hash>]`
 Executes **Phase 1 (Pull & Verify)** on an incoming Git bundle file without extracting any code to disk. It computes the file's SHA-256 cryptographic digest, optionally compares it against an expected baseline hash to detect tampering in transit, and runs `git bundle verify` to confirm the internal Git object graph and contained branch/tag references are valid.
@@ -75,7 +89,7 @@ Executes **Phase 5 (Ephemeral Teardown)** after an audit concludes. It unlocks a
 
 ---
 
-## 4. Cloud AMI Lifecycle Commands (Phases 1, 2 & 5)
+## 5. Cloud AMI Lifecycle Commands (Phases 1, 2 & 5)
 
 ### `./grc ami verify <ami-id> [--region <aws-region>] [--mock]`
 Executes **Phase 1 (AMI Verification)** against an Amazon Machine Image (`AMI`) before mounting. It inspects the AMI's metadata, root EBS snapshot ID, architecture, and KMS encryption status—enforcing a hard compliance gate (`NIST SP 800-53 SC-28`) that rejects unencrypted snapshots before any volume is created. Passing `--mock` simulates this workflow locally without requiring live AWS credentials or EC2 infrastructure.

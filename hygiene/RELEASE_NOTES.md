@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.3.4 — Sasebo` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.4.0 — Yokota` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner ([`@eodartintlabs-hue`](https://github.com/eodartintlabs-hue))  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.4.0`](#v140--yokota) | Yokota | 2026-11-01 | Minor | `3d4aeae` | GRC-xMINI rebrand under GRC-x Initiative, grc_test engine #7, artifacts drop-off/pick-up, and purple MINI logo |
 | [`v1.3.4`](#v134--sasebo) | Sasebo | 2026-11-01 | Hygiene / Docs | `802bdc9` | Documentation hygiene, GRC-xTEST rebranding, dual desktop navigation fork, and patch log restructuring |
 | [`v1.3.3`](#v133--sasebo) | Sasebo | 2026-10-31 | Bug fix | `f4b9075` | Dynamic POA&M ID nomenclature (`YYYY-MMM-#####`), backward-compatible ID parsing, and unit test suite expansion |
 | [`v1.3.2`](#v132--sasebo) | Sasebo | 2026-10-31 | Bug fix | `3a041cd` | Multi-scan POA&M transformation (up to 5 scans), finding consolidation, and tri-ledger patch logs (`BUG`, `MINOR`, `MAJOR`) |
@@ -41,6 +42,29 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.4.0 — Yokota
+
+**Minor Capability Release** · November 01, 2026 · Tag `v1.4.0`
+
+### 5 Core Objectives of the Yokota Series
+
+1. **Engine #7 — `scripts/grc_test.py` Compliance Invariant & Mock Engine**:
+   - Absorbed synthetic mock generators and test harnesses across all sister engines (`transform_scans.py`, `grc_bundle.py`, `crypto_lib_scan.py`, `grc_ami.py`, `sbom_analyzer.py`, `grc_reporter.py`).
+   - Slimmed sister engines (e.g. extracted 54 lines of synthetic mock fixtures from `scripts/grc_ami.py` into `grc_test.py`), keeping source code smaller and nimble.
+   - Built self-contained invariant verification runners and integrated them into the root CLI via `./grc test [suite]`.
+2. **Rebrand to GRC-xMINI under the GRC-x Initiative**:
+   - Rebranded the core compliance runtime to **GRC-xMINI**, formalizing that both **GRC-xMINI** and **GRC-xTEST** are core components of the overarching **GRC-x Initiative**.
+3. **Artifacts Directory Restructure (`artifacts/drop-off` and `artifacts/pick-up`)**:
+   - Relocated intake and deliverable directories into `artifacts/`: `artifacts/drop-off/` (formerly `scans/`) and `artifacts/pick-up/` (formerly `evidence/`).
+   - Maintained backward-compatibility in `scripts/transform_scans.py` with automatic fallback to legacy directories.
+4. **Timestamped Deliverable Directories with Automatic Fallback**:
+   - Deliverables inside `artifacts/pick-up/` now automatically generate a timestamped subfolder (`YYYY-MM-DD_HHMMSS`) instead of using input filenames.
+   - Includes automatic graceful fallback to the legacy naming convention (`poam-<scan_basename>`) if system date/time is unavailable.
+5. **New Terminal Logo & Fetch Banner**:
+   - Replaced terminal fetch banner (`./grc fetch`) with high-contrast Bold Black `GRCx` (`\033[1;30m`) and custom cyber double-line `MINI` wordmark in Purple (`\033[38;5;135m`), synchronizing styling with `GRC-xTEST`.
 
 ---
 

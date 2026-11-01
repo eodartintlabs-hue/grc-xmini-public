@@ -9,6 +9,16 @@ ephemeral_workspace/
 ephemeral_test_workspace/
 ephemeral_mock_ami/
 
+# Ephemeral Artifacts Intake and Deliverables
+artifacts/drop-off/*
+!artifacts/drop-off/.gitkeep
+artifacts/pick-up/*
+!artifacts/pick-up/.gitkeep
+scans/*
+!scans/.gitkeep
+evidence/*
+!evidence/.gitkeep
+
 # Release Bundles (never commit release bundles to the review engine repo)
 *.bundle
 

@@ -1,10 +1,10 @@
-# GRCx — The GRC eXperience (`grcx`)
+# GRC-xMINI — The GRC eXperience (`grc`)
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/grcx-logo-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/logo/grcx-logo-light.png">
-    <img alt="GRCx — The GRC eXperience" src="assets/logo/grcx-logo-dark.png" width="380">
+    <img alt="GRC-xMINI — The GRC eXperience" src="assets/logo/grcx-logo-dark.png" width="380">
   </picture>
 </p>
 
@@ -28,26 +28,30 @@
 </p>
 
 ```text
-> grcfetch
-        .--.          .--.          .--.
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  eodartintlabs-hue/grcx
- {GGG'     `G# {GGG     `GGG {GGG'     `G#                   ----------------------
- @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   App: GRCx v1.3.4 (Sasebo)
+> ./grc fetch
+        .--.          .--.          .--.                       
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  eodartintlabs-hue/grc-x (Initiative)
+ {GGG'     `G# {GGG     `GGG {GGG'     `G#                   ------------------------------------
+ @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   App: GRC-xMINI v1.4.0 (Yokota)
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      OS: Darwin ARM64 / Linux Bookworm
   GGG   ""`GGG @GGG   `GGG,   GGG             `GGGGG'        Model: Out-of-Band (OOB) / Fail-Open
- ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        Isolation: Air-Gapped (--network none, :ro)
-  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG"  ,GGG' `GGG,      Engines: (10) Semgrep, Gitleaks, Checkov, Syft,
-   `@GGGG###G# @GGG     `GGG   `@GGGG###G" dGGG'   `GGGb                    Grype, Trivy, OpenSCAP, Crypto, SBOM, Transform
-     `"%N>"`    `"%NW" `"%NW"    `"%N>"`   `"%N"   "%N"`     Ruleset: 37 AST Rules (AOC 02–140)
-                                                             Frameworks: DISA STIG, NIST 800-53 R5, FedRAMP
-       ───  T h e   G R C   e X p e r i e n c e  ───         Output: FedRAMP POA&M (.xlsx/.md), Controls, SCR/SCN
+ ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        Assurance: Pure Python Stdlib (Host-Native)
+  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG"  ,GGG' `GGG,      Engines: (7) Transform, Bundle, Crypto, AMI,
+   `@GGGG###G# @GGG     `GGG   `@GGGG###G" dGGG'   `GGGb                  SBOM, Reporter, Test Engine
+     `"%N>"`    `"%NW" `"%NW"    `"%N>"`   `"%N"   "%N"`     Companion: GRC-xTEST (v1.3.x+ Synchronized)
+   ███╗   ███╗   ██╗   ███╗   ██╗   ██╗                    Frameworks: DISA STIG, NIST 800-53 R5, FedRAMP
+   ████╗ ████║   ██║   ████╗  ██║   ██║                    Artifacts: artifacts/drop-off & pick-up
+   ██╔████╔██║   ██║   ██╔██╗ ██║   ██║                    Output: Timestamps (YYYY-MM-DD_HHMMSS)
+   ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║                    Ruleset: 37 AST Rules (AOC 02–140)
+   ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║                    Status: Agile & Nimble Architecture
+   ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝                    Deliverables: Sealed with sha256sum
 
-                                                             ███ ███ ███ ███ ███ ███ ███ ███
-                                                             ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄
+                                                               ███ ███ ███ ███ ███ ███ ███ ███
+                                                               ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄ ▄▄▄
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.3.4 — Sasebo` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.4.0 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Test Corpus**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)  
@@ -65,7 +69,7 @@
 7. [Minimum & Recommended System Requirements](#7-minimum--recommended-system-requirements)
 8. [Installation, Quickstart & CLI Reference (`INSTALL.md` & `COMMANDS.md`)](#8-installation-quickstart--cli-reference-installmd--commandsmd)
 9. [Security Assurance, Negative Testing & Verification](#9-security-assurance-negative-testing--verification)
-10. [Product Roadmap (`Yokosuka` $\rightarrow$ `Kadena` $\rightarrow$ `Misawa` $\rightarrow$ `Sasebo` $\rightarrow$ `Pearl Harbor` GA)](#10-product-roadmap-yokosuka-rightarrow-kadena-rightarrow-misawa-rightarrow-sasebo-rightarrow-pearl-harbor-ga)
+10. [Product Roadmap (`Yokosuka` $\rightarrow$ `Kadena` $\rightarrow$ `Misawa` $\rightarrow$ `Sasebo` $\rightarrow$ `Yokota` $\rightarrow$ `Pearl Harbor` GA)](#10-product-roadmap-yokosuka-rightarrow-kadena-rightarrow-misawa-rightarrow-sasebo-rightarrow-pearl-harbor-ga)
 11. [Repository Structure & Documentation Index](#11-repository-structure--documentation-index)
 
 ---
@@ -74,7 +78,7 @@
 
 **GRCx** (*The GRC eXperience*) is an automated, cryptographic verification, static security analysis, and Continuous Monitoring (ConMon) compliance platform engineered for **FedRAMP High**, **DISA STIG**, and **DoD RMF** environments. It supports two primary operational workflows:
 
-1. **Standalone Scan-to-FedRAMP POA&M Transformation (`./grc transform` / [`scripts/transform_scans.py`](scripts/transform_scans.py))**: Built for direct, standalone daily use by GRC analysts (requiring zero Docker containers or `.bundle` files). Analysts simply drop **Tenable** or **AWS Inspector** scan exports (`.csv` or `.xlsx`) and their previous **OPEN FedRAMP POA&M** (`.xlsx`) into the designated **`scans/`** folder, pick their file by number or filename, automatically move remediated items into the **CLOSED FedRAMP POA&M** template, auto-draft missing remediation plans with official Tenable/AWS URLs, and receive an itemized **SLA Breach & Finding Age** report. *(See **[`docs/transform_scans-guide.md`](docs/transform_scans-guide.md)**).*
+1. **Standalone Scan-to-FedRAMP POA&M Transformation (`./grc transform` / [`scripts/transform_scans.py`](scripts/transform_scans.py))**: Built for direct, standalone daily use by GRC analysts (requiring zero Docker containers or `.bundle` files). Analysts simply drop **Tenable** or **AWS Inspector** scan exports (`.csv` or `.xlsx`) and their previous **OPEN FedRAMP POA&M** (`.xlsx`) into the designated **`artifacts/drop-off/`** folder, pick their file by number or filename, automatically move remediated items into the **CLOSED FedRAMP POA&M** template, auto-draft missing remediation plans with official Tenable/AWS URLs, and receive an itemized **SLA Breach & Finding Age** report. *(See **[`docs/transform_scans-guide.md`](docs/transform_scans-guide.md)**).*
 2. **5-Phase Out-of-Band Release & Infrastructure Auditing (`./grc bundle`, `./grc ami`, `./grc scan`)**: Audits **Git software release bundles (`.bundle`)** and **Amazon Machine Images (`AMI`)** inside an air-gapped 9-engine scanner suite (`grc-scanner:local`) to generate **Security Change Request / Security Change Notification (SCR/SCN)** evidence packages without gating or slowing down developer CI/CD velocity.
 
 > 🏛️ **Explore the Visual Technology Stack**: View our Layered System Architecture diagram and detailed technology stack breakdown in **[`amplifying-info/ARCHITECTURE.md`](amplifying-info/ARCHITECTURE.md)**.
@@ -218,7 +222,7 @@ Zero-dependency Python 3 engines that power both standalone GRC analyst workflow
 
 ## 6. Phase 4 Compliance Deliverables & SCR/SCN Package
 
-Every completed scan automatically populates `evidence/<target-name>/` with a sealed, audit-ready package:
+Every completed scan automatically populates `artifacts/pick-up/<timestamp>/` with a sealed, audit-ready package:
 
 | Deliverable File | Format | Consumer / System | Compliance Purpose |
 | :--- | :--- | :--- | :--- |
@@ -289,7 +293,7 @@ In high-assurance compliance automation, a scanner that outputs zero findings is
 
 | Active Milestone | Series Codename | Status | Summary of Active Capabilities | Full Roadmap & Release Docs |
 | :--- | :--- | :--- | :--- | :--- |
-| **`v1.3.4 — Sasebo`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Documentation Hygiene, Rebranding & Navigation Fork**: Renamed guides to `transform_scans-guide.md`, `grc_bundle-guide.md`, and `grc-xtest-guide.md`; rebranded test harness to `GRC-xTEST` supporting both bundle and scan fixtures; added dual-platform (macOS / Windows) desktop navigation instructions; updated patch ledgers to reverse-chronological order. | See **[`hygiene/`](hygiene/)** |
+| **`v1.4.0 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Documentation Hygiene, Rebranding & Navigation Fork**: Renamed guides to `transform_scans-guide.md`, `grc_bundle-guide.md`, and `grc-xtest-guide.md`; rebranded test harness to `GRC-xTEST` supporting both bundle and scan fixtures; added dual-platform (macOS / Windows) desktop navigation instructions; updated patch ledgers to reverse-chronological order. | See **[`hygiene/`](hygiene/)** |
 
 > 🗺️ **Looking Ahead to Future Milestones?**  
 > Planned releases—including the upcoming **`v1.3.5 — Sasebo`** (Universal Workstation Portability & `./grc doctor`) and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:

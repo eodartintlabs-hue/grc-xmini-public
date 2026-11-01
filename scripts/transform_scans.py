@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.3.4 — Sasebo) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.4.0 — Yokota) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -49,7 +49,11 @@ MATCH_MODE = "legacy"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
-DEFAULT_SCANS_DIR = os.path.join(REPO_ROOT, "scans")
+DEFAULT_DROPOFF_DIR = os.path.join(REPO_ROOT, "artifacts", "drop-off")
+DEFAULT_PICKUP_DIR = os.path.join(REPO_ROOT, "artifacts", "pick-up")
+DEFAULT_SCANS_DIR = DEFAULT_DROPOFF_DIR
+LEGACY_SCANS_DIR = os.path.join(REPO_ROOT, "scans")
+LEGACY_EVIDENCE_DIR = os.path.join(REPO_ROOT, "evidence")
 SAMPLE_SCANS_DIR = os.path.join(REPO_ROOT, "testing", "sample-scans")
 DEFAULT_OPEN_TEMPLATE = os.path.join(REPO_ROOT, "templates", "OPEN FedRAMP-POAM-Template.xlsx")
 DEFAULT_CLOSED_TEMPLATE = os.path.join(REPO_ROOT, "templates", "CLOSED LEGACY FedRAMP-POAM-Template.xlsx")
@@ -1943,7 +1947,7 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRCx (v1.3.4 — Sasebo) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRC-xMINI (v1.4.0 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:
@@ -2126,8 +2130,14 @@ def resolve_input_file(
     if os.path.isfile(expanded):
         return os.path.abspath(expanded)
 
-    # 3. Search inside designated drop-in directory (scans/) then fallback dirs
+    # 3. Search inside designated drop-in directory (artifacts/drop-off/) then fallback dirs
     search_dirs = [scans_dir] + (fallback_dirs or [])
+    if DEFAULT_DROPOFF_DIR not in search_dirs and os.path.isdir(DEFAULT_DROPOFF_DIR):
+        search_dirs.append(DEFAULT_DROPOFF_DIR)
+    if LEGACY_SCANS_DIR not in search_dirs and os.path.isdir(LEGACY_SCANS_DIR):
+        search_dirs.append(LEGACY_SCANS_DIR)
+    if SAMPLE_SCANS_DIR not in search_dirs and os.path.isdir(SAMPLE_SCANS_DIR):
+        search_dirs.append(SAMPLE_SCANS_DIR)
     ext_lower = tuple(e.lower() for e in extensions)
 
     for d in search_dirs:
@@ -2198,6 +2208,39 @@ def display_detected_files(
     return []
 
 
+def generate_output_dir_path(
+    scan_paths: List[str],
+    base_pickup_dir: str = DEFAULT_PICKUP_DIR,
+    force_legacy: bool = False,
+) -> str:
+    """
+    Generate output directory path under base_pickup_dir.
+    Objective 4: Auto-creates folder based off system date and time (YYYY-MM-DD_HHMMSS).
+    If system date and time are unavailable or unparseable, falls back to the previous
+    naming convention ('poam-<scan_stem>' or 'poam-<first_stem>-and-N-more').
+    """
+    if len(scan_paths) == 1:
+        scan_stem = os.path.splitext(os.path.basename(scan_paths[0]))[0]
+        legacy_name = f"poam-{scan_stem}"
+    else:
+        first_stem = os.path.splitext(os.path.basename(scan_paths[0]))[0]
+        legacy_name = f"poam-{first_stem}-and-{len(scan_paths)-1}-more"
+
+    if force_legacy or os.environ.get("GRC_NO_TIMESTAMP") == "1":
+        folder_name = legacy_name
+    else:
+        try:
+            now = datetime.datetime.now()
+            if now and now.year >= 2000:
+                folder_name = now.strftime("%Y-%m-%d_%H%M%S")
+            else:
+                folder_name = legacy_name
+        except Exception:
+            folder_name = legacy_name
+
+    return os.path.join(base_pickup_dir, folder_name)
+
+
 # ---------------------------------------------------------------------------
 # CLI & Interactive Orchestration
 # ---------------------------------------------------------------------------
@@ -2206,9 +2249,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         prog="grc transform",
         description=(
-            "GRCx Standalone Scan-to-POA&M Transformer (transform_scans.py): "
+            "GRC-xMINI Standalone Scan-to-POA&M Transformer (transform_scans.py): "
             "Drop your scan exports (.csv/.xlsx) and previous POA&M (.xlsx) into the "
-            "'scans/' folder and pass just the filename (or run interactively to pick "
+            "'artifacts/drop-off/' folder and pass just the filename (or run interactively to pick "
             "from a numbered list). Reconciles Open -> Closed items, drafts missing "
             "remediation plans with official Tenable/AWS URLs, and reports SLA breaches."
         ),
@@ -2218,19 +2261,26 @@ def main() -> int:
         nargs="*",
         default=[],
         metavar="SCAN_FILE",
-        help="Optional scan filename(s) in scans/ (up to 5 scans, e.g. 'tenable_scan.csv' or 'scan1.csv scan2.csv') or path.",
+        help="Optional scan filename(s) in artifacts/drop-off/ (up to 5 scans, e.g. 'tenable_scan.csv' or 'scan1.csv scan2.csv') or path.",
     )
     parser.add_argument(
         "--scan", "-s",
         action="append",
         dest="scans",
         default=[],
-        help="Scan filename in scans/ (or path to Tenable / AWS Inspector .csv or .xlsx file). May be passed multiple times (up to 5 scans) or as comma-separated filenames.",
+        help="Scan filename in artifacts/drop-off/ (or path to Tenable / AWS Inspector .csv or .xlsx file). May be passed multiple times (up to 5 scans) or as comma-separated filenames.",
     )
     parser.add_argument(
-        "--scans-dir",
-        default=DEFAULT_SCANS_DIR,
-        help="Designated drop-in directory for scan exports and previous POA&M files (default: ./scans/).",
+        "--dropoff-dir", "--scans-dir",
+        dest="dropoff_dir",
+        default=DEFAULT_DROPOFF_DIR,
+        help="Designated intake drop-off directory for scan exports and previous POA&M files (default: ./artifacts/drop-off/).",
+    )
+    parser.add_argument(
+        "--pickup-dir",
+        dest="pickup_dir",
+        default=DEFAULT_PICKUP_DIR,
+        help="Base directory for deliverables pick-up folders (default: ./artifacts/pick-up/).",
     )
     parser.add_argument(
         "--scanner",
@@ -2241,7 +2291,7 @@ def main() -> int:
     parser.add_argument(
         "--previous-open", "-p",
         default=None,
-        help="Filename in scans/ (or path) of previously filled-out OPEN FedRAMP POA&M (.xlsx) for Open->Closed delta reconciliation (or 'none' for initial baseline).",
+        help="Filename in artifacts/drop-off/ (or path) of previously filled-out OPEN FedRAMP POA&M (.xlsx) for Open->Closed delta reconciliation (or 'none' for initial baseline).",
     )
     parser.add_argument(
         "--no-previous",
@@ -2251,12 +2301,17 @@ def main() -> int:
     parser.add_argument(
         "--previous-closed",
         default=None,
-        help="Optional filename in scans/ (or path) of existing CLOSED FedRAMP POA&M (.xlsx) to append newly closed entries.",
+        help="Optional filename in artifacts/drop-off/ (or path) of existing CLOSED FedRAMP POA&M (.xlsx) to append newly closed entries.",
     )
     parser.add_argument(
         "--output-dir", "-o",
         default=None,
-        help="Directory where finished OPEN and CLOSED FedRAMP POA&M .xlsx files will be saved (default: evidence/poam-<scan>/).",
+        help="Specific directory where finished OPEN and CLOSED FedRAMP POA&M .xlsx files will be saved (default: auto-created by date and time in artifacts/pick-up/).",
+    )
+    parser.add_argument(
+        "--legacy-output-naming",
+        action="store_true",
+        help="Force previous output directory naming convention (poam-<scan_basename>) instead of timestamped folder.",
     )
     parser.add_argument(
         "--open-template",
@@ -2332,9 +2387,9 @@ def main() -> int:
     if args.poam_id_column:
         POAM_ID_COLUMN_OVERRIDE = re.sub(r"[^A-Za-z]", "", args.poam_id_column).upper() or None
 
-    scans_dir = os.path.abspath(args.scans_dir)
+    scans_dir = os.path.abspath(args.dropoff_dir)
     os.makedirs(scans_dir, exist_ok=True)
-    fallback_dirs = [SAMPLE_SCANS_DIR, REPO_ROOT]
+    fallback_dirs = [DEFAULT_DROPOFF_DIR, LEGACY_SCANS_DIR, SAMPLE_SCANS_DIR, REPO_ROOT]
 
     today = parse_any_date(args.reference_date) if args.reference_date else datetime.date.today()
     if not today:
@@ -2620,14 +2675,15 @@ def main() -> int:
             print(f"[*] Left {len(missing_remediation_entries)} missing Remediation Plans blank per user selection.")
 
     # 6. Write Finished OPEN and CLOSED FedRAMP POA&M Workbooks (skipped in --dry-run mode)
-    if len(scan_paths) == 1:
-        scan_stem = os.path.splitext(os.path.basename(scan_paths[0]))[0]
-        default_out = f"poam-{scan_stem}"
+    if args.output_dir:
+        out_dir = os.path.abspath(args.output_dir)
     else:
-        first_stem = os.path.splitext(os.path.basename(scan_paths[0]))[0]
-        default_out = f"poam-{first_stem}-and-{len(scan_paths)-1}-more"
-
-    out_dir = args.output_dir or os.path.join(REPO_ROOT, "evidence", default_out)
+        base_pickup = os.path.abspath(args.pickup_dir or DEFAULT_PICKUP_DIR)
+        out_dir = generate_output_dir_path(
+            scan_paths=scan_paths,
+            base_pickup_dir=base_pickup,
+            force_legacy=args.legacy_output_naming,
+        )
 
     open_out_path = os.path.join(out_dir, "OPEN FedRAMP-POAM.xlsx")
     closed_out_path = os.path.join(out_dir, "CLOSED FedRAMP-POAM.xlsx")

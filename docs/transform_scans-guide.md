@@ -20,7 +20,7 @@
 </p>
 
 > **Engine**: [`scripts/transform_scans.py`](../scripts/transform_scans.py) · **CLI Command**: `./grc transform`  
-> **Release Series**: `v1.3.4 — Sasebo` *(Introduced in `v1.2.0 — Misawa`, enhanced with `scans/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`)*  
+> **Release Series**: `v1.4.0 — Yokota` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`)*  
 > **Execution Mode**: **100% Standalone** *(Requires only Python 3.9+ Standard Library — no Docker container, no `.bundle` file, and no `pip install` needed)*
 
 ---
@@ -31,7 +31,7 @@
 2. [Prerequisites, Workstation Desktop Navigation & Docker Isolation](#2-prerequisites-workstation-desktop-navigation--docker-isolation)
    * [2.1 Workstation Terminal / Command Prompt Navigation](#21-workstation-terminal--command-prompt-navigation)
    * [2.2 Do I Need Docker?](#22-do-i-need-docker)
-   * [2.3 The Designated `scans/` Drop-In Folder](#23-the-designated-scans-drop-in-folder-zero-path-copy-pasting)
+   * [2.3 The Designated `artifacts/drop-off/` Drop-In Folder](#23-the-designated-scans-drop-in-folder-zero-path-copy-pasting)
 3. [How Windows Users Use the `transform_scans` Engine](#3-how-windows-users-use-the-transform_scans-engine)
    * [3.1 Native PowerShell or Command Prompt (Interactive Mode)](#31-native-powershell-or-command-prompt-interactive-mode)
    * [3.2 One-Line Command Prompt / PowerShell CLI Mode](#32-one-line-command-prompt--powershell-cli-mode)
@@ -99,13 +99,13 @@ cd ~/Desktop/GRC-x
 
 ---
 
-### 2.3 The Designated `scans/` Drop-In Folder (Zero Path Copy-Pasting)
-Instead of hunting for absolute file paths and copy-pasting long directory strings into the terminal, **GRCx** includes a designated **`scans/`** folder at the root of the repository:
-1. **Drop your files into `scans/`**: Drag and drop your Tenable or AWS Inspector scan export (`.csv` or `.xlsx`) and your previous month's `OPEN FedRAMP-POAM.xlsx` (if reconciling) directly into the **`scans/`** directory.
+### 2.3 The Designated `artifacts/drop-off/` Drop-In Folder (Zero Path Copy-Pasting)
+Instead of hunting for absolute file paths and copy-pasting long directory strings into the terminal, **GRCx** includes a designated **`artifacts/drop-off/`** folder at the root of the repository:
+1. **Drop your files into `artifacts/drop-off/`**: Drag and drop your Tenable or AWS Inspector scan export (`.csv` or `.xlsx`) and your previous month's `OPEN FedRAMP-POAM.xlsx` (if reconciling) directly into the **`artifacts/drop-off/`** directory.
 2. **Run `./grc transform` (or `python .\scripts\transform_scans.py`)**:
-   * **GRCx** automatically scans `scans/` and displays a **numbered list** of detected files (`[1]`, `[2]`, etc.).
+   * **GRCx** automatically scans `artifacts/drop-off/` and displays a **numbered list** of detected files (`[1]`, `[2]`, etc.).
    * Select a file simply by typing its **number** (e.g., `1`) OR typing its **filename** (with or without the `.csv`/`.xlsx` extension, e.g., `tenable_monthly_scan`).
-   * Even on the command line (`--scan` / `--previous-open`), you only need to pass the filename (e.g., `--scan my_scan.csv` or `--scan my_scan`)—**GRCx** automatically looks inside `scans/` first!
+   * Even on the command line (`--scan` / `--previous-open`), you only need to pass the filename (e.g., `--scan my_scan.csv` or `--scan my_scan`)—**GRCx** automatically looks inside `artifacts/drop-off/` first!
 
 ---
 
@@ -120,7 +120,7 @@ A Windows user only needs **Python 3.9+** installed (available from `python.org`
    ```cmd
    cd %USERPROFILE%\Desktop\GRC-x
    ```
-2. Drop your scan and previous POA&M files into the **`scans\`** folder.
+2. Drop your scan and previous POA&M files into the **`artifacts\drop-off\`** folder.
 3. Run the engine interactively:
    ```powershell
    python .\scripts\transform_scans.py
@@ -170,7 +170,7 @@ macOS analysts execute the engine using the root `./grc` CLI dispatcher or direc
    ```bash
    cd ~/Desktop/GRC-x
    ```
-2. Drop your scan export (`.csv` or `.xlsx`) and previous OPEN POA&M (`.xlsx`) into the **`scans/`** folder.
+2. Drop your scan export (`.csv` or `.xlsx`) and previous OPEN POA&M (`.xlsx`) into the **`artifacts/drop-off/`** folder.
 3. Run `./grc transform` with no arguments:
    ```bash
    ./grc transform
@@ -179,29 +179,29 @@ macOS analysts execute the engine using the root `./grc` CLI dispatcher or direc
    * **Primary Scan Selection**:
      ```text
      === GRCx Standalone FedRAMP POA&M Scan Transformer ===
-       [*] Scan / Workbook files (.csv, .xlsx) detected in 'scans/':
+       [*] Scan / Workbook files (.csv, .xlsx) detected in 'artifacts/drop-off/':
            [1] aws_inspector_scan.csv
            [2] previous_open_poam.xlsx
            [3] tenable_monthly_scan.csv
-     [?] Select scan file by number [1-3] or enter filename in scans/ (.csv/.xlsx): 3
+     [?] Select scan file by number [1-3] or enter filename in artifacts/drop-off/ (.csv/.xlsx): 3
      [+] Added scan [1/5]: tenable_monthly_scan.csv
      ```
    * **Additional Scan Files Prompt (Up to 5 Scans)**:
      ```text
      [?] Would you like to add an additional scan file to also be transformed? [y/N]: y
-       [*] Additional scan files (.csv, .xlsx) [Scan 2/5] detected in 'scans/':
+       [*] Additional scan files (.csv, .xlsx) [Scan 2/5] detected in 'artifacts/drop-off/':
            [1] aws_inspector_scan.csv
            [2] previous_open_poam.xlsx
-     [?] Select additional scan file #2 by number [1-2] or enter filename in scans/ (.csv/.xlsx): 1
+     [?] Select additional scan file #2 by number [1-2] or enter filename in artifacts/drop-off/ (.csv/.xlsx): 1
      [+] Added scan [2/5]: aws_inspector_scan.csv
 
      [?] Would you like to add an additional scan file to also be transformed? [y/N]: n
      ```
    * **Previous OPEN POA&M Prompt**:
      ```text
-       [*] Previous POA&M workbooks (.xlsx) detected in 'scans/':
+       [*] Previous POA&M workbooks (.xlsx) detected in 'artifacts/drop-off/':
            [1] previous_open_poam.xlsx
-     [?] Select previous OPEN FedRAMP POA&M by number [1-1], enter filename in scans/,
+     [?] Select previous OPEN FedRAMP POA&M by number [1-1], enter filename in artifacts/drop-off/,
          or press Enter if none (initial baseline): 1
      ```
    * **Remediation Plan URL Drafting Prompt**:
@@ -286,7 +286,7 @@ Running a transformation outputs the itemized SLA Breach & Aging table directly 
 [+] Drafted 5 Remediation Plans with official TENABLE remediation URLs.
 
 ================================================================================================
-  GRCx (v1.3.4 — Sasebo) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
+  GRCx (v1.4.0 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
 ================================================================================================
   Analysis Reference Date : 2026-10-31
   Source Scan File(s)     : tenable_monthly_scan.csv (1 file)

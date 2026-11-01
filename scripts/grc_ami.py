@@ -47,6 +47,13 @@ try:
 except ImportError:
     HAS_BOTO3 = False
 
+# Import mock fixture generators from grc_test engine (Engine #7)
+try:
+    from grc_test import generate_mock_ami_metadata, create_mock_rootfs, generate_mock_ebs_volume
+except ImportError:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from grc_test import generate_mock_ami_metadata, create_mock_rootfs, generate_mock_ebs_volume
+
 
 # ==============================================================================
 # OS TO DISA STIG BENCHMARK RESOLVER
@@ -466,40 +473,13 @@ class GRCAMIManager:
         }
 
     def _mock_ami_metadata(self) -> Dict[str, Any]:
-        """Generates realistic synthetic AMI metadata for testing and local verification."""
-        snap_id = f"snap-{hashlib.sha256(self.ami_id.encode()).hexdigest()[:17]}"
-        return {
-            "image_id": self.ami_id,
-            "name": f"rhel-9-hardened-golden-image-{self.ami_id[:8]}",
-            "owner_id": "123456789012",
-            "architecture": "x86_64",
-            "creation_date": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "state": "available",
-            "root_device_name": "/dev/sda1",
-            "root_snapshot_id": snap_id,
-            "root_volume_size_gb": 40,
-            "encrypted": True,
-            "kms_key_id": f"arn:aws:kms:{self.region}:123456789012:key/c01d-m0un-t001-f1p5-1402k3y00000",
-            "virtualization_type": "hvm",
-            "ena_support": True,
-            "block_devices": [
-                {
-                    "DeviceName": "/dev/sda1",
-                    "Ebs": {
-                        "SnapshotId": snap_id,
-                        "VolumeSize": 40,
-                        "Encrypted": True,
-                        "KmsKeyId": f"arn:aws:kms:{self.region}:123456789012:key/c01d-m0un-t001-f1p5-1402k3y00000",
-                        "VolumeType": "gp3",
-                    },
-                }
-            ],
-        }
+        """Delegates synthetic AMI metadata generation to the grc_test engine."""
+        return generate_mock_ami_metadata(self.ami_id, self.region)
 
     def _create_ephemeral_volume(self, snapshot_id: str) -> str:
         """Provisions an ephemeral EBS volume from the root snapshot."""
         if self.mock_mode:
-            mock_vol = f"vol-{uuid.uuid4().hex[:17]}"
+            mock_vol = generate_mock_ebs_volume(snapshot_id)
             print(f"[*] [MOCK] Provisioned ephemeral EBS volume: {mock_vol} (from {snapshot_id})")
             return mock_vol
 
@@ -676,30 +656,8 @@ class GRCAMIManager:
         }
 
     def _create_mock_rootfs(self, mount_path: Path) -> None:
-        """Populates a synthetic root filesystem fixture for offline testing."""
-        etc_dir = mount_path / "etc"
-        etc_dir.mkdir(parents=True, exist_ok=True)
-        os_release_content = (
-            'NAME="Red Hat Enterprise Linux"\n'
-            'VERSION="9.2 (Plow)"\n'
-            'ID="rhel"\n'
-            'ID_LIKE="fedora"\n'
-            'VERSION_ID="9.2"\n'
-            'PLATFORM_ID="platform:el9"\n'
-            'PRETTY_NAME="Red Hat Enterprise Linux 9.2 (Plow)"\n'
-            'ANSI_COLOR="0;31"\n'
-            'CPE_NAME="cpe:/o:redhat:enterprise_linux:9::baseos"\n'
-            'HOME_URL="https://www.redhat.com/"\n'
-            'BUG_REPORT_URL="https://bugzilla.redhat.com/"\n'
-        )
-        with open(etc_dir / "os-release", "w", encoding="utf-8") as f:
-            f.write(os_release_content)
-
-        # Create sample library directories with mock files
-        lib_dir = mount_path / "usr" / "lib64"
-        lib_dir.mkdir(parents=True, exist_ok=True)
-        (lib_dir / "libssl.so.3").touch()
-        (lib_dir / "libcrypto.so.3").touch()
+        """Delegates synthetic root filesystem fixture generation to the grc_test engine."""
+        create_mock_rootfs(mount_path)
 
 
 # ==============================================================================

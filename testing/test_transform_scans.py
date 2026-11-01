@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRCx (v1.3.4 — Sasebo) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRC-xMINI (v1.4.0 — Yokota) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:
@@ -746,6 +746,29 @@ class TestTransformScansEngine(unittest.TestCase):
         with mock.patch("sys.argv", argv_excess):
             code = ts.main()
             self.assertEqual(code, 1)
+
+    def test_artifacts_dropoff_and_pickup_defaults(self) -> None:
+        """Verifies Objective 3: Default intake is artifacts/drop-off and output base is artifacts/pick-up."""
+        self.assertTrue(ts.DEFAULT_DROPOFF_DIR.endswith(os.path.join("artifacts", "drop-off")))
+        self.assertTrue(ts.DEFAULT_PICKUP_DIR.endswith(os.path.join("artifacts", "pick-up")))
+        self.assertEqual(ts.DEFAULT_SCANS_DIR, ts.DEFAULT_DROPOFF_DIR)
+
+    def test_timestamped_output_directory_creation_and_fallback(self) -> None:
+        """Verifies Objective 4: Auto-creation of timestamped folder with fallback to legacy format."""
+        scans = ["/path/to/my_tenable_scan.csv"]
+        # 1. Normal execution produces timestamped folder YYYY-MM-DD_HHMMSS
+        ts_dir = ts.generate_output_dir_path(scans, base_pickup_dir="/artifacts/pick-up")
+        folder_name = os.path.basename(ts_dir)
+        self.assertRegex(folder_name, r"^\d{4}-\d{2}-\d{2}_\d{6}$")
+
+        # 2. Legacy fallback produces poam-<stem>
+        legacy_dir = ts.generate_output_dir_path(scans, base_pickup_dir="/artifacts/pick-up", force_legacy=True)
+        self.assertEqual(os.path.basename(legacy_dir), "poam-my_tenable_scan")
+
+        # 3. Multiple scans produce poam-<stem>-and-N-more in legacy fallback
+        multi_scans = ["/path/to/scan1.csv", "/path/to/scan2.csv", "/path/to/scan3.csv"]
+        multi_legacy = ts.generate_output_dir_path(multi_scans, base_pickup_dir="/artifacts/pick-up", force_legacy=True)
+        self.assertEqual(os.path.basename(multi_legacy), "poam-scan1-and-2-more")
 
 
 if __name__ == "__main__":

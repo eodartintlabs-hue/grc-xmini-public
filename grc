@@ -10,7 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="${HOME}/.docker/bin:/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:${PATH}"
 
 print_grcfetch() {
-    local P="\033[38;5;135m"   # Purple ASCII art (matches VHS neofetch style)
+    local BK="\033[1;30m"      # Bold Black for "GRCx"
+    local P="\033[38;5;135m"   # Purple for "MINI"
     local M="\033[1;95m"       # Bright Magenta title
     local G="\033[1;32m"       # Bright Green keys
     local W="\033[0;37m"       # White values
@@ -18,18 +19,22 @@ print_grcfetch() {
     local R="\033[0m"          # Reset
 
     echo -e ""
-    echo -e "  ${P}        .--.          .--.          .--.                       ${R}"
-    echo -e "  ${P}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${M}eodartintlabs-hue/grcx${R}"
-    echo -e "  ${P} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}----------------------${R}"
-    echo -e "  ${P} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}App:${W} GRCx v1.3.4 (Sasebo)${R}"
-    echo -e "  ${P} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
-    echo -e "  ${P}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
-    echo -e "  ${P} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${G}Isolation:${W} Air-Gapped (--network none, :ro)${R}"
-    echo -e "  ${P}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${G}Engines:${W} (10) Semgrep, Gitleaks, Checkov, Syft,${R}"
-    echo -e "  ${P}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${W}              Grype, Trivy, OpenSCAP, Crypto, SBOM, Transform${R}"
-    echo -e "  ${P}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${G}Ruleset:${W} 37 AST Rules (AOC 02–140)${R}"
-    echo -e "  ${P}                                                             ${G}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
-    echo -e "  ${P}       ───  T h e   G R C   e X p e r i e n c e  ───         ${G}Output:${W} FedRAMP POA&M (.xlsx/.md), Controls, SCR/SCN${R}"
+    echo -e "  ${BK}        .--.          .--.          .--.                       ${R}"
+    echo -e "  ${BK}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${M}eodartintlabs-hue/grc-x (Initiative)${R}"
+    echo -e "  ${BK} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}------------------------------------${R}"
+    echo -e "  ${BK} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}App:${W} GRC-xMINI v1.4.0 (Yokota)${R}"
+    echo -e "  ${BK} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
+    echo -e "  ${BK}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
+    echo -e "  ${BK} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${G}Assurance:${W} Pure Python Stdlib (Host-Native)${R}"
+    echo -e "  ${BK}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${G}Engines:${W} (7) Transform, Bundle, Crypto, AMI,${R}"
+    echo -e "  ${BK}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${W}             SBOM, Reporter, Test Engine${R}"
+    echo -e "  ${BK}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${G}Companion:${W} GRC-xTEST (v1.3.x+ Synchronized)${R}"
+    echo -e "  ${P}   ███╗   ███╗   ██╗   ███╗   ██╗   ██╗                    ${G}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
+    echo -e "  ${P}   ████╗ ████║   ██║   ████╗  ██║   ██║                    ${G}Artifacts:${W} artifacts/drop-off & pick-up${R}"
+    echo -e "  ${P}   ██╔████╔██║   ██║   ██╔██╗ ██║   ██║                    ${G}Output:${W} Timestamps (YYYY-MM-DD_HHMMSS)${R}"
+    echo -e "  ${P}   ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║                    ${G}Ruleset:${W} 37 AST Rules (AOC 02–140)${R}"
+    echo -e "  ${P}   ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║                    ${G}Status:${W} Agile & Nimble Architecture${R}"
+    echo -e "  ${P}   ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═══╝   ╚═╝                    ${G}Deliverables:${W} Sealed with sha256sum${R}"
     echo -e ""
     echo -e "                                                               \033[40m   \033[41m   \033[42m   \033[43m   \033[44m   \033[45m   \033[46m   \033[47m   ${R}"
     echo -e "                                                               \033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \033[106m   \033[107m   ${R}"
@@ -53,7 +58,7 @@ print_scan_help() {
     echo ""
     echo "Options:"
     echo "  -w, --workspace <dir>  Target ephemeral workspace directory (default: ./ephemeral_workspace)"
-    echo "  -e, --evidence <dir>   Output evidence directory (default: auto-namespaced under ./evidence/)"
+    echo "  -e, --evidence <dir>   Output evidence directory (default: artifacts/pick-up/<timestamp>)"
     echo "  -t, --engine <name>    Compliance engine to execute (default: all)"
     echo "  --no-report            Skip automatic Phase 4 SCR/SCN report synthesis after scanning"
     echo "  -h, --help             Show this help message"
@@ -65,10 +70,11 @@ if [[ "$#" -eq 0 ]]; then
     echo ""
     echo "Standalone GRC Analyst Workflow (No Docker or .bundle Required):"
     echo "  transform      [filename]      Drop scan (.csv/.xlsx) & previous POA&M (.xlsx) into"
-    echo "                                 ./scans/ and run './grc transform' (lists files by"
-    echo "                                 number or accepts filename without path/extension)"
+    echo "                                 artifacts/drop-off/ and run './grc transform' (auto-generates"
+    echo "                                 timestamped deliverables in artifacts/pick-up/)"
     echo ""
-    echo "5-Phase Bundle & AMI Audit Pipeline Commands:"
+    echo "7-Engine Compliance & Invariant Testing Pipeline:"
+    echo "  test           [suite]         Run test suites (all, unit, transform, bundle, crypto, ami, sbom)"
     echo "  bundle restore <file.bundle>   Extract & verify bundle into ephemeral workspace"
     echo "  bundle verify  <file.bundle>   Cryptographic (SHA-256) and Git object validation"
     echo "  bundle clean   --workspace <w> Teardown ephemeral workspace & wipe bundle"
@@ -80,7 +86,7 @@ if [[ "$#" -eq 0 ]]; then
     echo "  sbom           --sbom <file>   Direct CLI wrapper for DISA STIG / SRG SBOM analyzer"
     echo "  crypto         -w <workspace>  Direct CLI wrapper for cryptographic & EOL library scanner"
     echo "  docker-build                   Build the local grc-scanner:local Docker image"
-    echo "  fetch | info                   Display the GRCx neofetch banner"
+    echo "  fetch | info                   Display the GRC-xMINI neofetch banner"
     echo "=========================================================="
     exit 1
 fi
@@ -91,6 +97,9 @@ shift
 case "${SUBCOMMAND}" in
     fetch|info|--version|-v)
         print_grcfetch
+        ;;
+    test)
+        python3 "${SCRIPT_DIR}/scripts/grc_test.py" "$@"
         ;;
     transform|ingest)
         python3 "${SCRIPT_DIR}/scripts/transform_scans.py" "$@"
@@ -169,7 +178,8 @@ case "${SUBCOMMAND}" in
 
         RESOLVED_WORKSPACE="$(cd "${WORKSPACE_PATH}" 2>/dev/null && pwd || echo "${WORKSPACE_PATH}")"
 
-        # Auto-namespace evidence directory by bundle name if provenance is present
+        # Auto-namespace deliverables/evidence directory under artifacts/pick-up
+        TIMESTAMP="$(date +%Y-%m-%d_%H%M%S 2>/dev/null || true)"
         if [[ -n "${EVIDENCE_PATH}" ]]; then
             mkdir -p "${EVIDENCE_PATH}"
             RESOLVED_EVIDENCE="$(cd "${EVIDENCE_PATH}" && pwd)"
@@ -177,12 +187,20 @@ case "${SUBCOMMAND}" in
             BUNDLE_SOURCE="$(grep -o '"bundle_source_path": *"[^"]*"' "${RESOLVED_WORKSPACE}/bundle_provenance.json" | cut -d'"' -f4 || true)"
             if [[ -n "${BUNDLE_SOURCE}" ]]; then
                 BUNDLE_BASE="$(basename "${BUNDLE_SOURCE}" .bundle)"
-                RESOLVED_EVIDENCE="${SCRIPT_DIR}/evidence/${BUNDLE_BASE}"
+                if [[ -n "${TIMESTAMP}" ]]; then
+                    RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}_${BUNDLE_BASE}"
+                else
+                    RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${BUNDLE_BASE}"
+                fi
+            elif [[ -n "${TIMESTAMP}" ]]; then
+                RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}"
             else
-                RESOLVED_EVIDENCE="${SCRIPT_DIR}/evidence"
+                RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up"
             fi
+        elif [[ -n "${TIMESTAMP}" ]]; then
+            RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}"
         else
-            RESOLVED_EVIDENCE="${SCRIPT_DIR}/evidence"
+            RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up"
         fi
         mkdir -p "${RESOLVED_EVIDENCE}"
 

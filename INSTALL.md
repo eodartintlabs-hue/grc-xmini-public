@@ -1,4 +1,4 @@
-# GRCx — Installation & Quickstart Guide (`INSTALL.md`)
+# GRC-xMINI — Installation & Quickstart Guide (`INSTALL.md`)
 
 <p align="center">
   <a href="README.md"><b>📖 README</b></a> &nbsp;·&nbsp;
@@ -56,11 +56,11 @@ git clone https://github.com/eodartintlabs-hue/grc-xtest.git GRC-xTEST
 ```
 
 ### Option B: Clone from a Portable `.bundle` File (Self-Hosted / Air-Gapped Transfer)
-If you received **GRCx** as a portable Git bundle file (e.g., `grcx-v1.3.4.bundle`), verify and clone directly from the file with zero network access:
+If you received **GRCx** as a portable Git bundle file (e.g., `grcx-v1.4.0.bundle`), verify and clone directly from the file with zero network access:
 
 ```bash
-git bundle verify grcx-v1.3.4.bundle
-git clone grcx-v1.3.4.bundle GRC-x
+git bundle verify grcx-v1.4.0.bundle
+git clone grcx-v1.4.0.bundle GRC-x
 ```
 
 ---
@@ -92,10 +92,10 @@ git clone grcx-v1.3.4.bundle GRC-x
 **GRCx** supports two primary workflows depending on your role:
 
 ### Workflow A: Standalone Scan-to-FedRAMP POA&M Transformation (`transform_scans.py`)
-> **Does NOT require Docker or a `.bundle` file**: Because `scripts/transform_scans.py` uses **100% Python 3 Standard Library** modules, you do **not** need to start the Docker container to run it. Simply drop your scan files (`.csv`/`.xlsx`) and previous OPEN POA&M (`.xlsx`) into the **`scans/`** folder at the repository root!
+> **Does NOT require Docker or a `.bundle` file**: Because `scripts/transform_scans.py` uses **100% Python 3 Standard Library** modules, you do **not** need to start the Docker container to run it. Simply drop your scan files (`.csv`/`.xlsx`) and previous OPEN POA&M (`.xlsx`) into the **`artifacts/drop-off/`** folder at the repository root!
 
 #### 🍎 macOS / 🐧 Linux / 🪟 Windows WSL2
-Drop your files into **`scans/`** and run `./grc transform` interactively (or pass just the filenames):
+Drop your files into **`artifacts/drop-off/`** and run `./grc transform` interactively (or pass just the filenames):
 
 ```bash
 # Interactive Drop-In Mode (lists files in scans/ by number, prompts to add up to 5 scans):
