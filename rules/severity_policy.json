@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "policy_metadata": {
+    "title": "GRC-xMINI Unified Severity, DISA CAT & FedRAMP ConMon SLA Policy",
+    "version": "1.4.2",
+    "last_updated": "2026-11-01",
+    "target_frameworks": [
+      "FedRAMP High & Moderate Continuous Monitoring (ConMon)",
+      "DISA STIG / DoD RMF Category I-III",
+      "NIST SP 800-53 Rev. 5 (RA-5, SI-2, CA-7)"
+    ],
+    "description": "Single source of truth for severity normalization, DISA STIG CAT mapping, numeric sorting rank, and FedRAMP SLA remediation windows across all GRC-xMINI engines."
+  },
+  "severities": {
+    "CRITICAL": {
+      "canonical": "CRITICAL",
+      "fedramp_risk": "Critical",
+      "cat_level": "CAT I",
+      "sla_days": 30,
+      "rank": 0,
+      "aliases": ["CRITICAL", "CRIT", "VERY HIGH", "CAT I", "CAT 1", "CAT-I"]
+    },
+    "HIGH": {
+      "canonical": "HIGH",
+      "fedramp_risk": "High",
+      "cat_level": "CAT II",
+      "sla_days": 30,
+      "rank": 1,
+      "aliases": ["HIGH", "ERROR", "IMPORTANT", "CAT II", "CAT 2", "CAT-II"]
+    },
+    "MEDIUM": {
+      "canonical": "MEDIUM",
+      "fedramp_risk": "Moderate",
+      "cat_level": "CAT II",
+      "sla_days": 90,
+      "rank": 2,
+      "aliases": ["MEDIUM", "MODERATE", "MOD", "MED", "WARNING", "WARN", "UNVERIFIED", "CAT III", "CAT 3", "CAT-III"]
+    },
+    "LOW": {
+      "canonical": "LOW",
+      "fedramp_risk": "Low",
+      "cat_level": "CAT III",
+      "sla_days": 180,
+      "rank": 3,
+      "aliases": ["LOW", "MINOR", "NEGLIGIBLE"]
+    },
+    "INFO": {
+      "canonical": "INFO",
+      "fedramp_risk": "Low",
+      "cat_level": "CAT III",
+      "sla_days": 180,
+      "rank": 4,
+      "aliases": ["INFO", "INFORMATIONAL", "NONE", "UNKNOWN"]
+    }
+  }
+}

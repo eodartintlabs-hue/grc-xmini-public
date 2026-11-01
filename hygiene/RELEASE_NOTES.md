@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.4.1 — Yokota` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.4.2 — Yokota` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner ([`@eodartintlabs-hue`](https://github.com/eodartintlabs-hue))  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.4.2`](#v142--yokota) | Yokota | 2026-11-01 | Bug fix | `pending` | Code Review Phase 2 (Externalized policy catalogs `rules/severity_policy.json` & `rules/stig_catalog.json`, `Ec2Backend` strategy pattern, `PoamIdAllocator`, `TenableAdapter`/`InspectorAdapter`, `@dataclass` models, 34 unit tests, and Bold White `GRCx` logo update) |
 | [`v1.4.1`](#v141--yokota) | Yokota | 2026-11-01 | Bug fix | `c8c629f` | Code Review Phase 1 (P0/P1 security & compliance integrity fixes across all 7 engines, `grc_common.py`, `grc_fixtures.py`, and 29 regression tests) |
 | [`v1.4.0`](#v140--yokota) | Yokota | 2026-11-01 | Minor | `4e88635` | GRC-xMINI rebrand under GRC-x Initiative, grc_test engine #7, artifacts drop-off/pick-up, and purple MINI logo |
 | [`v1.3.4`](#v134--sasebo) | Sasebo | 2026-11-01 | Hygiene / Docs | `802bdc9` | Documentation hygiene, GRC-xTEST rebranding, dual desktop navigation fork, and patch log restructuring |
@@ -43,6 +44,35 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.4.2 — Yokota
+
+**Architecture & Maintainability Refactoring (Code Review Phase 2)** · November 01, 2026 · Tag `v1.4.2`
+
+### Phase 2 Structural Refactoring & Externalized Policy Catalogs
+
+1. **Externalized Policy & Benchmark Catalogs (`rules/` & `scripts/grc_common.py`)**:
+   - Added [`rules/severity_policy.json`](../rules/severity_policy.json) and [`rules/stig_catalog.json`](../rules/stig_catalog.json) as single sources of truth for FedRAMP ConMon SLAs (`30 / 30 / 90 / 180` days), DISA STIG impact categories, OS-to-STIG mappings, and the 18 DISA STIG/SRG profiles.
+   - Extended [`scripts/grc_common.py`](../scripts/grc_common.py) with `load_severity_policy()`, `normalize_severity()`, `get_severity_policy()`, `load_stig_catalog()`, `load_os_stig_mapping()`, and `write_output()`.
+2. **`scripts/grc_bundle.py` (`CommitMetadata` Dataclass & Null-Delimited Git Parsing)**:
+   - Added `@dataclass class CommitMetadata` (with `.unknown()` and `.to_dict()`) and `_git()` subprocess helper.
+   - Upgraded `extract_commit_metadata()` to use `git log -1 -z` null-byte (`\x00`) field delimiters so commit subjects containing `|||` are parsed cleanly, and updated `git checkout` to `--detach <ref> --`.
+3. **`scripts/grc_ami.py` (`Ec2Backend` Strategy Pattern)**:
+   - Replaced interleaved `if self.mock_mode:` / `elif HAS_BOTO3:` / `else:` branches across 4 methods with a clean `Ec2Backend` Strategy hierarchy (`MockBackend`, `AwsCliBackend`, `Boto3Backend` with cached `self.ec2` client) and loaded `OS_STIG_MAPPING` from `rules/stig_catalog.json`.
+4. **`scripts/crypto_lib_scan.py` (Synced Catalog & Dispatch Registries)**:
+   - Synchronized `DEFAULT_CRYPTO_CATALOG` with `rules/crypto_catalog.json`, added `DependencyExtractor.PARSERS` dispatch table, and refactored `CryptoReporter` with `to_terminal()` and `FORMATTERS` dispatch dictionary.
+5. **`scripts/sbom_analyzer.py` (`@dataclass` Models, Nested CycloneDX & Resolver Chain)**:
+   - Converted `Component` and `STIGMapping` to `@dataclass` (with safe non-string field coercion in `Component.__post_init__`), added recursive `components[].components` CycloneDX traversal, loaded `DISA_STIG_CATALOG` from `rules/stig_catalog.json`, and refactored `STIGAnalyzer` to a Chain-of-Responsibility resolver list (`self._resolvers`).
+6. **`scripts/grc_reporter.py` (`PARSERS` Registry & SBOM STIG Ingestion)**:
+   - Added `_load_json()`, `PARSERS` registry dictionary, `_md_header()`, and `parse_sbom_stig()` (ingesting `stig_applicability.json` / `sbom_stig_map.json` into `scr_scn_package.json`).
+7. **`scripts/transform_scans.py` (`PoamIdAllocator`, Scanner Adapters & Strict Date Validation)**:
+   - Extracted `PoamIdAllocator` and `_close_item()` shared across `reconcile_poam_entries` and `reconcile_poam_entries_legacy` (retaining `MATCH_MODE = "legacy"` default).
+   - Added `TransformConfig` dataclass, `TenableAdapter` / `InspectorAdapter` classes (with distinct fallback asset keys when `Host` or `Resource ID` is absent), `_resolve_poam_arg_or_prompt()` helper, and strict `--reference-date` validation.
+8. **Expanded Regression Suite & CLI Banner (`testing/test_code_review_regressions.py`, `./grc`, `README.md`)**:
+   - Added Phase 2 unit tests (34 total unit tests + all 7 compliance engines passing via `./grc test`).
+   - Updated the `./grc fetch` terminal logo to render `GRCx` in Bold White (`\033[1;97m`) above `MINI` in Purple (`\033[38;5;135m`).
 
 ---
 

@@ -41,6 +41,7 @@ import grc_bundle  # noqa: E402
 import grc_common  # noqa: E402
 import grc_reporter  # noqa: E402
 import sbom_analyzer  # noqa: E402
+import transform_scans  # noqa: E402
 
 
 class TestCodeReviewRegressions(unittest.TestCase):
@@ -268,6 +269,126 @@ class TestCodeReviewRegressions(unittest.TestCase):
         self.assertEqual(mappings["redis"], "ASD_STIG")
         self.assertEqual(mappings["openjdk-17-jre"], "JAVA_JRE_STIG")
         self.assertEqual(mappings["glibc"], "RHEL_8_STIG")
+
+    # -----------------------------------------------------------------------
+    # Phase 2 Architectural & P2 Refactors
+    # -----------------------------------------------------------------------
+
+    def test_phase2_externalized_catalogs_and_severity_policy(self) -> None:
+        sev_policy = grc_common.load_severity_policy()
+        self.assertEqual(sev_policy["CRITICAL"][1], 30)
+        self.assertEqual(sev_policy["HIGH"][1], 30)
+        self.assertEqual(sev_policy["MEDIUM"][1], 90)
+        self.assertEqual(sev_policy["LOW"][1], 180)
+        self.assertEqual(grc_common.normalize_severity("ERROR"), "HIGH")
+        self.assertEqual(grc_common.normalize_severity("WARN"), "MEDIUM")
+
+        stig_cat = grc_common.load_stig_catalog()
+        self.assertIn("RHEL_9_STIG", stig_cat)
+        self.assertIn("ASD_STIG", stig_cat)
+        os_map = grc_common.load_os_stig_mapping()
+        self.assertIn("rhel-8", os_map)
+
+    def test_phase2_commit_metadata_and_ec2_backend_strategy(self) -> None:
+        meta = grc_bundle.CommitMetadata.unknown()
+        self.assertEqual(meta.commit_hash, "UNKNOWN")
+        self.assertIn("commit_hash", meta.to_dict())
+
+        mock_mgr = grc_ami.GRCAMIManager(ami_id="ami-0123456789abcdef0", mock_mode=True)
+        self.assertIsInstance(mock_mgr.backend, grc_ami.MockBackend)
+
+        with mock.patch.object(grc_ami, "HAS_BOTO3", False):
+            cli_mgr = grc_ami.GRCAMIManager(ami_id="ami-0123456789abcdef0", mock_mode=False)
+            self.assertIsInstance(cli_mgr.backend, grc_ami.AwsCliBackend)
+
+    def test_phase2_sbom_nested_cyclonedx_and_non_string_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            sbom_file = Path(tmp) / "nested_sbom.json"
+            payload = {
+                "bomFormat": "CycloneDX",
+                "components": [
+                    {
+                        "name": "parent-app",
+                        "version": 123,  # non-string version coerced safely
+                        "type": "application",
+                        "components": [
+                            {
+                                "name": "nginx",
+                                "version": "1.24.0",
+                                "purl": "pkg:deb/debian/nginx@1.24.0",
+                                "type": "application",
+                            }
+                        ],
+                    }
+                ],
+            }
+            sbom_file.write_text(json.dumps(payload), encoding="utf-8")
+            comps = sbom_analyzer.SBOMParser.parse(sbom_file)
+            names = {c.name: c.version for c in comps}
+            self.assertEqual(names.get("parent-app"), "123")
+            self.assertEqual(names.get("nginx"), "1.24.0")
+
+    def test_phase2_reporter_clean_path_and_sbom_ingestion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ev_dir = Path(tmp)
+            (ev_dir / "stig_applicability.json").write_text(
+                json.dumps({"summary": {"unique_applicable_stigs_count": 2}}),
+                encoding="utf-8",
+            )
+            reporter = grc_reporter.GRCComplianceReporter(evidence_dir=ev_dir)
+            # Only leading /workspace/ is stripped; mid-path 'workspace' is preserved
+            self.assertEqual(
+                reporter.clean_path("/workspace/services/workspace/handler.py"),
+                "services/workspace/handler.py",
+            )
+            reporter.run(write_files=True)
+            pkg = json.loads((ev_dir / "scr_scn_package.json").read_text(encoding="utf-8"))
+            self.assertIn("SBOM", pkg["assessed_scanners"])
+            self.assertIn("sbom_stig_applicability", pkg)
+            self.assertEqual(pkg["controls_rollup"]["CM-8"]["status"], "PASS")
+
+    def test_phase2_transform_scans_poam_id_allocator_and_adapters(self) -> None:
+        import datetime as dt
+
+        today = dt.date(2026, 3, 29)
+        prev_open = [{"poam_id": "VULN-00004", "weakness_name": "Old", "cve": "CVE-2024-0001"}]
+        prev_closed = [{"poam_id": "COMP-00002", "weakness_name": "Old Comp", "cve": ""}]
+        alloc = transform_scans.PoamIdAllocator(prev_open, prev_closed, today)
+        self.assertTrue(alloc.uses_typed_prefix)
+        self.assertEqual(
+            alloc.next_id({"weakness_name": "OpenSSH RCE", "cve": "CVE-2024-6387"}),
+            "VULN-00005",
+        )
+        self.assertEqual(
+            alloc.next_id({"weakness_name": "TLS 1.0 Cipher Suite Enabled", "cve": ""}),
+            "COMP-00003",
+        )
+
+        # Two Inspector rows missing Resource ID but having distinct Finding ARNs must not collapse
+        rows = [
+            {
+                "Severity": "High",
+                "Vulnerability ID": "CVE-2024-1111",
+                "Finding ARN": "arn:aws:inspector2:us-east-1:123456789012:finding/aaa",
+                "AWS Account ID": "123456789012",
+                "Title": "CVE-2024-1111 in openssl",
+            },
+            {
+                "Severity": "High",
+                "Vulnerability ID": "CVE-2024-1111",
+                "Finding ARN": "arn:aws:inspector2:us-east-1:123456789012:finding/bbb",
+                "AWS Account ID": "123456789012",
+                "Title": "CVE-2024-1111 in openssl",
+            },
+        ]
+        norm = transform_scans.normalize_scan_rows(
+            records=rows,
+            scanner_type="inspector",
+            scan_filename="inspector.csv",
+            today=today,
+            default_poc="SecOps",
+        )
+        self.assertEqual(len(norm), 2)
 
 
 if __name__ == "__main__":

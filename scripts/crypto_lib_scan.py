@@ -153,6 +153,16 @@ DEFAULT_CRYPTO_CATALOG: Dict[str, Any] = {
     },
 }
 
+# Synchronize DEFAULT_CRYPTO_CATALOG with rules/crypto_catalog.json when present
+_CATALOG_FILE = Path(__file__).resolve().parent.parent / "rules" / "crypto_catalog.json"
+if _CATALOG_FILE.is_file():
+    try:
+        _cat_data = json.loads(_CATALOG_FILE.read_text(encoding="utf-8"))
+        if isinstance(_cat_data, dict) and isinstance(_cat_data.get("rules"), dict):
+            DEFAULT_CRYPTO_CATALOG = _cat_data["rules"]
+    except Exception:
+        pass
+
 
 # ==============================================================================
 # DATA MODELS
@@ -215,16 +225,9 @@ class DependencyExtractor:
                 f_path = r_path / f
                 rel_path = str(f_path.relative_to(ws_resolved))
 
-                if f == "requirements.txt":
-                    extracted.extend(DependencyExtractor._parse_requirements(f_path, rel_path))
-                elif f == "pyproject.toml":
-                    extracted.extend(DependencyExtractor._parse_pyproject(f_path, rel_path))
-                elif f == "package.json":
-                    extracted.extend(DependencyExtractor._parse_package_json(f_path, rel_path))
-                elif f == "pom.xml":
-                    extracted.extend(DependencyExtractor._parse_pom_xml(f_path, rel_path))
-                elif f == "go.mod":
-                    extracted.extend(DependencyExtractor._parse_go_mod(f_path, rel_path))
+                parser_fn = DependencyExtractor.PARSERS.get(f)
+                if parser_fn is not None:
+                    extracted.extend(parser_fn(f_path, rel_path))
                 elif f.startswith("libcrypto.") or f.startswith("libssl.") or f == "openssl":
                     so_ver = DependencyExtractor._extract_soname_version(f)
                     extracted.append((f, so_ver, rel_path, "system"))
@@ -379,6 +382,15 @@ class DependencyExtractor:
         except OSError:
             pass
         return results
+
+
+DependencyExtractor.PARSERS = {
+    "requirements.txt": DependencyExtractor._parse_requirements,
+    "pyproject.toml": DependencyExtractor._parse_pyproject,
+    "package.json": DependencyExtractor._parse_package_json,
+    "pom.xml": DependencyExtractor._parse_pom_xml,
+    "go.mod": DependencyExtractor._parse_go_mod,
+}
 
 
 # ==============================================================================
@@ -585,6 +597,9 @@ class CryptoReporter:
             "summary": {
                 "total_crypto_libraries": len(findings),
                 "critical_eol_count": sum(1 for f in findings if f.severity == "CRITICAL"),
+                "eol_count": sum(1 for f in findings if f.status == "FAIL_EOL"),
+                "deprecated_count": sum(1 for f in findings if f.status == "FAIL_DEPRECATED"),
+                "unverified_count": sum(1 for f in findings if f.status == "WARN_UNVERIFIED"),
                 "high_severity_count": sum(1 for f in findings if f.severity == "HIGH"),
                 "warning_count": sum(1 for f in findings if f.status.startswith("WARN")),
                 "compliant_count": sum(1 for f in findings if f.status == "PASS"),
@@ -595,6 +610,32 @@ class CryptoReporter:
             ],
         }
         return json.dumps(payload, indent=2)
+
+    @staticmethod
+    def to_terminal(findings: List[CryptoFinding], workspace: str) -> str:
+        lines = [
+            "=======================================================================",
+            "  Cryptographic Provider & Dependency Audit Report",
+            "=======================================================================",
+            f"Workspace: {workspace}",
+            f"Crypto Packages Detected: {len(findings)}",
+            "-----------------------------------------------------------------------",
+        ]
+        for f in sorted(findings, key=lambda x: (SEVERITY_RANK.get(x.severity.upper(), 99), x.name)):
+            tag = f"[{f.severity}]"
+            lines.append(f"{tag:<10} {f.name:<20} Ver: {f.version:<10} Status: {f.status}")
+            lines.append(f"           Source: {f.source_file}")
+            lines.append(f"           NIST: {', '.join(f.nist_controls)} | AOC: {f.aoc}")
+            lines.append(f"           Action: {f.remediation}")
+            lines.append("-----------------------------------------------------------------------")
+        return "\n".join(lines)
+
+
+FORMATTERS = {
+    "json": CryptoReporter.to_json,
+    "markdown": CryptoReporter.to_markdown,
+    "terminal": CryptoReporter.to_terminal,
+}
 
 
 # ==============================================================================
@@ -681,28 +722,9 @@ def main() -> None:
         elif str(args.output).lower().endswith(".md"):
             fmt = "markdown"
 
-    # 3. Format Output
-    if fmt == "json":
-        out = CryptoReporter.to_json(findings, str(workspace_path))
-    elif fmt == "markdown":
-        out = CryptoReporter.to_markdown(findings, str(workspace_path))
-    else:
-        lines = [
-            "=======================================================================",
-            "  Cryptographic Provider & Dependency Audit Report",
-            "=======================================================================",
-            f"Workspace: {workspace_path}",
-            f"Crypto Packages Detected: {len(findings)}",
-            "-----------------------------------------------------------------------",
-        ]
-        for f in sorted(findings, key=lambda x: (SEVERITY_RANK.get(x.severity.upper(), 99), x.name)):
-            tag = f"[{f.severity}]"
-            lines.append(f"{tag:<10} {f.name:<20} Ver: {f.version:<10} Status: {f.status}")
-            lines.append(f"           Source: {f.source_file}")
-            lines.append(f"           NIST: {', '.join(f.nist_controls)} | AOC: {f.aoc}")
-            lines.append(f"           Action: {f.remediation}")
-            lines.append("-----------------------------------------------------------------------")
-        out = "\n".join(lines)
+    # 3. Format Output via FORMATTERS dispatch dict
+    formatter = FORMATTERS.get(fmt, CryptoReporter.to_terminal)
+    out = formatter(findings, str(workspace_path))
 
     if args.output:
         try:

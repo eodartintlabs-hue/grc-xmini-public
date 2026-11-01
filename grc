@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="${HOME}/.docker/bin:/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:${PATH}"
 
 print_grcfetch() {
-    local BK="\033[1;30m"      # Bold Black for "GRCx"
+    local BW="\033[1;97m"      # Bold White for "GRCx"
     local P="\033[38;5;135m"   # Purple for "MINI"
     local HP="\033[38;5;198m"  # Hot Pink for title
     local G="\033[1;32m"       # Bright Green keys
@@ -19,16 +19,16 @@ print_grcfetch() {
     local R="\033[0m"          # Reset
 
     echo -e ""
-    echo -e "  ${BK}        .--.          .--.          .--.                       ${R}"
-    echo -e "  ${BK}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.4.1 (Yokota Series)${R}"
-    echo -e "  ${BK} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}--------------------------------${R}"
-    echo -e "  ${BK} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
-    echo -e "  ${BK} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
-    echo -e "  ${BK}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Assurance:${W} Pure Python Stdlib (Host-Native)${R}"
-    echo -e "  ${BK} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${G}Companion:${W} GRC-xTEST (v1.3.x+ Synchronized)${R}"
-    echo -e "  ${BK}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${G}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
-    echo -e "  ${BK}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${G}Output:${W} Timestamps (YYYY-MM-DD_HHMMSS)${R}"
-    echo -e "  ${BK}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${G}Deliverables:${W} Sealed with sha256sum${R}"
+    echo -e "  ${BW}        .--.          .--.          .--.                       ${R}"
+    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.4.2 (Yokota Series)${R}"
+    echo -e "  ${BW} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}--------------------------------${R}"
+    echo -e "  ${BW} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
+    echo -e "  ${BW} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
+    echo -e "  ${BW}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Assurance:${W} Pure Python Stdlib (Host-Native)${R}"
+    echo -e "  ${BW} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${G}Companion:${W} GRC-xTEST (v1.3.x+ Synchronized)${R}"
+    echo -e "  ${BW}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${G}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
+    echo -e "  ${BW}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${G}Output:${W} Timestamps (YYYY-MM-DD_HHMMSS)${R}"
+    echo -e "  ${BW}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${G}Deliverables:${W} Sealed with sha256sum${R}"
     echo -e "  ${P}                      ███╗   ███╗   ██╗   ███╗   ██╗   ██╗    ${G}Engines:${W} (7) Transform, Bundle, Crypto, AMI,${R}"
     echo -e "  ${P}                      ████╗ ████║   ██║   ████╗  ██║   ██║    ${W}         SBOM, Reporter, Test Engine${R}"
     echo -e "  ${P}                      ██╔████╔██║   ██║   ██╔██╗ ██║   ██║    ${R}"

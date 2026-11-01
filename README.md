@@ -30,7 +30,7 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.1 (Yokota Series)
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.2 (Yokota Series)
  {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
@@ -51,7 +51,7 @@
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.4.1 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.4.2 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Test Corpus**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)  

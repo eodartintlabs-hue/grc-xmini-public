@@ -5,18 +5,25 @@ grc_ami.py - GRC Amazon Machine Image (AMI) Ingestion & Cold-Mount Lifecycle Man
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Phase 1 (Pull & Verify) & Phase 2 (Restore / Cold-Mount) Core Orchestrator
-Target Frameworks: NIST SP 800-53 (SC-12, SC-13, SC-28, SI-7, CM-6), FedRAMP High, DISA STIG
+Target Frameworks: NIST SP 800-53 (SC-12, SC-13, SI-7, CM-6), FedRAMP High, DISA STIG
 Architecture Pattern: EBS Snapshot Cold-Mount (Zero Untrusted Execution)
 
 Purpose:
   Provides the operational CLI and orchestration engine for auditing AMIs out-of-band:
     - Verifies AMI metadata, root EBS snapshot integrity, and KMS encryption compliance.
-    - Provisions ephemeral secondary EBS volumes from root snapshots with automatic rollback.
-    - Executes read-only cold mounts (`ro,norecovery,nouuid,noexec,nosuid` on XFS or
-      `ro,noload,noexec,nosuid` on ext4) without booting untrusted code.
+    - Provisions ephemeral secondary EBS volumes from root snapshots in the worker's AZ.
+    - Executes read-only cold mounts (`ro,norecovery,nouuid,noexec,nosuid` for XFS;
+      `ro,noload,noexec,nosuid` for ext4) without booting untrusted code.
     - Extracts OS release identifiers (`/etc/os-release`) to map applicable DISA STIG profiles.
     - Emits formal `ami_provenance.json` audit manifests for FedRAMP / DoD SCR packages.
-    - Guarantees complete ephemeral teardown (`grc ami clean`) to eliminate cloud sprawl.
+    - Guarantees complete ephemeral teardown (`grc ami clean`) and automatic volume rollback
+      on failure to eliminate cloud sprawl.
+
+Design Rule Adherence:
+  - Out-of-Band (OOB): Never gates main VM image build pipelines.
+  - Zero Untrusted Execution: Cold-mounting prevents code execution, daemon activation, and state mutation.
+  - Ephemeral Lifecycle: Volumes and mount points exist solely for analysis and are destroyed post-audit.
+  - Explicit Mock Mode: Simulation mode runs ONLY when `--mock` is explicitly passed.
 """
 
 import argparse
@@ -26,9 +33,9 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-# Optional boto3 import; fallback to AWS CLI if unavailable
+# Optional boto3 import; falls back to AWS CLI if unavailable (never silent mock fallback)
 try:
     import boto3
     from botocore.exceptions import BotoCoreError, ClientError
@@ -37,7 +44,7 @@ except ImportError:
     HAS_BOTO3 = False
 
 try:
-    from grc_common import safe_rmtree, utc_now_iso
+    from grc_common import load_os_stig_mapping, safe_rmtree, utc_now_iso
     from grc_fixtures import (
         create_mock_rootfs,
         generate_mock_ami_metadata,
@@ -45,7 +52,7 @@ try:
     )
 except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from grc_common import safe_rmtree, utc_now_iso
+    from grc_common import load_os_stig_mapping, safe_rmtree, utc_now_iso
     from grc_fixtures import (
         create_mock_rootfs,
         generate_mock_ami_metadata,
@@ -54,12 +61,12 @@ except ImportError:
 
 
 # ==============================================================================
-# OS TO DISA STIG BENCHMARK RESOLVER
+# OS TO DISA STIG BENCHMARK RESOLVER (SHARED CATALOG)
 # ==============================================================================
 
 DEFAULT_SCAP_PROFILE = "xccdf_org.ssgproject.content_profile_stig"
 
-OS_STIG_MAPPING: Dict[str, Dict[str, str]] = {
+_FALLBACK_OS_STIG_MAPPING: Dict[str, Dict[str, str]] = {
     "rhel-9": {
         "benchmark_id": "U_RHEL_9_STIG",
         "benchmark_title": "Red Hat Enterprise Linux 9 STIG",
@@ -104,6 +111,8 @@ OS_STIG_MAPPING: Dict[str, Dict[str, str]] = {
     },
 }
 
+OS_STIG_MAPPING: Dict[str, Dict[str, str]] = load_os_stig_mapping() or dict(_FALLBACK_OS_STIG_MAPPING)
+
 
 def resolve_os_stig(os_id: str, version_id: str) -> Dict[str, str]:
     """Resolves OS identity to the corresponding DISA STIG benchmark."""
@@ -135,10 +144,285 @@ def _kms_key_matches(actual_kms: Optional[str], expected_kms: str) -> bool:
     expected = expected_kms.strip()
     if actual == expected:
         return True
-    # Allow matching the key UUID portion of an ARN (e.g. 'arn:aws:kms:...:key/<id>')
     if "/" in actual and actual.rsplit("/", 1)[-1] == expected:
         return True
     return False
+
+
+def parse_ec2_image(img: Dict[str, Any]) -> Dict[str, Any]:
+    """Extracts normalized metadata from an EC2 DescribeImages response dictionary."""
+    root_device = img.get("RootDeviceName", "/dev/sda1")
+    block_devices = img.get("BlockDeviceMappings", [])
+    root_snap = None
+    encrypted = False
+    kms_key = None
+    vol_size = 30
+
+    # Pass 1: Match exact RootDeviceName
+    matched_bdm = None
+    for bdm in block_devices:
+        if bdm.get("DeviceName") == root_device and "Ebs" in bdm:
+            matched_bdm = bdm
+            break
+    # Pass 2: Fallback to first EBS mapping only if RootDeviceName didn't match
+    if not matched_bdm:
+        for bdm in block_devices:
+            if "Ebs" in bdm:
+                matched_bdm = bdm
+                break
+
+    if matched_bdm:
+        ebs = matched_bdm.get("Ebs", {})
+        root_snap = ebs.get("SnapshotId")
+        encrypted = ebs.get("Encrypted", False)
+        kms_key = ebs.get("KmsKeyId")
+        vol_size = ebs.get("VolumeSize", 30)
+
+    return {
+        "image_id": img.get("ImageId"),
+        "name": img.get("Name", "unnamed-image"),
+        "owner_id": img.get("OwnerId", "unknown"),
+        "architecture": img.get("Architecture", "x86_64"),
+        "creation_date": img.get("CreationDate"),
+        "state": img.get("State", "available"),
+        "root_device_name": root_device,
+        "root_snapshot_id": root_snap,
+        "root_volume_size_gb": vol_size,
+        "encrypted": encrypted,
+        "kms_key_id": kms_key,
+        "virtualization_type": img.get("VirtualizationType", "hvm"),
+        "ena_support": img.get("EnaSupport", True),
+        "block_devices": block_devices,
+    }
+
+
+# ==============================================================================
+# EC2 BACKEND STRATEGY PATTERN (MOCK / AWS CLI / BOTO3)
+# ==============================================================================
+
+class Ec2Backend:
+    """Strategy interface for AWS EC2 image inspection and ephemeral EBS lifecycle operations."""
+
+    def __init__(self, region: str):
+        self.region = region
+
+    def describe_image(self, ami_id: str) -> Dict[str, Any]:
+        raise NotImplementedError
+
+    def resolve_worker_az(self, worker_id: Optional[str], default_az: str) -> str:
+        raise NotImplementedError
+
+    def create_volume(self, snapshot_id: str, az: str, tags: List[Dict[str, str]]) -> str:
+        raise NotImplementedError
+
+    def attach_volume(self, volume_id: str, worker_id: str, device_name: str) -> str:
+        raise NotImplementedError
+
+    def detach_and_delete_volume(self, volume_id: str) -> None:
+        raise NotImplementedError
+
+
+class MockBackend(Ec2Backend):
+    """Offline simulation backend (activated ONLY when `--mock` is explicitly passed)."""
+
+    def describe_image(self, ami_id: str) -> Dict[str, Any]:
+        return generate_mock_ami_metadata(ami_id, self.region)
+
+    def resolve_worker_az(self, worker_id: Optional[str], default_az: str) -> str:
+        return default_az
+
+    def create_volume(self, snapshot_id: str, az: str, tags: List[Dict[str, str]]) -> str:
+        mock_vol = generate_mock_ebs_volume(snapshot_id)
+        print(f"[*] [MOCK] Provisioned ephemeral EBS volume: {mock_vol} (from {snapshot_id})")
+        return mock_vol
+
+    def attach_volume(self, volume_id: str, worker_id: str, device_name: str) -> str:
+        print(f"[*] [MOCK] Attached volume {volume_id} to worker as {device_name}")
+        return device_name
+
+    def detach_and_delete_volume(self, volume_id: str) -> None:
+        print(f"    -> [MOCK] Detached and deleted volume {volume_id}.")
+
+
+class AwsCliBackend(Ec2Backend):
+    """AWS CLI (`aws ec2 ...`) backend strategy."""
+
+    def describe_image(self, ami_id: str, boto_err: Optional[Exception] = None) -> Dict[str, Any]:
+        try:
+            cmd = [
+                "aws", "ec2", "describe-images",
+                "--image-ids", ami_id,
+                "--region", self.region,
+                "--output", "json",
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            data = json.loads(res.stdout)
+            images = data.get("Images", [])
+            if not images:
+                raise FileNotFoundError(f"AMI '{ami_id}' not found in region '{self.region}'")
+            return parse_ec2_image(images[0])
+        except FileNotFoundError as e:
+            if getattr(e, "filename", None) == "aws":
+                raise RuntimeError(
+                    f"Failed to query AMI '{ami_id}': AWS CLI ('aws') is not installed "
+                    f"(and boto3 {'failed: ' + str(boto_err) if boto_err else 'is not installed'}). "
+                    f"Pass --mock only when running offline simulations."
+                ) from e
+            raise
+        except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+            err_detail = getattr(e, "stderr", None) or str(e)
+            raise RuntimeError(
+                f"Failed to query AMI '{ami_id}' in region '{self.region}': {err_detail.strip()}"
+            ) from e
+
+    def resolve_worker_az(self, worker_id: Optional[str], default_az: str) -> str:
+        if not worker_id:
+            return default_az
+        try:
+            cmd = [
+                "aws", "ec2", "describe-instances",
+                "--instance-ids", worker_id,
+                "--query", "Reservations[0].Instances[0].Placement.AvailabilityZone",
+                "--output", "text",
+                "--region", self.region,
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            az = res.stdout.strip()
+            if az and az != "None":
+                return az
+        except Exception:
+            pass
+        return default_az
+
+    def create_volume(self, snapshot_id: str, az: str, tags: List[Dict[str, str]]) -> str:
+        tag_items = ",".join(f"{{Key={t['Key']},Value={t['Value']}}}" for t in tags)
+        tag_spec = f"ResourceType=volume,Tags=[{tag_items}]"
+        cmd = [
+            "aws", "ec2", "create-volume",
+            "--snapshot-id", snapshot_id,
+            "--volume-type", "gp3",
+            "--availability-zone", az,
+            "--tag-specifications", tag_spec,
+            "--region", self.region,
+            "--output", "json",
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        data = json.loads(res.stdout)
+        vol_id = data["VolumeId"]
+        subprocess.run(
+            ["aws", "ec2", "wait", "volume-available", "--volume-ids", vol_id, "--region", self.region],
+            check=True,
+        )
+        return vol_id
+
+    def attach_volume(self, volume_id: str, worker_id: str, device_name: str) -> str:
+        cmd = [
+            "aws", "ec2", "attach-volume",
+            "--volume-id", volume_id,
+            "--instance-id", worker_id,
+            "--device", device_name,
+            "--region", self.region,
+        ]
+        subprocess.run(cmd, check=True)
+        subprocess.run(
+            ["aws", "ec2", "wait", "volume-in-use", "--volume-ids", volume_id, "--region", self.region],
+            check=True,
+        )
+        return device_name
+
+    def detach_and_delete_volume(self, volume_id: str) -> None:
+        subprocess.run(
+            ["aws", "ec2", "detach-volume", "--volume-id", volume_id, "--force", "--region", self.region],
+            check=False,
+        )
+        subprocess.run(
+            ["aws", "ec2", "wait", "volume-available", "--volume-ids", volume_id, "--region", self.region],
+            check=False,
+        )
+        subprocess.run(
+            ["aws", "ec2", "delete-volume", "--volume-id", volume_id, "--region", self.region],
+            check=False,
+        )
+
+
+class Boto3Backend(Ec2Backend):
+    """Native `boto3` EC2 backend with lazily cached client and CLI fallback on SDK transport errors."""
+
+    def __init__(self, region: str):
+        super().__init__(region)
+        self._ec2: Any = None
+        self._cli_fallback = AwsCliBackend(region)
+
+    @property
+    def ec2(self) -> Any:
+        if self._ec2 is None:
+            self._ec2 = boto3.client("ec2", region_name=self.region)
+        return self._ec2
+
+    def describe_image(self, ami_id: str) -> Dict[str, Any]:
+        try:
+            resp = self.ec2.describe_images(ImageIds=[ami_id])
+            images = resp.get("Images", [])
+            if not images:
+                raise FileNotFoundError(f"AMI '{ami_id}' not found in region '{self.region}'")
+            return parse_ec2_image(images[0])
+        except FileNotFoundError:
+            raise
+        except (ClientError, BotoCoreError) as e:
+            print(f"[WARN] boto3 call failed ({e}); attempting AWS CLI...", file=sys.stderr)
+            return self._cli_fallback.describe_image(ami_id, boto_err=e)
+
+    def resolve_worker_az(self, worker_id: Optional[str], default_az: str) -> str:
+        if not worker_id:
+            return default_az
+        try:
+            resp = self.ec2.describe_instances(InstanceIds=[worker_id])
+            for resv in resp.get("Reservations", []):
+                for inst in resv.get("Instances", []):
+                    az = inst.get("Placement", {}).get("AvailabilityZone")
+                    if az:
+                        return az
+        except Exception:
+            pass
+        return self._cli_fallback.resolve_worker_az(worker_id, default_az)
+
+    def create_volume(self, snapshot_id: str, az: str, tags: List[Dict[str, str]]) -> str:
+        resp = self.ec2.create_volume(
+            SnapshotId=snapshot_id,
+            VolumeType="gp3",
+            AvailabilityZone=az,
+            TagSpecifications=[{"ResourceType": "volume", "Tags": tags}],
+        )
+        vol_id = resp["VolumeId"]
+        print(f"    -> Created Volume ID: {vol_id}. Waiting for 'available' state...")
+        waiter = self.ec2.get_waiter("volume_available")
+        waiter.wait(VolumeIds=[vol_id])
+        return vol_id
+
+    def attach_volume(self, volume_id: str, worker_id: str, device_name: str) -> str:
+        self.ec2.attach_volume(
+            VolumeId=volume_id,
+            InstanceId=worker_id,
+            Device=device_name,
+        )
+        waiter = self.ec2.get_waiter("volume_in_use")
+        waiter.wait(VolumeIds=[volume_id])
+        print("    -> Volume successfully attached in use.")
+        return device_name
+
+    def detach_and_delete_volume(self, volume_id: str) -> None:
+        try:
+            self.ec2.detach_volume(VolumeId=volume_id, Force=True)
+            waiter = self.ec2.get_waiter("volume_available")
+            waiter.wait(VolumeIds=[volume_id])
+        except Exception as e:
+            print(f"[WARN] Error detaching volume: {e}", file=sys.stderr)
+
+        try:
+            self.ec2.delete_volume(VolumeId=volume_id)
+            print(f"    -> Deleted ephemeral volume {volume_id}.")
+        except Exception as e:
+            print(f"[ERROR] Failed to delete volume {volume_id}: {e}", file=sys.stderr)
 
 
 # ==============================================================================
@@ -161,6 +445,7 @@ class GRCAMIManager:
         partition: Optional[str] = None,
         mock_mode: bool = False,
         allow_unencrypted: bool = False,
+        backend: Optional[Ec2Backend] = None,
     ):
         self.ami_id = ami_id.strip()
         self.region = region
@@ -182,6 +467,16 @@ class GRCAMIManager:
         self.ephemeral_volume_id: Optional[str] = None
         self.ami_metadata: Dict[str, Any] = {}
         self.last_mount_options: str = "ro,norecovery,nouuid,noexec,nosuid"
+        self._explicit_backend = backend
+        self._live_backend: Ec2Backend = Boto3Backend(region) if HAS_BOTO3 else AwsCliBackend(region)
+        self._mock_backend: Ec2Backend = MockBackend(region)
+
+    @property
+    def backend(self) -> Ec2Backend:
+        """Returns the active EC2 strategy backend (`MockBackend`, `Boto3Backend`, or `AwsCliBackend`)."""
+        if self._explicit_backend is not None:
+            return self._explicit_backend
+        return self._mock_backend if self.mock_mode else self._live_backend
 
     # --------------------------------------------------------------------------
     # PHASE 1: PULL & VERIFY
@@ -339,10 +634,12 @@ class GRCAMIManager:
         # Step 6: Identify Target OS Distribution & Map STIG
         os_info = self._identify_target_os(self.mount_point)
         stig_mapping = resolve_os_stig(os_info["os_id"], os_info["version_id"])
-        os_info["applicable_stig_benchmark"] = stig_mapping["benchmark_id"]
-        os_info["benchmark_title"] = stig_mapping["benchmark_title"]
-        os_info["scap_datastream"] = stig_mapping["scap_datastream"]
-        os_info["default_profile"] = stig_mapping["default_profile"]
+        os_info.update({
+            "applicable_stig_benchmark": stig_mapping["benchmark_id"],
+            "benchmark_title": stig_mapping["benchmark_title"],
+            "scap_datastream": stig_mapping["scap_datastream"],
+            "default_profile": stig_mapping["default_profile"],
+        })
 
         print(f"    -> Detected Operating System: {os_info['pretty_name']}")
         print(f"    -> Mapped DISA STIG Baseline: {os_info['benchmark_title']}")
@@ -443,232 +740,51 @@ class GRCAMIManager:
         print("[SUCCESS] AMI audit workspace teardown and cleanup complete.")
 
     # --------------------------------------------------------------------------
-    # INTERNAL AWS & LOCAL MOUNT IMPLEMENTATION
+    # INTERNAL DELEGATES TO EC2 BACKEND & LOCAL MOUNT HELPERS
     # --------------------------------------------------------------------------
 
     def _fetch_ami_metadata(self) -> Dict[str, Any]:
-        """Queries AMI details from EC2 or explicit `--mock` mode (never silent fallback)."""
-        if self.mock_mode:
-            return self._mock_ami_metadata()
-
-        boto_err: Optional[Exception] = None
-        if HAS_BOTO3:
-            try:
-                ec2 = boto3.client("ec2", region_name=self.region)
-                resp = ec2.describe_images(ImageIds=[self.ami_id])
-                images = resp.get("Images", [])
-                if not images:
-                    raise FileNotFoundError(f"AMI '{self.ami_id}' not found in region '{self.region}'")
-                return self._parse_ec2_image(images[0])
-            except FileNotFoundError:
-                raise
-            except (ClientError, BotoCoreError) as e:
-                boto_err = e
-                print(f"[WARN] boto3 call failed ({e}); attempting AWS CLI...", file=sys.stderr)
-
-        # Try AWS CLI
-        try:
-            cmd = [
-                "aws", "ec2", "describe-images",
-                "--image-ids", self.ami_id,
-                "--region", self.region,
-                "--output", "json",
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            data = json.loads(res.stdout)
-            images = data.get("Images", [])
-            if not images:
-                raise FileNotFoundError(f"AMI '{self.ami_id}' not found in region '{self.region}'")
-            return self._parse_ec2_image(images[0])
-        except FileNotFoundError as e:
-            if getattr(e, "filename", None) == "aws":
-                raise RuntimeError(
-                    f"Failed to query AMI '{self.ami_id}': AWS CLI ('aws') is not installed "
-                    f"(and boto3 {'failed: ' + str(boto_err) if boto_err else 'is not installed'}). "
-                    f"Pass --mock only when running offline simulations."
-                )
-            raise
-        except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
-            err_detail = getattr(e, "stderr", None) or str(e)
-            raise RuntimeError(
-                f"Failed to query AMI '{self.ami_id}' in region '{self.region}': {err_detail.strip()}"
-            )
+        """Queries AMI details via the active `Ec2Backend` strategy."""
+        return self.backend.describe_image(self.ami_id)
 
     def _parse_ec2_image(self, img: Dict[str, Any]) -> Dict[str, Any]:
-        """Extracts normalized metadata from EC2 DescribeImages response."""
-        root_device = img.get("RootDeviceName", "/dev/sda1")
-        block_devices = img.get("BlockDeviceMappings", [])
-        root_snap = None
-        encrypted = False
-        kms_key = None
-        vol_size = 30
-
-        # Pass 1: Match exact RootDeviceName
-        matched_bdm = None
-        for bdm in block_devices:
-            if bdm.get("DeviceName") == root_device and "Ebs" in bdm:
-                matched_bdm = bdm
-                break
-        # Pass 2: Fallback to first EBS mapping only if RootDeviceName didn't match
-        if not matched_bdm:
-            for bdm in block_devices:
-                if "Ebs" in bdm:
-                    matched_bdm = bdm
-                    break
-
-        if matched_bdm:
-            ebs = matched_bdm.get("Ebs", {})
-            root_snap = ebs.get("SnapshotId")
-            encrypted = ebs.get("Encrypted", False)
-            kms_key = ebs.get("KmsKeyId")
-            vol_size = ebs.get("VolumeSize", 30)
-
-        return {
-            "image_id": img.get("ImageId"),
-            "name": img.get("Name", "unnamed-image"),
-            "owner_id": img.get("OwnerId", "unknown"),
-            "architecture": img.get("Architecture", "x86_64"),
-            "creation_date": img.get("CreationDate"),
-            "state": img.get("State", "available"),
-            "root_device_name": root_device,
-            "root_snapshot_id": root_snap,
-            "root_volume_size_gb": vol_size,
-            "encrypted": encrypted,
-            "kms_key_id": kms_key,
-            "virtualization_type": img.get("VirtualizationType", "hvm"),
-            "ena_support": img.get("EnaSupport", True),
-            "block_devices": block_devices,
-        }
+        """Backward-compatible wrapper around `parse_ec2_image`."""
+        return parse_ec2_image(img)
 
     def _mock_ami_metadata(self) -> Dict[str, Any]:
         """Delegates synthetic AMI metadata generation to `grc_fixtures`."""
         return generate_mock_ami_metadata(self.ami_id, self.region)
 
     def _resolve_worker_az(self) -> str:
-        """Resolves the Availability Zone of `self.worker_id` so the EBS volume is created in the same AZ."""
+        """Resolves the Availability Zone of `self.worker_id` via the active `Ec2Backend`."""
         default_az = f"{self.region}a"
-        if self.mock_mode or not self.worker_id:
-            return default_az
-
-        if HAS_BOTO3:
-            try:
-                ec2 = boto3.client("ec2", region_name=self.region)
-                resp = ec2.describe_instances(InstanceIds=[self.worker_id])
-                for resv in resp.get("Reservations", []):
-                    for inst in resv.get("Instances", []):
-                        az = inst.get("Placement", {}).get("AvailabilityZone")
-                        if az:
-                            return az
-            except Exception:
-                pass
-
-        try:
-            cmd = [
-                "aws", "ec2", "describe-instances",
-                "--instance-ids", self.worker_id,
-                "--query", "Reservations[0].Instances[0].Placement.AvailabilityZone",
-                "--output", "text",
-                "--region", self.region,
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            az = res.stdout.strip()
-            if az and az != "None":
-                return az
-        except Exception:
-            pass
-
-        return default_az
+        return self.backend.resolve_worker_az(self.worker_id, default_az)
 
     def _create_ephemeral_volume(self, snapshot_id: str) -> str:
-        """Provisions an ephemeral EBS volume from the root snapshot in the worker's AZ."""
-        if self.mock_mode:
-            mock_vol = generate_mock_ebs_volume(snapshot_id)
-            print(f"[*] [MOCK] Provisioned ephemeral EBS volume: {mock_vol} (from {snapshot_id})")
-            return mock_vol
-
+        """Provisions an ephemeral EBS volume from the root snapshot via the active `Ec2Backend`."""
         target_az = self._resolve_worker_az()
-        print(f"[*] Provisioning ephemeral EBS volume from snapshot: {snapshot_id} (AZ: {target_az})")
+        if not self.mock_mode:
+            print(f"[*] Provisioning ephemeral EBS volume from snapshot: {snapshot_id} (AZ: {target_az})")
         worker_tag = self.worker_id or "unknown-worker"
         tags = [
             {"Key": "GRC-Audit-Session", "Value": self.session_id},
             {"Key": "Ephemeral-Worker", "Value": worker_tag},
             {"Key": "PurgeAfter", "Value": "4h"},
         ]
-
-        if HAS_BOTO3:
-            ec2 = boto3.client("ec2", region_name=self.region)
-            resp = ec2.create_volume(
-                SnapshotId=snapshot_id,
-                VolumeType="gp3",
-                AvailabilityZone=target_az,
-                TagSpecifications=[{"ResourceType": "volume", "Tags": tags}],
-            )
-            vol_id = resp["VolumeId"]
-            print(f"    -> Created Volume ID: {vol_id}. Waiting for 'available' state...")
-            waiter = ec2.get_waiter("volume_available")
-            waiter.wait(VolumeIds=[vol_id])
-            return vol_id
-
-        # AWS CLI fallback with identical 3 tags
-        tag_spec = (
-            f"ResourceType=volume,Tags=["
-            f"{{Key=GRC-Audit-Session,Value={self.session_id}}},"
-            f"{{Key=Ephemeral-Worker,Value={worker_tag}}},"
-            f"{{Key=PurgeAfter,Value=4h}}]"
-        )
-        cmd = [
-            "aws", "ec2", "create-volume",
-            "--snapshot-id", snapshot_id,
-            "--volume-type", "gp3",
-            "--availability-zone", target_az,
-            "--tag-specifications", tag_spec,
-            "--region", self.region,
-            "--output", "json",
-        ]
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        data = json.loads(res.stdout)
-        vol_id = data["VolumeId"]
-        subprocess.run(
-            ["aws", "ec2", "wait", "volume-available", "--volume-ids", vol_id, "--region", self.region],
-            check=True,
-        )
-        return vol_id
+        return self.backend.create_volume(snapshot_id, target_az, tags)
 
     def _attach_ephemeral_volume(self, volume_id: str) -> str:
-        """Attaches the secondary EBS volume to the audit worker instance."""
-        if self.mock_mode:
-            print(f"[*] [MOCK] Attached volume {volume_id} to worker as {self.device_name}")
-            return self.device_name
-
-        if not self.worker_id:
+        """Attaches the secondary EBS volume to the audit worker instance via the active `Ec2Backend`."""
+        if not self.mock_mode and not self.worker_id:
             raise ValueError("Cannot attach EBS volume without --worker-id in live AWS mode.")
+        if not self.mock_mode:
+            print(f"[*] Attaching volume {volume_id} to worker {self.worker_id} at {self.device_name}")
+        return self.backend.attach_volume(volume_id, self.worker_id or "", self.device_name)
 
-        print(f"[*] Attaching volume {volume_id} to worker {self.worker_id} at {self.device_name}")
-        if HAS_BOTO3:
-            ec2 = boto3.client("ec2", region_name=self.region)
-            ec2.attach_volume(
-                VolumeId=volume_id,
-                InstanceId=self.worker_id,
-                Device=self.device_name,
-            )
-            waiter = ec2.get_waiter("volume_in_use")
-            waiter.wait(VolumeIds=[volume_id])
-            print("    -> Volume successfully attached in use.")
-            return self.device_name
-
-        cmd = [
-            "aws", "ec2", "attach-volume",
-            "--volume-id", volume_id,
-            "--instance-id", self.worker_id,
-            "--device", self.device_name,
-            "--region", self.region,
-        ]
-        subprocess.run(cmd, check=True)
-        subprocess.run(
-            ["aws", "ec2", "wait", "volume-in-use", "--volume-ids", volume_id, "--region", self.region],
-            check=True,
-        )
-        return self.device_name
+    def _detach_and_delete_volume(self, volume_id: str) -> None:
+        """Detaches and deletes the ephemeral EBS volume via the active `Ec2Backend`."""
+        print(f"[*] Tearing down ephemeral EBS volume: {volume_id}")
+        self.backend.detach_and_delete_volume(volume_id)
 
     def _resolve_block_device(self, requested_device: str, volume_id: Optional[str] = None) -> str:
         """Resolves AWS Nitro NVMe `/dev/disk/by-id/...` symlink if `/dev/xvdf` is mapped as NVMe."""
@@ -750,43 +866,6 @@ class GRCAMIManager:
         except subprocess.CalledProcessError:
             subprocess.run(["umount", "-l", str(mount_path)], check=False)
             print("    -> Lazy unmount executed.")
-
-    def _detach_and_delete_volume(self, volume_id: str) -> None:
-        """Detaches and deletes the ephemeral EBS volume."""
-        print(f"[*] Tearing down ephemeral EBS volume: {volume_id}")
-        if self.mock_mode:
-            print(f"    -> [MOCK] Detached and deleted volume {volume_id}.")
-            return
-
-        if HAS_BOTO3:
-            ec2 = boto3.client("ec2", region_name=self.region)
-            try:
-                ec2.detach_volume(VolumeId=volume_id, Force=True)
-                waiter = ec2.get_waiter("volume_available")
-                waiter.wait(VolumeIds=[volume_id])
-            except Exception as e:
-                print(f"[WARN] Error detaching volume: {e}", file=sys.stderr)
-
-            try:
-                ec2.delete_volume(VolumeId=volume_id)
-                print(f"    -> Deleted ephemeral volume {volume_id}.")
-            except Exception as e:
-                print(f"[ERROR] Failed to delete volume {volume_id}: {e}", file=sys.stderr)
-            return
-
-        # AWS CLI fallback
-        subprocess.run(
-            ["aws", "ec2", "detach-volume", "--volume-id", volume_id, "--force", "--region", self.region],
-            check=False,
-        )
-        subprocess.run(
-            ["aws", "ec2", "wait", "volume-available", "--volume-ids", volume_id, "--region", self.region],
-            check=False,
-        )
-        subprocess.run(
-            ["aws", "ec2", "delete-volume", "--volume-id", volume_id, "--region", self.region],
-            check=False,
-        )
 
     def _identify_target_os(self, mount_path: Path) -> Dict[str, Any]:
         """Parses /etc/os-release or /usr/lib/os-release from mounted rootfs."""

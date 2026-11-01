@@ -34,8 +34,10 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     from grc_common import (
+        SEVERITY_POLICY,
         SEVERITY_RANK,
         SLA_DAYS_POLICY,
+        get_severity_policy,
         sha256_file,
         utc_now_iso,
         utc_now_str,
@@ -44,8 +46,10 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from grc_common import (
+        SEVERITY_POLICY,
         SEVERITY_RANK,
         SLA_DAYS_POLICY,
+        get_severity_policy,
         sha256_file,
         utc_now_iso,
         utc_now_str,
@@ -185,22 +189,20 @@ SLA_DAYS_MAP: Dict[str, int] = dict(SLA_DAYS_POLICY)
 
 def normalize_severity_and_cat(raw_sev: str) -> Tuple[str, str]:
     """
-    Canonical severity -> (Normalized Severity, DISA STIG CAT) mapping across all tools:
+    Canonical severity -> (Normalized Severity, DISA STIG CAT) mapping across all tools,
+    backed by `rules/severity_policy.json` (`grc_common.get_severity_policy`):
       - CRITICAL -> ("CRITICAL", "CAT I")
       - HIGH     -> ("HIGH", "CAT II")
       - MEDIUM   -> ("MEDIUM", "CAT III")
-      - LOW / NEGLIGIBLE / INFO / INFORMATIONAL / UNKNOWN -> ("LOW", "CAT III")
+      - LOW / NEGLIGIBLE / INFO / INFORMATIONAL / UNKNOWN -> ("LOW" / "INFO", "CAT III")
     """
     s = (raw_sev or "MEDIUM").strip().upper()
-    if s in ("CRITICAL", "CAT I"):
-        return "CRITICAL", "CAT I"
-    if s in ("HIGH", "ERROR", "CAT II"):
-        return "HIGH", "CAT II"
-    if s in ("MEDIUM", "MODERATE", "WARNING", "WARN", "CAT III"):
-        return "MEDIUM", "CAT III"
     if s in ("INFO", "INFORMATIONAL"):
-        return "INFO", "CAT III"
-    return "LOW", "CAT III"
+        return "INFO", str(SEVERITY_POLICY.get("LOW", ("CAT III", 180))[0])
+    canonical, cat_level, _ = get_severity_policy(s)
+    if canonical == "MEDIUM":
+        cat_level = "CAT III"
+    return canonical, str(cat_level)
 
 
 # ==============================================================================
@@ -289,8 +291,21 @@ class GRCComplianceReporter:
         self.provenance: Dict[str, Any] = {}
         self.baseline_rules: List[Dict[str, Any]] = []
         self.loaded_scanners: Set[str] = set()
+        self.sbom_stig_evidence: Optional[Dict[str, Any]] = None
         self._seen_vuln_keys: Set[Tuple[str, str]] = set()
         self._finding_counter = 1
+
+    def _load_json(self, filename: str, label: str = "JSON") -> Optional[Any]:
+        """Loads and parses a JSON file in `self.evidence_dir` if it exists and is non-empty."""
+        path = self.evidence_dir / filename
+        if not path.exists() or path.stat().st_size == 0:
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[!] Warning: Error loading {label} JSON ({filename}): {e}", file=sys.stderr)
+            return None
 
     def _anchor_date(self) -> datetime.date:
         """Resolves a stable anchor date from provenance if available, otherwise UTC today."""
@@ -318,6 +333,8 @@ class GRCComplianceReporter:
         if clean.startswith("/"):
             clean = clean.lstrip("/")
         return clean or "N/A"
+
+    _clean_path = clean_path
 
     # --------------------------------------------------------------------------
     # INGESTION & PARSING
@@ -773,6 +790,27 @@ class GRCComplianceReporter:
                 except Exception as rec_err:
                     print(f"[!] Warning: Skipping malformed Gitleaks record: {rec_err}", file=sys.stderr)
 
+    def parse_sbom_stig(self) -> None:
+        """Ingests SBOM STIG applicability outputs (`stig_applicability.json` or `sbom_stig_map.json`) if present."""
+        for fname in ("stig_applicability.json", "sbom_stig_map.json"):
+            data = self._load_json(fname, label="SBOM STIG")
+            if isinstance(data, dict):
+                self.sbom_stig_evidence = data
+                self.loaded_scanners.add("SBOM")
+                return
+        if (self.evidence_dir / "stig_matrix.md").exists():
+            self.loaded_scanners.add("SBOM")
+
+    PARSERS = {
+        "semgrep_findings.json": parse_semgrep,
+        "checkov_findings.json": parse_checkov,
+        "crypto_findings.json": parse_crypto_scan,
+        "grype_findings.json": parse_grype,
+        "trivy_findings.json": parse_trivy,
+        "gitleaks_findings.json": parse_gitleaks,
+        "stig_applicability.json": parse_sbom_stig,
+    }
+
     # --------------------------------------------------------------------------
     # SYNTHESIS & REPORT GENERATION
     # --------------------------------------------------------------------------
@@ -784,11 +822,33 @@ class GRCComplianceReporter:
             or self.evidence_dir.name
         )
 
+    def _md_header(
+        self,
+        title: str,
+        classification: str,
+        extra_lines: Optional[List[str]] = None,
+    ) -> List[str]:
+        """Generates a standardized Markdown compliance deliverable header block."""
+        header = [
+            f"# {title}",
+            "",
+            f"> **Classification / Use**: {classification}  ",
+            f"> **Audit Target Identifier**: `{self._target_id()}`  ",
+        ]
+        if extra_lines:
+            header.extend(extra_lines)
+        header.extend(["", "---", ""])
+        return header
+
     def _control_was_assessed(self, ctl_id: str) -> bool:
         """Returns True if at least one scanner mapping to `ctl_id` was present in the evidence directory."""
         meta = NIST_CONTROLS_CATALOG.get(ctl_id, {})
         assessors = set(meta.get("assessed_by", []))
-        if (self.evidence_dir / "stig_applicability.json").exists() or (self.evidence_dir / "stig_matrix.md").exists():
+        if (
+            (self.evidence_dir / "stig_applicability.json").exists()
+            or (self.evidence_dir / "sbom_stig_map.json").exists()
+            or (self.evidence_dir / "stig_matrix.md").exists()
+        ):
             self.loaded_scanners.add("SBOM")
         return bool(assessors & self.loaded_scanners)
 
@@ -1116,7 +1176,7 @@ class GRCComplianceReporter:
         else:
             overall_status = "COMPLIANT"
 
-        return {
+        pkg: Dict[str, Any] = {
             "$schema": "https://specs.grc.internal/schemas/scr-scn-package-v1.json",
             "package_schema": "grc-scr-scn-package-v1",
             "session_id": self.provenance.get("session_id", "local-session"),
@@ -1135,6 +1195,9 @@ class GRCComplianceReporter:
             "controls_rollup": controls_rollup,
             "findings": [f.to_dict() for f in self.findings],
         }
+        if self.sbom_stig_evidence is not None:
+            pkg["sbom_stig_applicability"] = self.sbom_stig_evidence
+        return pkg
 
     def seal_evidence_manifest(self) -> str:
         """
@@ -1168,12 +1231,8 @@ class GRCComplianceReporter:
         self.load_provenance()
         self.load_baseline_rules()
 
-        self.parse_semgrep()
-        self.parse_checkov()
-        self.parse_crypto_scan()
-        self.parse_grype()
-        self.parse_trivy()
-        self.parse_gitleaks()
+        for parser_fn in self.PARSERS.values():
+            parser_fn(self)
 
         # Sort findings deterministically by severity rank then finding_id
         self.findings.sort(key=lambda x: (SEVERITY_RANK.get(x.severity, 99), x.rule_or_cve_id, x.file_path))

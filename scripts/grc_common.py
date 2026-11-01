@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-grc_common.py - Shared Standard-Library Utilities for GRC-xMINI Engines
-=======================================================================
+grc_common.py - Shared Standard-Library Utilities & Policy Loaders for GRC-xMINI
+================================================================================
 
 Classification: Internal Compliance & Engineering Specification
 Target Frameworks: NIST SP 800-53 Rev. 5, FedRAMP High, DISA STIG
@@ -9,24 +9,38 @@ Zero External Dependencies: 100% Python 3 Standard Library.
 
 Provides cross-engine utilities for:
   - Cryptographic SHA-256 file hashing (`sha256_file`)
-  - Canonical UTC timestamps (`utc_now_iso`, `utc_now_str`)
+  - Canonical UTC timestamps (`utc_now_iso`, `utc_now_str`, `utc_today`)
   - Guarded workspace teardown (`safe_rmtree`) preventing accidental deletion
     of root, $HOME, repository root, or unverified directories
   - Numeric tuple version parsing & segment-safe EOL prefix matching
     (`parse_version`, `version_lt`, `version_matches_prefix`)
-  - Unified FedRAMP ConMon severity & SLA policy constants
+  - Unified FedRAMP ConMon severity & SLA policy loader (`rules/severity_policy.json`)
+  - Unified DISA STIG & SRG catalog loader (`rules/stig_catalog.json`)
+  - Standardized output writer (`write_output`)
 """
 
 import datetime
 import hashlib
-import os
+import json
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
+RULES_DIR = REPO_ROOT / "rules"
+SEVERITY_POLICY_PATH = RULES_DIR / "severity_policy.json"
+STIG_CATALOG_PATH = RULES_DIR / "stig_catalog.json"
+
+# Built-in fallback severity policy if rules/severity_policy.json is unavailable
+_FALLBACK_SEVERITY_POLICY: Dict[str, Tuple[str, int]] = {
+    "CRITICAL": ("CAT I", 30),
+    "HIGH": ("CAT II", 30),
+    "MEDIUM": ("CAT II", 90),
+    "LOW": ("CAT III", 180),
+    "INFO": ("CAT III", 180),
+}
 
 # Unified FedRAMP Continuous Monitoring (ConMon) SLA Policy (in calendar days)
 SLA_DAYS_POLICY: Dict[str, int] = {
@@ -57,6 +71,105 @@ SEVERITY_RANK: Dict[str, int] = {
     "INFO": 4,
     "UNKNOWN": 5,
 }
+
+
+def load_severity_policy(path: Optional[Path] = None) -> Dict[str, Tuple[str, int]]:
+    """
+    Loads the canonical severity -> (DISA CAT level, FedRAMP SLA days) table from
+    `rules/severity_policy.json` (with safe fallback to built-in policy).
+    """
+    target = Path(path) if path else SEVERITY_POLICY_PATH
+    if target.is_file():
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            sev_block = data.get("severities", {})
+            if isinstance(sev_block, dict) and sev_block:
+                policy: Dict[str, Tuple[str, int]] = {}
+                for k, v in sev_block.items():
+                    cat = str(v.get("cat_level", "CAT II"))
+                    sla = int(v.get("sla_days", 90))
+                    policy[k.upper()] = (cat, sla)
+                    for alias in v.get("aliases", []):
+                        SLA_DAYS_POLICY[str(alias).upper()] = sla
+                return policy
+        except Exception:
+            pass
+    return dict(_FALLBACK_SEVERITY_POLICY)
+
+
+SEVERITY_POLICY: Dict[str, Tuple[str, int]] = load_severity_policy()
+
+
+def normalize_severity(raw_severity: Optional[str], default: str = "MEDIUM") -> str:
+    """
+    Normalizes heterogeneous scanner severity strings ('Critical', 'ERROR', 'MODERATE',
+    'Negligible', 'CAT I', etc.) to canonical ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO').
+    """
+    if not raw_severity:
+        return default
+    s = str(raw_severity).strip().upper()
+    if s in ("CRITICAL", "CRIT", "VERY HIGH", "CAT I", "CAT 1", "CAT-I"):
+        return "CRITICAL"
+    if s in ("HIGH", "ERROR", "IMPORTANT", "CAT II", "CAT 2", "CAT-II"):
+        return "HIGH"
+    if s in ("MEDIUM", "MODERATE", "MOD", "MED", "WARNING", "WARN", "UNVERIFIED", "CAT III", "CAT 3", "CAT-III"):
+        return "MEDIUM"
+    if s in ("LOW", "MINOR", "NEGLIGIBLE"):
+        return "LOW"
+    if s in ("INFO", "INFORMATIONAL", "NONE", "UNKNOWN"):
+        return "INFO"
+    return default
+
+
+def get_severity_policy(raw_severity: Optional[str]) -> Tuple[str, str, int]:
+    """
+    Returns `(canonical_severity, cat_level, sla_days)` for any raw severity label.
+    """
+    canon = normalize_severity(raw_severity)
+    cat_level, sla_days = SEVERITY_POLICY.get(canon, ("CAT II", 90))
+    return canon, cat_level, sla_days
+
+
+def load_stig_catalog(path: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Loads the `catalog` section of `rules/stig_catalog.json`."""
+    target = Path(path) if path else STIG_CATALOG_PATH
+    if target.is_file():
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            catalog = data.get("catalog", {})
+            if isinstance(catalog, dict) and catalog:
+                return catalog
+        except Exception:
+            pass
+    return {}
+
+
+def load_os_stig_mapping(path: Optional[Path] = None) -> Dict[str, Dict[str, str]]:
+    """Loads the `os_stig_mapping` section of `rules/stig_catalog.json`."""
+    target = Path(path) if path else STIG_CATALOG_PATH
+    if target.is_file():
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            mapping = data.get("os_stig_mapping", {})
+            if isinstance(mapping, dict) and mapping:
+                return mapping
+        except Exception:
+            pass
+    return {}
+
+
+def write_output(text: str, output_path: Optional[Union[Path, str]] = None) -> None:
+    """
+    Writes formatted output `text` to `output_path` (creating parent directories if needed),
+    or prints to stdout when `output_path` is None.
+    """
+    if output_path:
+        out = Path(output_path).resolve()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text + ("\n" if not text.endswith("\n") else ""), encoding="utf-8")
+        print(f"[SUCCESS] Report written to: {out}")
+    else:
+        print(text)
 
 
 def sha256_file(file_path: Union[Path, str], block_size: int = 65536) -> str:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRC-xMINI (v1.4.1 — Yokota) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRC-xMINI (v1.4.2 — Yokota) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:

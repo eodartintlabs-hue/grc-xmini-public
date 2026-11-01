@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.4.1 — Yokota) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.4.2 — Yokota) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -36,7 +36,8 @@ import re
 import sys
 import zipfile
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # ---------------------------------------------------------------------------
 # Constants & FedRAMP Column Definitions
@@ -46,6 +47,17 @@ from typing import Dict, List, Optional, Set, Tuple
 # "legacy": Apps Script behavior - match on Weakness Name + Description only.
 # "strict": plugin/source ID + host, unscanned hosts kept open for review.
 MATCH_MODE = "legacy"
+
+
+@dataclass
+class TransformConfig:
+    """Encapsulates runtime configuration for scan transformation and POA&M reconciliation."""
+    match_mode: str = MATCH_MODE
+    poam_id_column_override: Optional[str] = None
+    strict_fedramp_risk: bool = False
+    reference_date: Optional[datetime.date] = None
+    include_scanner_solutions: bool = False
+    close_unscanned_hosts: bool = False
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -856,6 +868,169 @@ def _merge_into_existing_entry(existing: Dict[str, object], entry: Dict[str, obj
                 existing["bod_22_01_due_date"] = entry["bod_22_01_due_date"]
 
 
+class TenableAdapter:
+    """Adapter that normalizes a raw Tenable Nessus / Tenable.sc / Tenable.io row into intermediate fields."""
+
+    @staticmethod
+    def parse_row(
+        row: Dict[str, str],
+        row_lc: Dict[str, str],
+        today: datetime.date,
+        kev_db: Dict[str, Dict[str, str]],
+        strict_fedramp_risk: bool,
+    ) -> Optional[Dict[str, Any]]:
+        raw_risk = get_first_field(row, ["Risk", "Severity", "Risk Factor", "VPR Severity"], lower_map=row_lc)
+        risk = normalize_risk(raw_risk)
+        if not risk:
+            return None
+        if strict_fedramp_risk and risk == "Critical":
+            risk = "High"
+
+        plugin_id = get_first_field(row, ["Plugin ID", "Plugin", "PluginID"], lower_map=row_lc)
+        if plugin_id.endswith(".0"):
+            plugin_id = plugin_id[:-2]
+        name = get_first_field(row, ["Name", "Plugin Name", "Title"], default=f"Tenable Plugin {plugin_id}", lower_map=row_lc)
+        synopsis = get_first_field(row, ["Synopsis"], lower_map=row_lc)
+        desc = get_first_field(row, ["Description", "Summary"], lower_map=row_lc)
+        plugin_out = get_first_field(row, ["Plugin Output", "Output"], lower_map=row_lc)
+        full_desc = desc or synopsis or name
+        if synopsis and desc and synopsis not in desc:
+            full_desc = f"{synopsis}\n\n{desc}"
+        if plugin_out:
+            snippet = plugin_out[:400] + ("..." if len(plugin_out) > 400 else "")
+            full_desc = f"{full_desc}\n\n[Scanner Evidence]: {snippet}"
+
+        raw_host = get_first_field(row, ["Host", "IP Address", "DNS Name", "FQDN", "Asset", "NetBIOS Name"], lower_map=row_lc)
+        port = get_first_field(row, ["Port"], lower_map=row_lc)
+        proto = get_first_field(row, ["Protocol"], lower_map=row_lc)
+        host = raw_host or "unknown-host"
+        solution = get_first_field(row, ["Solution", "Remediation", "Recommendation"], lower_map=row_lc)
+        see_also = get_first_field(row, ["See Also", "References", "URL"], lower_map=row_lc)
+        raw_cve = get_first_field(row, ["CVE", "CVEs"], lower_map=row_lc)
+        cves = extract_cves(raw_cve, f"{name} {desc}")
+
+        # Note: Never use 'Plugin Publication Date' here (that is when Tenable authored the plugin, not host detection)
+        first_seen_str = get_first_field(row, ["First Discovered", "First Seen", "Discovery Date", "Original Detection Date"], lower_map=row_lc)
+        last_seen_str = get_first_field(row, ["Last Observed", "Last Seen", "Status Date"], lower_map=row_lc)
+        det_date = parse_any_date(first_seen_str) or parse_any_date(last_seen_str, fallback=today) or today
+        stat_date = parse_any_date(last_seen_str, fallback=today) or today
+
+        is_kev, kev_due_str = resolve_bod_22_01_status(row, cves, det_date, kev_db)
+
+        source_id = plugin_id or cves.split(",")[0].strip() or name
+        if not raw_host and (port and port != "0" and proto):
+            asset_base = f"unknown-host:{port}/{proto.lower()}"
+        else:
+            asset_base = extract_base_asset(host) or host.strip().lower()
+        asset_display = f"{host} ({port}/{proto.upper()})" if (port and port != "0" and proto) else host
+        return {
+            "risk": risk,
+            "source_id": source_id,
+            "name": name,
+            "full_desc": full_desc,
+            "asset_base": asset_base,
+            "asset_display": asset_display,
+            "detector_source": "Tenable Nessus",
+            "solution": solution,
+            "see_also": see_also,
+            "cves": cves,
+            "det_date": det_date,
+            "stat_date": stat_date,
+            "is_kev": is_kev,
+            "kev_due_str": kev_due_str,
+            "vendor_dep": "No",
+            "vendor_prod": "",
+        }
+
+
+class InspectorAdapter:
+    """Adapter that normalizes a raw AWS Inspector row into intermediate fields."""
+
+    @staticmethod
+    def parse_row(
+        row: Dict[str, str],
+        row_lc: Dict[str, str],
+        today: datetime.date,
+        kev_db: Dict[str, Dict[str, str]],
+        strict_fedramp_risk: bool,
+    ) -> Optional[Dict[str, Any]]:
+        raw_risk = get_first_field(row, ["Severity", "Original Risk Rating", "Risk"], lower_map=row_lc)
+        risk = normalize_risk(raw_risk)
+        if not risk:
+            return None
+        if strict_fedramp_risk and risk == "Critical":
+            risk = "High"
+
+        vuln_id = get_first_field(row, ["Vulnerability ID", "CVE", "Plugin ID", "Finding ID"], lower_map=row_lc)
+        finding_arn = get_first_field(row, ["Finding ARN", "ARN"], lower_map=row_lc)
+        title = get_first_field(row, ["Title", "Finding Title", "Weakness Name"], default=vuln_id or "AWS Inspector Finding", lower_map=row_lc)
+        desc = get_first_field(row, ["Description", "Weakness Description"], default=title, lower_map=row_lc)
+        pkg = get_first_field(row, ["Affected Packages", "Package", "Package Name", "Vulnerable Package"], lower_map=row_lc)
+        file_path = get_first_field(row, ["File Path", "Package Path"], lower_map=row_lc)
+        full_desc = desc
+        if pkg:
+            full_desc += f"\n\nAffected Package(s): {pkg}"
+        if file_path:
+            full_desc += f" ({file_path})"
+
+        explicit_resource = get_first_field(row, ["Resource ID", "Instance ID", "Asset Identifier", "Asset ID"], lower_map=row_lc)
+        account_id = get_first_field(row, ["AWS Account ID"], lower_map=row_lc)
+        resource_id = explicit_resource or account_id or finding_arn or "aws-resource"
+        resource_type = get_first_field(row, ["Resource Type"], lower_map=row_lc)
+        if not explicit_resource and finding_arn:
+            asset_base = f"{(account_id or 'aws-account').strip().lower()}:{finding_arn.strip().lower()}"
+        else:
+            asset_base = extract_base_asset(resource_id) or resource_id.strip().lower()
+        asset_display = f"{resource_id} ({resource_type})" if resource_type and resource_type not in resource_id else resource_id
+
+        solution = get_first_field(row, ["Remediation", "Recommendation", "Remediation Plan", "Fixed Version"], lower_map=row_lc)
+        fix_avail = get_first_field(row, ["Fix Available", "FixAvailable"], lower_map=row_lc)
+        pkg_mgr = get_first_field(row, ["Package Manager", "Vendor", "Platform"], lower_map=row_lc)
+        see_also = get_first_field(row, ["Vendor Advisory", "Reference URLs", "URL", "See Also"], lower_map=row_lc)
+        raw_cve = get_first_field(row, ["CVE", "Vulnerability ID"], lower_map=row_lc)
+        cves = extract_cves(raw_cve, f"{title} {desc}")
+
+        first_seen_str = get_first_field(row, ["First Observed At", "First Seen", "Created At", "Original Detection Date"], lower_map=row_lc)
+        last_seen_str = get_first_field(row, ["Last Observed At", "Last Seen", "Updated At", "Status Date"], lower_map=row_lc)
+        det_date = parse_any_date(first_seen_str, fallback=today) or today
+        stat_date = parse_any_date(last_seen_str, fallback=today) or today
+
+        is_kev, kev_due_str = resolve_bod_22_01_status(row, cves, det_date, kev_db)
+
+        source_id = vuln_id or finding_arn or cves.split(",")[0].strip() or title
+        if fix_avail.lower() == "no":
+            vendor_dep = "Yes"
+            vendor_prod = pkg_mgr or "Upstream OS / Package Maintainer"
+        else:
+            vendor_dep = "No"
+            vendor_prod = ""
+
+        return {
+            "risk": risk,
+            "source_id": source_id,
+            "name": title,
+            "full_desc": full_desc,
+            "asset_base": asset_base,
+            "asset_display": asset_display,
+            "detector_source": "AWS Inspector",
+            "solution": solution,
+            "see_also": see_also,
+            "cves": cves,
+            "det_date": det_date,
+            "stat_date": stat_date,
+            "is_kev": is_kev,
+            "kev_due_str": kev_due_str,
+            "vendor_dep": vendor_dep,
+            "vendor_prod": vendor_prod,
+        }
+
+
+SCANNER_ADAPTERS = {
+    "tenable": TenableAdapter,
+    "inspector": InspectorAdapter,
+}
+
+
 def normalize_scan_rows(
     records: List[Dict[str, str]],
     scanner_type: str,
@@ -871,104 +1046,31 @@ def normalize_scan_rows(
     """
     grouped: Dict[Tuple[str, str], Dict[str, object]] = {}
     kev_db = kev_catalog if kev_catalog is not None else load_cisa_kev_catalog()
+    adapter = SCANNER_ADAPTERS.get(scanner_type, InspectorAdapter)
 
     for row in records:
         row_lc = {k.lower().strip(): v for k, v in row.items()}
         row_aliases = extract_row_asset_aliases(row)
-        if scanner_type == "tenable":
-            raw_risk = get_first_field(row, ["Risk", "Severity", "Risk Factor", "VPR Severity"], lower_map=row_lc)
-            risk = normalize_risk(raw_risk)
-            if not risk:
-                continue
-            if strict_fedramp_risk and risk == "Critical":
-                risk = "High"
+        parsed = adapter.parse_row(row, row_lc, today, kev_db, strict_fedramp_risk)
+        if not parsed:
+            continue
 
-            plugin_id = get_first_field(row, ["Plugin ID", "Plugin", "PluginID"], lower_map=row_lc)
-            if plugin_id.endswith(".0"):
-                plugin_id = plugin_id[:-2]
-            name = get_first_field(row, ["Name", "Plugin Name", "Title"], default=f"Tenable Plugin {plugin_id}", lower_map=row_lc)
-            synopsis = get_first_field(row, ["Synopsis"], lower_map=row_lc)
-            desc = get_first_field(row, ["Description", "Summary"], lower_map=row_lc)
-            plugin_out = get_first_field(row, ["Plugin Output", "Output"], lower_map=row_lc)
-            full_desc = desc or synopsis or name
-            if synopsis and desc and synopsis not in desc:
-                full_desc = f"{synopsis}\n\n{desc}"
-            if plugin_out:
-                snippet = plugin_out[:400] + ("..." if len(plugin_out) > 400 else "")
-                full_desc = f"{full_desc}\n\n[Scanner Evidence]: {snippet}"
-
-            host = get_first_field(row, ["Host", "IP Address", "DNS Name", "FQDN", "Asset", "NetBIOS Name"], default="unknown-host", lower_map=row_lc)
-            port = get_first_field(row, ["Port"], lower_map=row_lc)
-            proto = get_first_field(row, ["Protocol"], lower_map=row_lc)
-            solution = get_first_field(row, ["Solution", "Remediation", "Recommendation"], lower_map=row_lc)
-            see_also = get_first_field(row, ["See Also", "References", "URL"], lower_map=row_lc)
-            raw_cve = get_first_field(row, ["CVE", "CVEs"], lower_map=row_lc)
-            cves = extract_cves(raw_cve, f"{name} {desc}")
-
-            # Note: Never use 'Plugin Publication Date' here (that is when Tenable authored the plugin, not host detection)
-            first_seen_str = get_first_field(row, ["First Discovered", "First Seen", "Discovery Date", "Original Detection Date"], lower_map=row_lc)
-            last_seen_str = get_first_field(row, ["Last Observed", "Last Seen", "Status Date"], lower_map=row_lc)
-            det_date = parse_any_date(first_seen_str) or parse_any_date(last_seen_str, fallback=today) or today
-            stat_date = parse_any_date(last_seen_str, fallback=today) or today
-
-            is_kev, kev_due_str = resolve_bod_22_01_status(row, cves, det_date, kev_db)
-
-            source_id = plugin_id or cves.split(",")[0].strip() or name
-            asset_base = extract_base_asset(host) or host.strip().lower()
-            asset_display = f"{host} ({port}/{proto.upper()})" if (port and port != "0" and proto) else host
-            detector_source = "Tenable Nessus"
-            vendor_dep = "No"
-            vendor_prod = ""
-
-        else:
-            # AWS Inspector
-            raw_risk = get_first_field(row, ["Severity", "Original Risk Rating", "Risk"], lower_map=row_lc)
-            risk = normalize_risk(raw_risk)
-            if not risk:
-                continue
-            if strict_fedramp_risk and risk == "Critical":
-                risk = "High"
-
-            vuln_id = get_first_field(row, ["Vulnerability ID", "CVE", "Plugin ID", "Finding ID"], lower_map=row_lc)
-            finding_arn = get_first_field(row, ["Finding ARN", "ARN"], lower_map=row_lc)
-            title = get_first_field(row, ["Title", "Finding Title", "Weakness Name"], default=vuln_id or "AWS Inspector Finding", lower_map=row_lc)
-            desc = get_first_field(row, ["Description", "Weakness Description"], default=title, lower_map=row_lc)
-            pkg = get_first_field(row, ["Affected Packages", "Package", "Package Name", "Vulnerable Package"], lower_map=row_lc)
-            file_path = get_first_field(row, ["File Path", "Package Path"], lower_map=row_lc)
-            full_desc = desc
-            if pkg:
-                full_desc += f"\n\nAffected Package(s): {pkg}"
-            if file_path:
-                full_desc += f" ({file_path})"
-
-            resource_id = get_first_field(row, ["Resource ID", "Instance ID", "Asset Identifier", "Asset ID", "AWS Account ID"], default="aws-resource", lower_map=row_lc)
-            resource_type = get_first_field(row, ["Resource Type"], lower_map=row_lc)
-            asset_base = extract_base_asset(resource_id) or resource_id.strip().lower()
-            asset_display = f"{resource_id} ({resource_type})" if resource_type and resource_type not in resource_id else resource_id
-
-            solution = get_first_field(row, ["Remediation", "Recommendation", "Remediation Plan", "Fixed Version"], lower_map=row_lc)
-            fix_avail = get_first_field(row, ["Fix Available", "FixAvailable"], lower_map=row_lc)
-            pkg_mgr = get_first_field(row, ["Package Manager", "Vendor", "Platform"], lower_map=row_lc)
-            see_also = get_first_field(row, ["Vendor Advisory", "Reference URLs", "URL", "See Also"], lower_map=row_lc)
-            raw_cve = get_first_field(row, ["CVE", "Vulnerability ID"], lower_map=row_lc)
-            cves = extract_cves(raw_cve, f"{title} {desc}")
-
-            first_seen_str = get_first_field(row, ["First Observed At", "First Seen", "Created At", "Original Detection Date"], lower_map=row_lc)
-            last_seen_str = get_first_field(row, ["Last Observed At", "Last Seen", "Updated At", "Status Date"], lower_map=row_lc)
-            det_date = parse_any_date(first_seen_str, fallback=today) or today
-            stat_date = parse_any_date(last_seen_str, fallback=today) or today
-
-            is_kev, kev_due_str = resolve_bod_22_01_status(row, cves, det_date, kev_db)
-
-            source_id = vuln_id or finding_arn or cves.split(",")[0].strip() or title
-            name = title
-            detector_source = "AWS Inspector"
-            if fix_avail.lower() == "no":
-                vendor_dep = "Yes"
-                vendor_prod = pkg_mgr or "Upstream OS / Package Maintainer"
-            else:
-                vendor_dep = "No"
-                vendor_prod = ""
+        risk = parsed["risk"]
+        source_id = parsed["source_id"]
+        name = parsed["name"]
+        full_desc = parsed["full_desc"]
+        asset_base = parsed["asset_base"]
+        asset_display = parsed["asset_display"]
+        detector_source = parsed["detector_source"]
+        solution = parsed["solution"]
+        see_also = parsed["see_also"]
+        cves = parsed["cves"]
+        det_date = parsed["det_date"]
+        stat_date = parsed["stat_date"]
+        is_kev = parsed["is_kev"]
+        kev_due_str = parsed["kev_due_str"]
+        vendor_dep = parsed["vendor_dep"]
+        vendor_prod = parsed["vendor_prod"]
 
         # Deduplication key: 1 row per (Vulnerability Source ID + Base Asset Identifier)
         dedup_key = (source_id.strip().lower(), asset_base.strip().lower())
@@ -1187,6 +1289,71 @@ def _merge_carry_over(scan_item: Dict[str, object], matched_prev: Dict[str, obje
     return merged
 
 
+class PoamIdAllocator:
+    """
+    Tracks existing POA&M IDs across both previous OPEN and CLOSED workbooks
+    and allocates sequential, collision-free IDs for newly discovered items.
+    Supports both typed prefixes (VULN-00001 / COMP-00001) and date-prefixed IDs (YYYY-Mon-0001).
+    """
+
+    def __init__(
+        self,
+        prev_open_entries: List[Dict[str, object]],
+        prev_closed_entries: Optional[List[Dict[str, object]]],
+        today: datetime.date,
+    ):
+        self.today = today
+        self.max_poam_seq = 0
+        self.uses_typed_prefix = False
+        self.max_by_prefix: Dict[str, int] = {"VULN": 0, "COMP": 0, "PENT": 0}
+
+        for p in list(prev_open_entries) + list(prev_closed_entries or []):
+            pid = str(p.get("poam_id", "")).strip()
+            m_typed = re.match(r"^(VULN|COMP|PENT)-(\d+)$", pid, flags=re.IGNORECASE)
+            if m_typed:
+                self.uses_typed_prefix = True
+                pfx = m_typed.group(1).upper()
+                seq_num = int(m_typed.group(2))
+                self.max_by_prefix[pfx] = max(self.max_by_prefix.get(pfx, 0), seq_num)
+                self.max_poam_seq = max(self.max_poam_seq, seq_num)
+            else:
+                m_dyn = re.match(r"^\d{4}-[A-Za-z]{3}-(\d+)$", pid)
+                m_leg = re.match(r"^POAM-\d{4}-(\d+)$", pid, flags=re.IGNORECASE)
+                if m_dyn:
+                    self.max_poam_seq = max(self.max_poam_seq, int(m_dyn.group(1)))
+                elif m_leg:
+                    self.max_poam_seq = max(self.max_poam_seq, int(m_leg.group(1)))
+                else:
+                    m_seq = re.search(r"(\d+)$", pid)
+                    if m_seq:
+                        self.max_poam_seq = max(self.max_poam_seq, int(m_seq.group(1)))
+
+    def next_id(self, item: Dict[str, object]) -> str:
+        """Allocate the next sequential POA&M ID for a newly discovered finding."""
+        if self.uses_typed_prefix:
+            w_lower = str(item.get("weakness_name", "")).lower()
+            is_comp = (not str(item.get("cve", "")).strip()) or any(
+                kw in w_lower
+                for kw in ("cipher", "tls", "stig", "cis ", "compliance", "policy", "banner", "configuration")
+            )
+            pfx = "COMP" if is_comp else "VULN"
+            self.max_by_prefix[pfx] = self.max_by_prefix.get(pfx, 0) + 1
+            return f"{pfx}-{self.max_by_prefix[pfx]:05d}"
+        self.max_poam_seq += 1
+        return format_poam_id(self.today, self.max_poam_seq)
+
+
+def _close_item(item: Dict[str, object], today: datetime.date, reason: str) -> Dict[str, object]:
+    """Build a closed POA&M entry copy stamped with today's status date and closure audit note."""
+    closed_item = dict(item)
+    closed_item["status_date"] = format_date_iso(today)
+    closed_item["_stat_date_obj"] = today
+    prev_comment = str(closed_item.get("comments", "")).strip()
+    note = f"[Closed {format_date_iso(today)}: {reason}]"
+    closed_item["comments"] = f"{prev_comment}\n{note}".strip() if prev_comment else note
+    return closed_item
+
+
 def reconcile_poam_entries(
     prev_open_entries: List[Dict[str, object]],
     new_scan_entries: List[Dict[str, object]],
@@ -1208,31 +1375,7 @@ def reconcile_poam_entries(
     """
     prev_by_key: Dict[Tuple[str, str], List[Dict[str, object]]] = {}
     prev_by_alt_key: Dict[Tuple[str, str], List[Dict[str, object]]] = {}
-
-    # Compute highest existing POA&M ID across BOTH previous OPEN and previous CLOSED workbooks
-    max_poam_seq = 0
-    uses_typed_prefix = False
-    max_by_prefix: Dict[str, int] = {"VULN": 0, "COMP": 0, "PENT": 0}
-    for p in list(prev_open_entries) + list(prev_closed_entries or []):
-        pid = str(p.get("poam_id", "")).strip()
-        m_typed = re.match(r"^(VULN|COMP|PENT)-(\d+)$", pid, flags=re.IGNORECASE)
-        if m_typed:
-            uses_typed_prefix = True
-            pfx = m_typed.group(1).upper()
-            seq_num = int(m_typed.group(2))
-            max_by_prefix[pfx] = max(max_by_prefix.get(pfx, 0), seq_num)
-            max_poam_seq = max(max_poam_seq, seq_num)
-        else:
-            m_dyn = re.match(r"^\d{4}-[A-Za-z]{3}-(\d+)$", pid)
-            m_leg = re.match(r"^POAM-\d{4}-(\d+)$", pid, flags=re.IGNORECASE)
-            if m_dyn:
-                max_poam_seq = max(max_poam_seq, int(m_dyn.group(1)))
-            elif m_leg:
-                max_poam_seq = max(max_poam_seq, int(m_leg.group(1)))
-            else:
-                m_seq = re.search(r"(\d+)$", pid)
-                if m_seq:
-                    max_poam_seq = max(max_poam_seq, int(m_seq.group(1)))
+    allocator = PoamIdAllocator(prev_open_entries, prev_closed_entries, today)
 
     for p in prev_open_entries:
         k = p["_dedup_key"]
@@ -1282,13 +1425,7 @@ def reconcile_poam_entries(
 
             # If marked False Positive == Yes in previous POA&M, move to CLOSED
             if str(matched_prev.get("false_positive", "")).strip().lower() == "yes":
-                closed_copy = dict(matched_prev)
-                closed_copy["status_date"] = format_date_iso(today)
-                closed_copy["_stat_date_obj"] = today
-                prev_comment = str(closed_copy.get("comments", "")).strip()
-                note = f"[Closed {format_date_iso(today)}: Approved False Positive moved to Closed POA&M]"
-                closed_copy["comments"] = f"{prev_comment}\n{note}".strip() if prev_comment else note
-                newly_closed.append(closed_copy)
+                newly_closed.append(_close_item(matched_prev, today, "Approved False Positive moved to Closed POA&M"))
                 continue
 
             merged = _merge_carry_over(scan_item, matched_prev, today)
@@ -1298,17 +1435,7 @@ def reconcile_poam_entries(
         else:
             # Newly detected Open POA&M item
             new_item = dict(scan_item)
-            if uses_typed_prefix:
-                w_lower = str(new_item.get("weakness_name", "")).lower()
-                is_comp = (not str(new_item.get("cve", "")).strip()) or any(
-                    kw in w_lower for kw in ("cipher", "tls", "stig", "cis ", "compliance", "policy", "banner", "configuration")
-                )
-                pfx = "COMP" if is_comp else "VULN"
-                max_by_prefix[pfx] = max_by_prefix.get(pfx, 0) + 1
-                new_item["poam_id"] = f"{pfx}-{max_by_prefix[pfx]:05d}"
-            else:
-                max_poam_seq += 1
-                new_item["poam_id"] = format_poam_id(today, max_poam_seq)
+            new_item["poam_id"] = allocator.next_id(new_item)
             new_item["_is_carry_over"] = False
             new_item["_unverified_host"] = False
             final_open.append(new_item)
@@ -1321,13 +1448,7 @@ def reconcile_poam_entries(
 
         # Approved False Positives always move to CLOSED
         if str(p.get("false_positive", "")).strip().lower() == "yes":
-            closed_item = dict(p)
-            closed_item["status_date"] = format_date_iso(today)
-            closed_item["_stat_date_obj"] = today
-            prev_comment = str(closed_item.get("comments", "")).strip()
-            note = f"[Closed {format_date_iso(today)}: Approved False Positive moved to Closed POA&M]"
-            closed_item["comments"] = f"{prev_comment}\n{note}".strip() if prev_comment else note
-            newly_closed.append(closed_item)
+            newly_closed.append(_close_item(p, today, "Approved False Positive moved to Closed POA&M"))
             continue
 
         _, p_asset = p["_dedup_key"]
@@ -1342,13 +1463,9 @@ def reconcile_poam_entries(
         )
 
         if asset_was_scanned:
-            closed_item = dict(p)
-            closed_item["status_date"] = format_date_iso(today)
-            closed_item["_stat_date_obj"] = today
-            prev_comment = str(closed_item.get("comments", "")).strip()
-            note = f"[Closed {format_date_iso(today)}: Verified remediated — asset scanned and finding no longer present]"
-            closed_item["comments"] = f"{prev_comment}\n{note}".strip() if prev_comment else note
-            newly_closed.append(closed_item)
+            newly_closed.append(
+                _close_item(p, today, "Verified remediated — asset scanned and finding no longer present")
+            )
         else:
             # Asset was NOT seen in the scan at all -> do NOT blindly close; retain in OPEN and flag for review!
             unverified_item = dict(p)
@@ -1409,29 +1526,7 @@ def reconcile_poam_entries_legacy(
         a new item (it is the same vulnerability); everything else is new.
     Approved False Positives (False Positive = Yes) still move to CLOSED, as in strict mode.
     """
-    max_poam_seq = 0
-    uses_typed_prefix = False
-    max_by_prefix: Dict[str, int] = {"VULN": 0, "COMP": 0, "PENT": 0}
-    for p in list(prev_open_entries) + list(prev_closed_entries or []):
-        pid = str(p.get("poam_id", "")).strip()
-        m_typed = re.match(r"^(VULN|COMP|PENT)-(\d+)$", pid, flags=re.IGNORECASE)
-        if m_typed:
-            uses_typed_prefix = True
-            pfx = m_typed.group(1).upper()
-            seq_num = int(m_typed.group(2))
-            max_by_prefix[pfx] = max(max_by_prefix.get(pfx, 0), seq_num)
-            max_poam_seq = max(max_poam_seq, seq_num)
-        else:
-            m_dyn = re.match(r"^\d{4}-[A-Za-z]{3}-(\d+)$", pid)
-            m_leg = re.match(r"^POAM-\d{4}-(\d+)$", pid, flags=re.IGNORECASE)
-            if m_dyn:
-                max_poam_seq = max(max_poam_seq, int(m_dyn.group(1)))
-            elif m_leg:
-                max_poam_seq = max(max_poam_seq, int(m_leg.group(1)))
-            else:
-                m_seq = re.search(r"(\d+)$", pid)
-                if m_seq:
-                    max_poam_seq = max(max_poam_seq, int(m_seq.group(1)))
+    allocator = PoamIdAllocator(prev_open_entries, prev_closed_entries, today)
 
     scan_by_key: Dict[str, List[Dict[str, object]]] = {}
     for se in new_scan_entries:
@@ -1453,16 +1548,12 @@ def reconcile_poam_entries_legacy(
         candidates = scan_by_key.get(key, [])
 
         if fp_yes or not candidates:
-            closed_item = dict(p)
-            closed_item["status_date"] = format_date_iso(today)
-            closed_item["_stat_date_obj"] = today
-            prev_comment = str(closed_item.get("comments", "")).strip()
-            if fp_yes:
-                note = f"[Closed {format_date_iso(today)}: Approved False Positive moved to Closed POA&M]"
-            else:
-                note = f"[Closed {format_date_iso(today)}: Not present in latest scan (legacy name+description match)]"
-            closed_item["comments"] = f"{prev_comment}\n{note}".strip() if prev_comment else note
-            newly_closed.append(closed_item)
+            reason = (
+                "Approved False Positive moved to Closed POA&M"
+                if fp_yes
+                else "Not present in latest scan (legacy name+description match)"
+            )
+            newly_closed.append(_close_item(p, today, reason))
             continue
 
         # STAY: prefer the scan row for the same (plugin/source id, host); otherwise any row with the same name+description
@@ -1484,17 +1575,7 @@ def reconcile_poam_entries_legacy(
             continue
         for se in items:  # all hosts for a genuinely new vulnerability become new rows
             new_item = dict(se)
-            if uses_typed_prefix:
-                w_lower = str(new_item.get("weakness_name", "")).lower()
-                is_comp = (not str(new_item.get("cve", "")).strip()) or any(
-                    kw in w_lower for kw in ("cipher", "tls", "stig", "cis ", "compliance", "policy", "banner", "configuration")
-                )
-                pfx = "COMP" if is_comp else "VULN"
-                max_by_prefix[pfx] = max_by_prefix.get(pfx, 0) + 1
-                new_item["poam_id"] = f"{pfx}-{max_by_prefix[pfx]:05d}"
-            else:
-                max_poam_seq += 1
-                new_item["poam_id"] = format_poam_id(today, max_poam_seq)
+            new_item["poam_id"] = allocator.next_id(new_item)
             new_item["_is_carry_over"] = False
             new_item["_unverified_host"] = False
             final_open.append(new_item)
@@ -1977,7 +2058,7 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRC-xMINI (v1.4.1 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRC-xMINI (v1.4.2 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:
@@ -2417,9 +2498,25 @@ def main() -> int:
     # Only search designated drop-off and legacy scans directories (never sample-scans or repo root)
     fallback_dirs = [DEFAULT_DROPOFF_DIR, LEGACY_SCANS_DIR]
 
-    today = parse_any_date(args.reference_date) if args.reference_date else datetime.date.today()
-    if not today:
+    if args.reference_date:
+        today = parse_any_date(args.reference_date)
+        if not today:
+            print(
+                f"[ERROR] Invalid --reference-date '{args.reference_date}'. Expected YYYY-MM-DD.",
+                file=sys.stderr,
+            )
+            return 1
+    else:
         today = datetime.date.today()
+
+    config = TransformConfig(
+        match_mode=args.match_mode,
+        poam_id_column_override=POAM_ID_COLUMN_OVERRIDE,
+        strict_fedramp_risk=args.strict_fedramp_risk,
+        reference_date=today,
+        include_scanner_solutions=args.include_scanner_solutions,
+        close_unscanned_hosts=args.close_unscanned_hosts,
+    )
 
     # 1. Resolve Scan Input Paths (from CLI argument or interactive prompt in artifacts/drop-off/)
     raw_scan_args: List[str] = []
@@ -2539,94 +2636,92 @@ def main() -> int:
         )
 
     # 2. Request Previously Filled-Out OPEN & CLOSED FedRAMP POA&M Forms (if not provided via flag)
-    prev_open_path = ""
-    if args.previous_open is not None:
-        if args.previous_open.strip().lower() not in ("", "none", "null", "false", "-"):
-            resolved_prev = resolve_input_file(
-                args.previous_open,
+    def _resolve_poam_arg_or_prompt(
+        cli_val: Optional[str],
+        allow_prompt: bool,
+        kind_label: str,
+        list_label: str,
+        exclude_paths: List[str],
+        empty_prompt_suffix: str,
+    ) -> Tuple[Optional[str], bool]:
+        """Returns (resolved_path_or_empty, ok_flag)."""
+        if cli_val is not None:
+            if cli_val.strip().lower() in ("", "none", "null", "false", "-"):
+                return "", True
+            resolved = resolve_input_file(
+                cli_val,
                 scans_dir=scans_dir,
                 extensions=POAM_EXTENSIONS,
                 fallback_dirs=fallback_dirs,
             )
-            if not resolved_prev:
-                print(f"[ERROR] Previous OPEN POA&M file not found in artifacts/drop-off/: '{args.previous_open}'", file=sys.stderr)
-                return 1
-            prev_open_path = resolved_prev
-    elif not args.no_previous and sys.stdin.isatty():
-        print("")
-        poam_choices = display_detected_files(
-            scans_dir=scans_dir,
-            extensions=POAM_EXTENSIONS,
-            label="Previous POA&M workbooks (.xlsx)",
-            exclude_paths=scan_paths,
-        )
-        prev_prompt = (
-            f"[?] Select previous OPEN FedRAMP POA&M by number [1-{len(poam_choices)}], enter filename in artifacts/drop-off/,\n"
-            f"    or press Enter if none (initial baseline): "
-            if poam_choices
-            else "[?] Enter previous OPEN FedRAMP POA&M filename in artifacts/drop-off/ (.xlsx) to reconcile\n"
-                 "    Open -> Closed transitions (or press Enter if none / initial baseline): "
-        )
-        user_prev = input(prev_prompt).strip()
-        if user_prev and user_prev.lower() not in ("none", "null", "false", "-"):
-            live_poam_choices = poam_choices or list_eligible_files(scans_dir, POAM_EXTENSIONS, exclude_paths=scan_paths)
-            resolved_prev = resolve_input_file(
-                user_prev,
-                scans_dir=scans_dir,
-                extensions=POAM_EXTENSIONS,
-                numbered_choices=live_poam_choices,
-                fallback_dirs=fallback_dirs,
-            )
-            if not resolved_prev:
-                print(f"[ERROR] Previous OPEN POA&M file not found in artifacts/drop-off/: '{user_prev}'", file=sys.stderr)
-                return 1
-            prev_open_path = resolved_prev
+            if not resolved:
+                print(
+                    f"[ERROR] Previous {kind_label} POA&M file not found in artifacts/drop-off/: '{cli_val}'",
+                    file=sys.stderr,
+                )
+                return None, False
+            return resolved, True
 
-    # Also resolve --previous-closed through artifacts/drop-off/ (or prompt interactively)
-    prev_closed_path = ""
-    if args.previous_closed is not None:
-        if args.previous_closed.strip().lower() not in ("", "none", "null", "false", "-"):
-            resolved_closed = resolve_input_file(
-                args.previous_closed,
-                scans_dir=scans_dir,
-                extensions=POAM_EXTENSIONS,
-                fallback_dirs=fallback_dirs,
-            )
-            if not resolved_closed:
-                print(f"[ERROR] Previous CLOSED POA&M file not found in artifacts/drop-off/: '{args.previous_closed}'", file=sys.stderr)
-                return 1
-            prev_closed_path = resolved_closed
-    elif args.previous_open is None and not args.no_previous and sys.stdin.isatty():
-        excluded_for_closed = list(scan_paths) + ([prev_open_path] if prev_open_path else [])
-        closed_choices = display_detected_files(
+        if not allow_prompt or not sys.stdin.isatty():
+            return "", True
+
+        if kind_label == "OPEN":
+            print("")
+        choices = display_detected_files(
             scans_dir=scans_dir,
             extensions=POAM_EXTENSIONS,
-            label="Previous CLOSED POA&M workbooks (.xlsx)",
-            exclude_paths=excluded_for_closed,
+            label=list_label,
+            exclude_paths=exclude_paths,
         )
-        closed_prompt = (
-            f"[?] Select previous CLOSED FedRAMP POA&M by number [1-{len(closed_choices)}], enter filename in artifacts/drop-off/,\n"
-            f"    or press Enter if none: "
-            if closed_choices
-            else "[?] Enter previous CLOSED FedRAMP POA&M filename in artifacts/drop-off/ (.xlsx) to preserve\n"
-                 "    closed history & prevent POA&M ID reuse (or press Enter if none): "
+        prompt = (
+            f"[?] Select previous {kind_label} FedRAMP POA&M by number [1-{len(choices)}], enter filename in artifacts/drop-off/,\n"
+            f"    or press Enter if none{' (initial baseline)' if kind_label == 'OPEN' else ''}: "
+            if choices
+            else f"[?] Enter previous {kind_label} FedRAMP POA&M filename in artifacts/drop-off/ (.xlsx) {empty_prompt_suffix}: "
         )
-        user_closed = input(closed_prompt).strip()
-        if user_closed and user_closed.lower() not in ("none", "null", "false", "-"):
-            live_closed_choices = closed_choices or list_eligible_files(
-                scans_dir, POAM_EXTENSIONS, exclude_paths=excluded_for_closed
+        user_val = input(prompt).strip()
+        if not user_val or user_val.lower() in ("none", "null", "false", "-"):
+            return "", True
+        live_choices = choices or list_eligible_files(scans_dir, POAM_EXTENSIONS, exclude_paths=exclude_paths)
+        resolved = resolve_input_file(
+            user_val,
+            scans_dir=scans_dir,
+            extensions=POAM_EXTENSIONS,
+            numbered_choices=live_choices,
+            fallback_dirs=fallback_dirs,
+        )
+        if not resolved:
+            print(
+                f"[ERROR] Previous {kind_label} POA&M file not found in artifacts/drop-off/: '{user_val}'",
+                file=sys.stderr,
             )
-            resolved_closed = resolve_input_file(
-                user_closed,
-                scans_dir=scans_dir,
-                extensions=POAM_EXTENSIONS,
-                numbered_choices=live_closed_choices,
-                fallback_dirs=fallback_dirs,
-            )
-            if not resolved_closed:
-                print(f"[ERROR] Previous CLOSED POA&M file not found in artifacts/drop-off/: '{user_closed}'", file=sys.stderr)
-                return 1
-            prev_closed_path = resolved_closed
+            return None, False
+        return resolved, True
+
+    prev_open_res, ok_open = _resolve_poam_arg_or_prompt(
+        cli_val=args.previous_open,
+        allow_prompt=not args.no_previous,
+        kind_label="OPEN",
+        list_label="Previous POA&M workbooks (.xlsx)",
+        exclude_paths=scan_paths,
+        empty_prompt_suffix="to reconcile\n    Open -> Closed transitions (or press Enter if none / initial baseline)",
+    )
+    if not ok_open:
+        return 1
+    prev_open_path = prev_open_res or ""
+
+    excluded_for_closed = list(scan_paths) + ([prev_open_path] if prev_open_path else [])
+    prev_closed_res, ok_closed = _resolve_poam_arg_or_prompt(
+        cli_val=args.previous_closed,
+        allow_prompt=(args.previous_open is None and not args.no_previous),
+        kind_label="CLOSED",
+        list_label="Previous CLOSED POA&M workbooks (.xlsx)",
+        exclude_paths=excluded_for_closed,
+        empty_prompt_suffix="to preserve\n    closed history & prevent POA&M ID reuse (or press Enter if none)",
+    )
+    if not ok_closed:
+        return 1
+    prev_closed_path = prev_closed_res or ""
 
     # 3. Load and Normalize Scan Findings
     per_file_entries: List[List[Dict[str, object]]] = []

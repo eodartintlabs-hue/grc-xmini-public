@@ -21,27 +21,29 @@ Key Outputs:
 
 import argparse
 import csv
+import dataclasses
 import io
 import json
 import os
 import re
 import sys
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import parse_qs
 
 try:
-    from grc_common import utc_now_iso, utc_now_str
+    from grc_common import load_stig_catalog, utc_now_iso, utc_now_str
 except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from grc_common import utc_now_iso, utc_now_str
+    from grc_common import load_stig_catalog, utc_now_iso, utc_now_str
 
 
 # ==============================================================================
-# DISA STIG & SRG KNOWLEDGE BASE CATALOG
+# DISA STIG & SRG KNOWLEDGE BASE CATALOG (SHARED VIA rules/stig_catalog.json)
 # ==============================================================================
 
-DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
+_FALLBACK_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
     # General Application & Development
     "ASD_STIG": {
         "id": "U_ASD_V5R1_STIG",
@@ -286,6 +288,7 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
     },
 }
 
+DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = load_stig_catalog() or dict(_FALLBACK_STIG_CATALOG)
 CATALOG_BY_ID: Dict[str, Dict[str, Any]] = {v["id"]: v for v in DISA_STIG_CATALOG.values()}
 
 # Application dependency ecosystems (where client SDKs like `pkg:pypi/redis` or `pkg:npm/mysql` live)
@@ -370,28 +373,27 @@ PURL_ECOSYSTEM_MAP: Dict[str, Tuple[str, str]] = {
 # DATA MODELS
 # ==============================================================================
 
+@dataclass
 class Component:
     """Normalized representation of an SBOM component/package."""
+    name: Any
+    version: Any = "Unknown"
+    purl: Any = ""
+    component_type: Any = "library"
+    supplier: Any = ""
+    license_str: Any = ""
+    description: Any = ""
 
-    def __init__(
-        self,
-        name: Any,
-        version: Any = "Unknown",
-        purl: Any = "",
-        component_type: Any = "library",
-        supplier: Any = "",
-        license_str: Any = "",
-        description: Any = "",
-    ):
-        self.name = str(name if name is not None else "").strip()
-        ver_str = str(version if version is not None else "").strip()
+    def __post_init__(self) -> None:
+        self.name = str(self.name if self.name is not None else "").strip()
+        ver_str = str(self.version if self.version is not None else "").strip()
         self.version = ver_str if ver_str else "Unknown"
-        self.purl = str(purl if purl is not None else "").strip()
-        ctype = str(component_type if component_type is not None else "library").strip().lower()
+        self.purl = str(self.purl if self.purl is not None else "").strip()
+        ctype = str(self.component_type if self.component_type is not None else "library").strip().lower()
         self.component_type = ctype if ctype else "library"
-        self.supplier = str(supplier if supplier is not None else "").strip()
-        self.license_str = str(license_str if license_str is not None else "").strip()
-        self.description = str(description if description is not None else "").strip()
+        self.supplier = str(self.supplier if self.supplier is not None else "").strip()
+        self.license_str = str(self.license_str if self.license_str is not None else "").strip()
+        self.description = str(self.description if self.description is not None else "").strip()
 
     def get_ecosystem(self) -> Optional[str]:
         """Extracts the ecosystem/package manager from a PURL string."""
@@ -422,21 +424,18 @@ class Component:
         return f"<Component {self.name}@{self.version} ({self.purl or self.component_type})>"
 
 
+@dataclass
 class STIGMapping:
     """Association between an SBOM component and an applicable DISA STIG/SRG."""
+    component: Component
+    stig_key: str
+    match_reason: str
+    match_type: str  # "REGEX_NAME", "PURL_ECOSYSTEM", "TYPE_INFERENCE", "FALLBACK"
+    stig_info: Dict[str, Any] = field(default_factory=dict)
 
-    def __init__(
-        self,
-        component: Component,
-        stig_key: str,
-        match_reason: str,
-        match_type: str,
-    ):
-        self.component = component
-        self.stig_key = stig_key
-        self.stig_info = DISA_STIG_CATALOG.get(stig_key, {})
-        self.match_reason = match_reason
-        self.match_type = match_type  # "REGEX_NAME", "PURL_ECOSYSTEM", "TYPE_INFERENCE", "FALLBACK"
+    def __post_init__(self) -> None:
+        if not self.stig_info:
+            self.stig_info = DISA_STIG_CATALOG.get(self.stig_key, {})
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -484,6 +483,8 @@ class SBOMParser:
         raise ValueError(
             "Unrecognized SBOM schema. File does not appear to be valid CycloneDX or SPDX JSON."
         )
+
+    parse = parse_file
 
     @staticmethod
     def _cdx_dict_to_component(comp: Dict[str, Any], default_type: str = "library") -> Optional[Component]:
@@ -590,6 +591,13 @@ class STIGAnalyzer:
     def __init__(self, components: List[Component]):
         self.components = components
         self.mappings: List[STIGMapping] = []
+        self._resolvers: List[Callable[[Component], Optional[STIGMapping]]] = [
+            self._by_always_match,
+            self._by_platform_service,
+            self._by_purl_ecosystem,
+            self._by_type_os,
+            self._by_type_container,
+        ]
 
     def analyze(self) -> List[STIGMapping]:
         self.mappings = [self._resolve_component(comp) for comp in self.components]
@@ -608,12 +616,8 @@ class STIGAnalyzer:
             return "RHEL_8_STIG", "RHEL 8 operating system baseline"
         return "RHEL_9_STIG", "RHEL 9 system package / OS baseline"
 
-    def _resolve_component(self, comp: Component) -> STIGMapping:
+    def _by_always_match(self, comp: Component) -> Optional[STIGMapping]:
         name_clean = comp.name.strip().lower()
-        ecosystem = comp.get_ecosystem()
-        is_app_library = (ecosystem in APP_LIBRARY_ECOSYSTEMS and comp.component_type in ("library", "package"))
-
-        # Step 1a: Always-applicable security/crypto/embedded engine patterns
         for pattern, stig_key, reason in ALWAYS_MATCH_NAME_MAP:
             if pattern.search(name_clean):
                 return STIGMapping(
@@ -622,21 +626,27 @@ class STIGAnalyzer:
                     match_reason=f"Direct component technology match: {reason}",
                     match_type="REGEX_NAME",
                 )
+        return None
 
-        # Step 1b: Platform/server/runtime patterns (only when not an app-ecosystem client library)
-        if not is_app_library:
-            for pattern, stig_key, reason in PLATFORM_SERVICE_NAME_MAP:
-                if pattern.search(name_clean):
-                    if stig_key == "RHEL_9_STIG":
-                        stig_key, _ = self._resolve_os_stig_key(comp)
-                    return STIGMapping(
-                        component=comp,
-                        stig_key=stig_key,
-                        match_reason=f"Direct component technology match: {reason}",
-                        match_type="REGEX_NAME",
-                    )
+    def _by_platform_service(self, comp: Component) -> Optional[STIGMapping]:
+        ecosystem = comp.get_ecosystem()
+        if ecosystem in APP_LIBRARY_ECOSYSTEMS and comp.component_type in ("library", "package"):
+            return None
+        name_clean = comp.name.strip().lower()
+        for pattern, stig_key, reason in PLATFORM_SERVICE_NAME_MAP:
+            if pattern.search(name_clean):
+                if stig_key == "RHEL_9_STIG":
+                    stig_key, _ = self._resolve_os_stig_key(comp)
+                return STIGMapping(
+                    component=comp,
+                    stig_key=stig_key,
+                    match_reason=f"Direct component technology match: {reason}",
+                    match_type="REGEX_NAME",
+                )
+        return None
 
-        # Step 2: Match against PURL ecosystem (with distro-aware RPM/DEB resolution)
+    def _by_purl_ecosystem(self, comp: Component) -> Optional[STIGMapping]:
+        ecosystem = comp.get_ecosystem()
         if ecosystem and ecosystem in PURL_ECOSYSTEM_MAP:
             if ecosystem == "rpm":
                 stig_key, reason = self._resolve_os_stig_key(comp)
@@ -653,8 +663,9 @@ class STIGAnalyzer:
                 match_reason=f"Resolved via PURL ecosystem ({ecosystem}): {reason}",
                 match_type="PURL_ECOSYSTEM",
             )
+        return None
 
-        # Step 3: Operating system indicators in component type
+    def _by_type_os(self, comp: Component) -> Optional[STIGMapping]:
         if comp.component_type in ("operating-system", "os"):
             stig_key, reason = self._resolve_os_stig_key(comp)
             return STIGMapping(
@@ -663,8 +674,9 @@ class STIGAnalyzer:
                 match_reason=reason,
                 match_type="TYPE_INFERENCE",
             )
+        return None
 
-        # Step 4: Container image indicators
+    def _by_type_container(self, comp: Component) -> Optional[STIGMapping]:
         if comp.component_type in ("container", "container-image"):
             return STIGMapping(
                 component=comp,
@@ -672,8 +684,13 @@ class STIGAnalyzer:
                 match_reason="Container image platform requirement",
                 match_type="TYPE_INFERENCE",
             )
+        return None
 
-        # Step 5: Default Fallback to Application Security and Development STIG
+    def _resolve_component(self, comp: Component) -> STIGMapping:
+        for resolver in self._resolvers:
+            matched = resolver(comp)
+            if matched is not None:
+                return matched
         return STIGMapping(
             component=comp,
             stig_key="ASD_STIG",

@@ -23,12 +23,14 @@ Design Rule Adherence:
 """
 
 import argparse
+import dataclasses
 import json
 import os
 import re
 import subprocess
 import sys
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +41,54 @@ except ImportError:
     from grc_common import safe_rmtree, sha256_file, utc_now_iso
 
 _HEX_HASH_RE = re.compile(r"^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$")
+
+
+# ==============================================================================
+# DATA MODELS & GIT SUBPROCESS HELPER
+# ==============================================================================
+
+@dataclass
+class CommitMetadata:
+    """Structured Git commit provenance metadata."""
+    commit_hash: str
+    short_hash: str
+    author_name: str
+    author_email: str
+    author_date: str
+    subject: str
+    ref: str = "HEAD"
+
+    @classmethod
+    def unknown(cls) -> "CommitMetadata":
+        return cls(
+            commit_hash="UNKNOWN",
+            short_hash="UNKNOWN",
+            author_name="UNKNOWN",
+            author_email="UNKNOWN",
+            author_date="UNKNOWN",
+            subject="UNKNOWN",
+            ref="HEAD",
+        )
+
+    def to_dict(self) -> Dict[str, str]:
+        return dataclasses.asdict(self)
+
+
+def _git(
+    *args: str,
+    cwd: Optional[Path] = None,
+    error_prefix: str = "Git command failed",
+) -> subprocess.CompletedProcess:
+    """Executes a Git command, combining stdout/stderr on failure into a clean RuntimeError."""
+    cmd = ["git"]
+    if cwd is not None:
+        cmd.extend(["-C", str(cwd)])
+    cmd.extend(args)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        combined = f"{e.stdout or ''}\n{e.stderr or ''}".strip() or str(e)
+        raise RuntimeError(f"{error_prefix}: {combined}") from e
 
 
 # ==============================================================================
@@ -124,19 +174,15 @@ class GRCBundleManager:
                 )
             print("    -> Cryptographic checksum verified against session baseline: MATCH")
 
-        # Execute git bundle verify
-        try:
-            result = subprocess.run(
-                ["git", "bundle", "verify", str(self.bundle_path)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            raw_verify_output = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
-            print("    -> Git bundle object verification: VALID")
-        except subprocess.CalledProcessError as e:
-            err_msg = (e.stderr or e.stdout or str(e)).strip()
-            raise RuntimeError(f"Git bundle verification failed: {err_msg}")
+        # Execute git bundle verify via _git helper
+        result = _git(
+            "bundle",
+            "verify",
+            str(self.bundle_path),
+            error_prefix="Git bundle verification failed",
+        )
+        raw_verify_output = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
+        print("    -> Git bundle object verification: VALID")
 
         # Parse available references from verification output
         refs = self._parse_bundle_refs(raw_verify_output)
@@ -188,31 +234,25 @@ class GRCBundleManager:
         print(f"[*] Extracting bundle into ephemeral workspace: {self.workspace_root}")
 
         # Step 3: Clone from bundle file
-        try:
-            subprocess.run(
-                ["git", "clone", str(self.bundle_path), str(self.workspace_root)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            print("    -> Cloned bundle repository successfully.")
-        except subprocess.CalledProcessError as e:
-            err_msg = (e.stderr or e.stdout or str(e)).strip()
-            raise RuntimeError(f"Failed to extract Git bundle: {err_msg}")
+        _git(
+            "clone",
+            str(self.bundle_path),
+            str(self.workspace_root),
+            error_prefix="Failed to extract Git bundle",
+        )
+        print("    -> Cloned bundle repository successfully.")
 
         # Step 4: Checkout target tag/branch if specified
         if target_ref:
-            try:
-                subprocess.run(
-                    ["git", "-C", str(self.workspace_root), "checkout", target_ref, "--"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                print(f"    -> Checked out reference: {target_ref}")
-            except subprocess.CalledProcessError as e:
-                err_msg = (e.stderr or e.stdout or str(e)).strip()
-                raise RuntimeError(f"Failed to checkout ref '{target_ref}': {err_msg}")
+            _git(
+                "checkout",
+                "--detach",
+                target_ref,
+                "--",
+                cwd=self.workspace_root,
+                error_prefix=f"Failed to checkout ref '{target_ref}'",
+            )
+            print(f"    -> Checked out reference: {target_ref}")
 
         # Step 5: Gather commit metadata
         commit_info = self._get_commit_metadata(self.workspace_root)
@@ -276,32 +316,20 @@ class GRCBundleManager:
     def _get_commit_metadata(self, repo_path: Path) -> Dict[str, Any]:
         fmt = "%H%x00%h%x00%an%x00%ae%x00%ad%x00%s%x00%D"
         try:
-            res = subprocess.run(
-                ["git", "-C", str(repo_path), "log", "-1", f"--format={fmt}"],
-                capture_output=True,
-                text=True,
-                check=True,
+            res = _git("log", "-1", "-z", f"--format={fmt}", cwd=repo_path)
+            parts = res.stdout.strip("\x00\n ").split("\x00")
+            meta = CommitMetadata(
+                commit_hash=parts[0] if len(parts) > 0 else "",
+                short_hash=parts[1] if len(parts) > 1 else "",
+                author_name=parts[2] if len(parts) > 2 else "",
+                author_email=parts[3] if len(parts) > 3 else "",
+                author_date=parts[4] if len(parts) > 4 else "",
+                subject=parts[5] if len(parts) > 5 else "",
+                ref=parts[6] if (len(parts) > 6 and parts[6]) else "HEAD",
             )
-            parts = res.stdout.strip().split("\x00")
-            return {
-                "commit_hash": parts[0] if len(parts) > 0 else "",
-                "short_hash": parts[1] if len(parts) > 1 else "",
-                "author_name": parts[2] if len(parts) > 2 else "",
-                "author_email": parts[3] if len(parts) > 3 else "",
-                "author_date": parts[4] if len(parts) > 4 else "",
-                "subject": parts[5] if len(parts) > 5 else "",
-                "ref": parts[6] if (len(parts) > 6 and parts[6]) else "HEAD",
-            }
-        except subprocess.CalledProcessError:
-            return {
-                "commit_hash": "UNKNOWN",
-                "short_hash": "UNKNOWN",
-                "author_name": "UNKNOWN",
-                "author_email": "UNKNOWN",
-                "author_date": "UNKNOWN",
-                "subject": "UNKNOWN",
-                "ref": "HEAD",
-            }
+            return meta.to_dict()
+        except RuntimeError:
+            return CommitMetadata.unknown().to_dict()
 
     def _apply_read_only(self, path: Path) -> None:
         """Makes source files read-only while keeping directories traversable and preserving .github/."""
