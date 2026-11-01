@@ -69,7 +69,7 @@ Executes unified invariant verification across all compliance engines without re
 Displays the **GRCx** ASCII system banner along with a summary of all available top-level subcommands. Use this any time you want a quick reminder of the CLI syntax right in your terminal.
 
 ### `./grc fetch` *(Aliases: `./grc info`, `./grc --version`, `./grc -v`)*
-Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.4.0 — Yokota`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
+Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.4.1 — Yokota`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
 
 ### `./grc docker-build`
 Builds the local `grc-scanner:local` Docker container image from `docker/Dockerfile.scanner`. This packages all containerized security scanners (Semgrep, Gitleaks, Checkov, Syft, Grype, Trivy, and OpenSCAP) along with pre-cached vulnerability databases so that all subsequent scans execute completely offline with zero network egress.

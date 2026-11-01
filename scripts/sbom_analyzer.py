@@ -15,19 +15,26 @@ Purpose:
 
 Key Outputs:
   - STIG Applicability Matrix (Markdown / JSON / CSV)
-  - CAT I / CAT II / CAT III Risk Surface Assessment
+  - Benchmark Scope & Risk Classification Summary
   - NIST SP 800-53 Traceability Matrix for POA&M / SCR-SCN Ingestion
 """
 
 import argparse
 import csv
-import datetime
+import io
 import json
 import os
 import re
 import sys
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
+from urllib.parse import parse_qs
+
+try:
+    from grc_common import utc_now_iso, utc_now_str
+except ImportError:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from grc_common import utc_now_iso, utc_now_str
 
 
 # ==============================================================================
@@ -35,9 +42,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 # ==============================================================================
 
 DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
-    # --------------------------------------------------------------------------
     # General Application & Development
-    # --------------------------------------------------------------------------
     "ASD_STIG": {
         "id": "U_ASD_V5R1_STIG",
         "title": "Application Security and Development (ASD) STIG",
@@ -61,9 +66,7 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Baseline security requirements for software applications where a technology-specific STIG does not exist.",
     },
 
-    # --------------------------------------------------------------------------
     # Runtimes, Languages & Execution Environments
-    # --------------------------------------------------------------------------
     "JAVA_JRE_STIG": {
         "id": "U_Java_Runtime_Environment_STIG",
         "title": "Java Runtime Environment (JRE) STIG",
@@ -109,9 +112,7 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Guidance for deployments utilizing .NET Core and CLR runtimes.",
     },
 
-    # --------------------------------------------------------------------------
     # Web, Proxy & Application Servers
-    # --------------------------------------------------------------------------
     "APACHE_HTTP_STIG": {
         "id": "U_Apache_Server_2.4_Unix_STIG",
         "title": "Apache Server 2.4 UNIX STIG",
@@ -157,19 +158,17 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Baseline requirements for web service engines (Caddy, Traefik, Envoy, Lighttpd).",
     },
 
-    # --------------------------------------------------------------------------
     # Database & Storage Systems
-    # --------------------------------------------------------------------------
     "POSTGRESQL_STIG": {
         "id": "U_PostgreSQL_9.x_STIG",
         "title": "PostgreSQL Database STIG",
         "benchmark_id": "PostgreSQL_Database_STIG",
         "version": "Version 2, Release 3",
         "type": "STIG",
-        "target_domain": "PostgreSQL RDBMS Engine & Client Libraries",
+        "target_domain": "PostgreSQL RDBMS Engine",
         "nist_controls": ["AC-3", "AU-2", "AU-12", "IA-2", "SC-8", "SC-13", "SI-2"],
         "max_severity": "CAT I",
-        "description": "Covers PostgreSQL relational database instances and client connectivity drivers.",
+        "description": "Covers PostgreSQL relational database instances and server packages.",
     },
     "MYSQL_STIG": {
         "id": "U_MySQL_Server_STIG",
@@ -205,9 +204,7 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Baseline requirements for data stores lacking a dedicated technology STIG.",
     },
 
-    # --------------------------------------------------------------------------
     # Operating Systems & Container Runtimes
-    # --------------------------------------------------------------------------
     "RHEL_9_STIG": {
         "id": "U_RHEL_9_STIG",
         "title": "Red Hat Enterprise Linux 9 STIG",
@@ -264,9 +261,7 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Security standards for Kubernetes container orchestration environments.",
     },
 
-    # --------------------------------------------------------------------------
     # Cryptographic & Network Security Infrastructure
-    # --------------------------------------------------------------------------
     "OPENSSL_CRYPTO_SRG": {
         "id": "U_FIPS_Cryptographic_Module_SRG",
         "title": "Cryptographic Module and Protocol Security SRG",
@@ -291,44 +286,70 @@ DISA_STIG_CATALOG: Dict[str, Dict[str, Any]] = {
     },
 }
 
+CATALOG_BY_ID: Dict[str, Dict[str, Any]] = {v["id"]: v for v in DISA_STIG_CATALOG.values()}
+
+# Application dependency ecosystems (where client SDKs like `pkg:pypi/redis` or `pkg:npm/mysql` live)
+APP_LIBRARY_ECOSYSTEMS = {"pypi", "npm", "maven", "golang", "nuget", "cargo", "gem"}
+
 
 # ==============================================================================
 # COMPONENT TO STIG RESOLUTION RULES
 # ==============================================================================
 
-# Regex patterns mapping component names or prefixes to STIG keys
-COMPONENT_NAME_MAP: List[Tuple[re.Pattern, str, str]] = [
+# Regex patterns that apply even when a component is an application library
+# (e.g., cryptographic modules and embedded servlet containers)
+ALWAYS_MATCH_NAME_MAP: List[Tuple[re.Pattern, str, str]] = [
+    (
+        re.compile(r"^(openssl(?:-[0-9a-z\.\-]+)?|libcrypto[0-9a-z\.\-]*|libssl[0-9a-z\.\-]*|boringssl|libressl)$", re.I),
+        "OPENSSL_CRYPTO_SRG",
+        "Cryptographic communications provider",
+    ),
+    (
+        re.compile(r"^(tomcat|apache-tomcat|tomcat-embed-[a-z0-9\-]+)$", re.I),
+        "TOMCAT_STIG",
+        "Tomcat servlet and JSP execution engine",
+    ),
+]
+
+# Regex patterns for platform services, OS packages, runtimes, and servers
+# (Skipped when PURL indicates an application-level client library in PyPI/npm/Maven/Go/NuGet/Cargo)
+PLATFORM_SERVICE_NAME_MAP: List[Tuple[re.Pattern, str, str]] = [
     # Web & Application Servers
     (re.compile(r"^(nginx|nginx-core|nginx-full|openresty)$", re.I), "NGINX_STIG", "Reverse proxy and web server engine"),
     (re.compile(r"^(apache2|httpd|apache-http-server)$", re.I), "APACHE_HTTP_STIG", "Apache web server core service"),
-    (re.compile(r"^(tomcat|apache-tomcat|tomcat-embed-.*)$", re.I), "TOMCAT_STIG", "Tomcat servlet and JSP execution engine"),
     (re.compile(r"^(caddy|traefik|envoy|haproxy)$", re.I), "WEB_SERVER_SRG", "Web ingress and edge routing proxy"),
 
-    # Runtimes & Interpreters
-    (re.compile(r"^(python|python3|cpython|pypy.*)$", re.I), "PYTHON_SRG", "Python runtime interpreter environment"),
+    # Runtimes & Interpreters (Tightened so 'java.*' never matches 'javascript' or 'java-jwt')
+    (re.compile(r"^(python|python3|python3\.[0-9]+|cpython|pypy3?)$", re.I), "PYTHON_SRG", "Python runtime interpreter environment"),
     (re.compile(r"^(nodejs|node|node-js)$", re.I), "NODEJS_SRG", "Node.js JavaScript server runtime engine"),
-    (re.compile(r"^(openjdk.*|java.*|jdk|jre|adoptium.*)$", re.I), "JAVA_JRE_STIG", "Java Virtual Machine (JVM) runtime"),
-    (re.compile(r"^(dotnet.*|microsoft\.net.*)$", re.I), "DOTNET_STIG", ".NET runtime and core libraries"),
+    (
+        re.compile(r"^(openjdk(?:-[0-9]+)?(?:-(?:jre|jdk)(?:-headless)?)?|java-(?:1\.)?[0-9]+-(?:openjdk|oracle)|jdk|jre|temurin-?[0-9]*|adoptium-?[0-9]*)$", re.I),
+        "JAVA_JRE_STIG",
+        "Java Virtual Machine (JVM) runtime",
+    ),
+    (re.compile(r"^(dotnet|dotnet-runtime.*|aspnetcore-runtime.*|microsoft\.netcore\.app)$", re.I), "DOTNET_STIG", ".NET runtime and core libraries"),
 
-    # Databases & Caches
-    (re.compile(r"^(postgresql.*|postgres.*|libpq.*)$", re.I), "POSTGRESQL_STIG", "PostgreSQL database engine and connection stack"),
-    (re.compile(r"^(mysql.*|mariadb.*)$", re.I), "MYSQL_STIG", "MySQL/MariaDB relational database service"),
-    (re.compile(r"^(mongodb.*|mongo)$", re.I), "MONGODB_STIG", "MongoDB document database engine"),
-    (re.compile(r"^(redis.*|memcached|sqlite.*)$", re.I), "DATABASE_SRG", "In-memory cache or embedded database engine"),
+    # Databases & Caches (Server / Engine packages)
+    (re.compile(r"^(postgresql(?:-[0-9]+)?|postgresql-server|postgres|libpq5?)$", re.I), "POSTGRESQL_STIG", "PostgreSQL database engine and connection stack"),
+    (re.compile(r"^(mysql-server|mysql-community-server|mysqld|mariadb-server|mariadb)$", re.I), "MYSQL_STIG", "MySQL/MariaDB relational database service"),
+    (re.compile(r"^(mongodb-org(?:-server)?|mongodb-enterprise(?:-server)?|mongod|mongodb)$", re.I), "MONGODB_STIG", "MongoDB document database engine"),
+    (re.compile(r"^(redis-server|redis|memcached|sqlite3)$", re.I), "DATABASE_SRG", "In-memory cache or embedded database engine"),
 
-    # Security & Cryptography Infrastructure
-    (re.compile(r"^(openssl.*|libcrypto.*|libssl.*|boringssl.*|libressl.*)$", re.I), "OPENSSL_CRYPTO_SRG", "Cryptographic communications provider"),
-    (re.compile(r"^(openssh.*|ssh)$", re.I), "OPENSSH_STIG", "SSH cryptographic terminal and transport tool"),
+    # SSH Infrastructure
+    (re.compile(r"^(openssh|openssh-server|openssh-client|openssh-clients|ssh)$", re.I), "OPENSSH_STIG", "SSH cryptographic terminal and transport tool"),
 
-    # Container & Orchestration
-    (re.compile(r"^(docker.*|containerd.*|podman|moby.*)$", re.I), "CONTAINER_PLATFORM_SRG", "Container virtualization and runtime service"),
-    (re.compile(r"^(kubernetes.*|k8s.*|coredns|kubelet|helm)$", re.I), "KUBERNETES_STIG", "Kubernetes cluster orchestration component"),
+    # Container & Orchestration Platforms
+    (re.compile(r"^(docker-ce|docker-ee|docker-engine|containerd(?:\.io)?|podman|moby-engine)$", re.I), "CONTAINER_PLATFORM_SRG", "Container virtualization and runtime service"),
+    (re.compile(r"^(kubernetes|kube-apiserver|kube-controller-manager|kube-scheduler|kubelet|kubectl|coredns|helm)$", re.I), "KUBERNETES_STIG", "Kubernetes cluster orchestration component"),
 
     # OS Distros & Base Images
-    (re.compile(r"^(rhel|redhat-release|centos.*|rocky.*|almalinux.*)$", re.I), "RHEL_9_STIG", "RHEL-derivative enterprise operating system base"),
-    (re.compile(r"^(ubuntu.*|debian.*)$", re.I), "UBUNTU_22_STIG", "Debian/Ubuntu Linux operating system baseline"),
-    (re.compile(r"^(alpine.*|distroless.*|busybox)$", re.I), "CONTAINER_PLATFORM_SRG", "Lightweight container operating system base image"),
+    (re.compile(r"^(rhel|redhat-release|centos-release|rocky-release|almalinux-release)$", re.I), "RHEL_9_STIG", "RHEL-derivative enterprise operating system base"),
+    (re.compile(r"^(ubuntu|ubuntu-minimal|debian|base-files)$", re.I), "UBUNTU_22_STIG", "Debian/Ubuntu Linux operating system baseline"),
+    (re.compile(r"^(alpine-baselayout|alpine-base|distroless|busybox)$", re.I), "CONTAINER_PLATFORM_SRG", "Lightweight container operating system base image"),
 ]
+
+# Backward-compatible combined alias
+COMPONENT_NAME_MAP: List[Tuple[re.Pattern, str, str]] = ALWAYS_MATCH_NAME_MAP + PLATFORM_SERVICE_NAME_MAP
 
 # PURL (Package URL) ecosystem mappings
 PURL_ECOSYSTEM_MAP: Dict[str, Tuple[str, str]] = {
@@ -354,29 +375,48 @@ class Component:
 
     def __init__(
         self,
-        name: str,
-        version: str = "Unknown",
-        purl: str = "",
-        component_type: str = "library",
-        supplier: str = "",
-        license_str: str = "",
-        description: str = "",
+        name: Any,
+        version: Any = "Unknown",
+        purl: Any = "",
+        component_type: Any = "library",
+        supplier: Any = "",
+        license_str: Any = "",
+        description: Any = "",
     ):
-        self.name = name.strip()
-        self.version = version.strip() if version else "Unknown"
-        self.purl = purl.strip()
-        self.component_type = component_type.strip().lower()
-        self.supplier = supplier.strip()
-        self.license_str = license_str.strip()
-        self.description = description.strip()
+        self.name = str(name if name is not None else "").strip()
+        ver_str = str(version if version is not None else "").strip()
+        self.version = ver_str if ver_str else "Unknown"
+        self.purl = str(purl if purl is not None else "").strip()
+        ctype = str(component_type if component_type is not None else "library").strip().lower()
+        self.component_type = ctype if ctype else "library"
+        self.supplier = str(supplier if supplier is not None else "").strip()
+        self.license_str = str(license_str if license_str is not None else "").strip()
+        self.description = str(description if description is not None else "").strip()
 
     def get_ecosystem(self) -> Optional[str]:
         """Extracts the ecosystem/package manager from a PURL string."""
         if self.purl.startswith("pkg:"):
-            parts = self.purl[4:].split("/")
-            if parts:
+            body = self.purl[4:].split("?", 1)[0]
+            parts = body.split("/")
+            if parts and parts[0]:
                 return parts[0].lower()
         return None
+
+    def get_purl_distro(self) -> str:
+        """Extracts distro qualifier or namespace hint from PURL or version string."""
+        hints: List[str] = []
+        if "?" in self.purl:
+            qs = parse_qs(self.purl.split("?", 1)[1])
+            for k in ("distro", "os", "arch"):
+                if k in qs:
+                    hints.extend(qs[k])
+        if self.purl.startswith("pkg:"):
+            body = self.purl[4:].split("?", 1)[0]
+            parts = body.split("/")
+            if len(parts) >= 2:
+                hints.append(parts[1])
+        hints.append(self.version)
+        return " ".join(hints).lower()
 
     def __repr__(self) -> str:
         return f"<Component {self.name}@{self.version} ({self.purl or self.component_type})>"
@@ -396,7 +436,7 @@ class STIGMapping:
         self.stig_key = stig_key
         self.stig_info = DISA_STIG_CATALOG.get(stig_key, {})
         self.match_reason = match_reason
-        self.match_type = match_type  # "EXACT_NAME", "REGEX_NAME", "PURL_ECOSYSTEM", "FALLBACK"
+        self.match_type = match_type  # "REGEX_NAME", "PURL_ECOSYSTEM", "TYPE_INFERENCE", "FALLBACK"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -433,103 +473,109 @@ class SBOMParser:
             except json.JSONDecodeError as e:
                 raise ValueError(f"Failed to parse SBOM JSON: {e}")
 
-        # Detect format
-        if "bomFormat" in data and data.get("bomFormat") == "CycloneDX":
+        if not isinstance(data, dict):
+            raise ValueError("Invalid SBOM JSON root: expected a JSON object.")
+
+        if data.get("bomFormat") == "CycloneDX" or ("components" in data and isinstance(data["components"], list)):
             return SBOMParser._parse_cyclonedx(data)
-        elif "spdxVersion" in data:
+        if "spdxVersion" in data or ("packages" in data and isinstance(data["packages"], list)):
             return SBOMParser._parse_spdx(data)
-        elif "components" in data and isinstance(data["components"], list):
-            # Fallback CycloneDX variant
-            return SBOMParser._parse_cyclonedx(data)
-        elif "packages" in data and isinstance(data["packages"], list):
-            # Fallback SPDX variant
-            return SBOMParser._parse_spdx(data)
-        else:
-            raise ValueError(
-                "Unrecognized SBOM schema. File does not appear to be valid CycloneDX or SPDX JSON."
-            )
+
+        raise ValueError(
+            "Unrecognized SBOM schema. File does not appear to be valid CycloneDX or SPDX JSON."
+        )
+
+    @staticmethod
+    def _cdx_dict_to_component(comp: Dict[str, Any], default_type: str = "library") -> Optional[Component]:
+        name = str(comp.get("name") or "").strip()
+        if not name:
+            return None
+
+        licenses: List[str] = []
+        for lic in comp.get("licenses", []) or []:
+            if isinstance(lic, dict):
+                if "license" in lic and isinstance(lic["license"], dict):
+                    val = lic["license"].get("name") or lic["license"].get("id") or ""
+                    if val:
+                        licenses.append(str(val))
+                elif "expression" in lic and lic["expression"]:
+                    licenses.append(str(lic["expression"]))
+
+        supplier_obj = comp.get("supplier")
+        supplier = supplier_obj.get("name", "") if isinstance(supplier_obj, dict) else ""
+
+        return Component(
+            name=name,
+            version=comp.get("version", "Unknown"),
+            purl=comp.get("purl", ""),
+            component_type=comp.get("type", default_type),
+            supplier=supplier,
+            license_str=", ".join(licenses),
+            description=comp.get("description", ""),
+        )
 
     @staticmethod
     def _parse_cyclonedx(data: Dict[str, Any]) -> List[Component]:
         components: List[Component] = []
+        seen: Set[Tuple[str, str, str]] = set()
 
-        # Top-level metadata component (if present)
-        meta_component = data.get("metadata", {}).get("component")
-        if meta_component and "name" in meta_component:
-            components.append(
-                Component(
-                    name=meta_component.get("name", ""),
-                    version=meta_component.get("version", ""),
-                    purl=meta_component.get("purl", ""),
-                    component_type=meta_component.get("type", "application"),
-                    supplier=meta_component.get("supplier", {}).get("name", "")
-                    if isinstance(meta_component.get("supplier"), dict)
-                    else "",
-                    description=meta_component.get("description", ""),
-                )
-            )
+        def _add_comp(c_dict: Dict[str, Any], default_type: str = "library") -> None:
+            if not isinstance(c_dict, dict):
+                return
+            comp_obj = SBOMParser._cdx_dict_to_component(c_dict, default_type=default_type)
+            if comp_obj:
+                key = (comp_obj.name.lower(), comp_obj.version.lower(), comp_obj.purl.lower())
+                if key not in seen:
+                    seen.add(key)
+                    components.append(comp_obj)
+            # Recursively walk nested components[].components
+            for child in c_dict.get("components", []) or []:
+                _add_comp(child, default_type="library")
 
-        # Child components
-        for comp in data.get("components", []):
-            name = comp.get("name", "").strip()
-            if not name:
-                continue
+        meta_component = data.get("metadata", {}).get("component") if isinstance(data.get("metadata"), dict) else None
+        if isinstance(meta_component, dict):
+            _add_comp(meta_component, default_type="application")
 
-            licenses = []
-            for lic in comp.get("licenses", []):
-                if isinstance(lic, dict):
-                    if "license" in lic and isinstance(lic["license"], dict):
-                        licenses.append(lic["license"].get("name") or lic["license"].get("id", ""))
-                    elif "expression" in lic:
-                        licenses.append(lic["expression"])
-
-            components.append(
-                Component(
-                    name=name,
-                    version=comp.get("version", "Unknown"),
-                    purl=comp.get("purl", ""),
-                    component_type=comp.get("type", "library"),
-                    supplier=comp.get("supplier", {}).get("name", "")
-                    if isinstance(comp.get("supplier"), dict)
-                    else "",
-                    license_str=", ".join(filter(None, licenses)),
-                    description=comp.get("description", ""),
-                )
-            )
+        for comp in data.get("components", []) or []:
+            _add_comp(comp, default_type="library")
 
         return components
 
     @staticmethod
     def _parse_spdx(data: Dict[str, Any]) -> List[Component]:
         components: List[Component] = []
+        seen: Set[Tuple[str, str, str]] = set()
 
-        for pkg in data.get("packages", []):
-            name = pkg.get("name", "").strip()
+        for pkg in data.get("packages", []) or []:
+            if not isinstance(pkg, dict):
+                continue
+            name = str(pkg.get("name") or "").strip()
             if not name:
                 continue
 
-            # Extract PURL from externalRefs
             purl = ""
-            for ref in pkg.get("externalRefs", []):
-                if ref.get("referenceType") == "purl":
-                    purl = ref.get("referenceLocator", "")
+            for ref in pkg.get("externalRefs", []) or []:
+                if isinstance(ref, dict) and ref.get("referenceType") == "purl":
+                    purl = str(ref.get("referenceLocator") or "")
                     break
 
-            supplier = pkg.get("supplier", "")
-            if supplier.lower().startswith("person:") or supplier.lower().startswith("organization:"):
+            supplier = str(pkg.get("supplier") or "")
+            if supplier.lower().startswith(("person:", "organization:")):
                 supplier = supplier.split(":", 1)[1].strip()
 
-            components.append(
-                Component(
-                    name=name,
-                    version=pkg.get("versionInfo", "Unknown"),
-                    purl=purl,
-                    component_type="package",
-                    supplier=supplier,
-                    license_str=pkg.get("licenseConcluded", "") or pkg.get("licenseDeclared", ""),
-                    description=pkg.get("description", "") or pkg.get("summary", ""),
-                )
+            comp_obj = Component(
+                name=name,
+                version=pkg.get("versionInfo", "Unknown"),
+                purl=purl,
+                component_type="package",
+                supplier=supplier,
+                license_str=pkg.get("licenseConcluded") or pkg.get("licenseDeclared") or "",
+                description=pkg.get("description") or pkg.get("summary") or "",
             )
+            key = (comp_obj.name.lower(), comp_obj.version.lower(), comp_obj.purl.lower())
+            if key not in seen:
+                seen.add(key)
+                components.append(comp_obj)
 
         return components
 
@@ -546,17 +592,29 @@ class STIGAnalyzer:
         self.mappings: List[STIGMapping] = []
 
     def analyze(self) -> List[STIGMapping]:
-        self.mappings = []
-        for comp in self.components:
-            mapping = self._resolve_component(comp)
-            self.mappings.append(mapping)
+        self.mappings = [self._resolve_component(comp) for comp in self.components]
         return self.mappings
+
+    def _resolve_os_stig_key(self, comp: Component) -> Tuple[str, str]:
+        """Resolves specific OS STIG key (RHEL 8 vs RHEL 9 vs Ubuntu 22.04) from distro/version hints."""
+        distro_hint = f"{comp.name} {comp.get_purl_distro()}".lower()
+        if any(tok in distro_hint for tok in ("el8", "rhel-8", "rhel8", "centos-8", "rocky-8", "almalinux-8")):
+            return "RHEL_8_STIG", "RHEL 8 system package / OS baseline"
+        if any(tok in distro_hint for tok in ("ubuntu", "debian", "deb")):
+            return "UBUNTU_22_STIG", "Debian/Ubuntu system package / OS baseline"
+        if any(tok in distro_hint for tok in ("alpine", "apk", "distroless")):
+            return "CONTAINER_PLATFORM_SRG", "Container OS package baseline"
+        if comp.name.lower() in ("rhel", "redhat-release", "centos", "rocky", "almalinux") and comp.version.startswith("8"):
+            return "RHEL_8_STIG", "RHEL 8 operating system baseline"
+        return "RHEL_9_STIG", "RHEL 9 system package / OS baseline"
 
     def _resolve_component(self, comp: Component) -> STIGMapping:
         name_clean = comp.name.strip().lower()
+        ecosystem = comp.get_ecosystem()
+        is_app_library = (ecosystem in APP_LIBRARY_ECOSYSTEMS and comp.component_type in ("library", "package"))
 
-        # Step 1: Match against specific component regular expressions
-        for pattern, stig_key, reason in COMPONENT_NAME_MAP:
+        # Step 1a: Always-applicable security/crypto/embedded engine patterns
+        for pattern, stig_key, reason in ALWAYS_MATCH_NAME_MAP:
             if pattern.search(name_clean):
                 return STIGMapping(
                     component=comp,
@@ -565,9 +623,29 @@ class STIGAnalyzer:
                     match_type="REGEX_NAME",
                 )
 
-        # Step 2: Match against PURL ecosystem
-        ecosystem = comp.get_ecosystem()
+        # Step 1b: Platform/server/runtime patterns (only when not an app-ecosystem client library)
+        if not is_app_library:
+            for pattern, stig_key, reason in PLATFORM_SERVICE_NAME_MAP:
+                if pattern.search(name_clean):
+                    if stig_key == "RHEL_9_STIG":
+                        stig_key, _ = self._resolve_os_stig_key(comp)
+                    return STIGMapping(
+                        component=comp,
+                        stig_key=stig_key,
+                        match_reason=f"Direct component technology match: {reason}",
+                        match_type="REGEX_NAME",
+                    )
+
+        # Step 2: Match against PURL ecosystem (with distro-aware RPM/DEB resolution)
         if ecosystem and ecosystem in PURL_ECOSYSTEM_MAP:
+            if ecosystem == "rpm":
+                stig_key, reason = self._resolve_os_stig_key(comp)
+                return STIGMapping(
+                    component=comp,
+                    stig_key=stig_key,
+                    match_reason=f"Resolved via PURL ecosystem (rpm): {reason}",
+                    match_type="PURL_ECOSYSTEM",
+                )
             stig_key, reason = PURL_ECOSYSTEM_MAP[ecosystem]
             return STIGMapping(
                 component=comp,
@@ -578,10 +656,11 @@ class STIGAnalyzer:
 
         # Step 3: Operating system indicators in component type
         if comp.component_type in ("operating-system", "os"):
+            stig_key, reason = self._resolve_os_stig_key(comp)
             return STIGMapping(
                 component=comp,
-                stig_key="RHEL_9_STIG",
-                match_reason="Operating system baseline requirement",
+                stig_key=stig_key,
+                match_reason=reason,
                 match_type="TYPE_INFERENCE",
             )
 
@@ -629,7 +708,7 @@ class STIGAnalyzer:
 # ==============================================================================
 
 class ReportGenerator:
-    """Formats STIG applicability analyses into Markdown, JSON, Table, or CSV deliverables."""
+    """Formats STIG applicability analyses into Markdown, JSON, or CSV deliverables."""
 
     @staticmethod
     def to_markdown(
@@ -637,59 +716,52 @@ class ReportGenerator:
         summary: Dict[str, Any],
         sbom_filename: str = "SBOM",
     ) -> str:
-        now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        now = utc_now_str()
 
-        md = []
-        md.append("# DISA STIG & SRG Applicability Matrix")
-        md.append(f"> **Generated**: {now}  ")
-        md.append(f"> **Source SBOM**: `{os.path.basename(sbom_filename)}`  ")
-        md.append("> **Classification / Use**: Internal Compliance & Security Audit Deliverable (SCR/SCN / FedRAMP / DoD)")
-        md.append("")
-        md.append("---")
-        md.append("")
-
-        # Executive Summary
-        md.append("## 1. Executive Summary")
-        md.append("")
-        md.append(f"* **Total SBOM Components Evaluated**: `{summary['total_components']}`")
-        md.append(f"* **Applicable DISA STIGs / SRGs Identified**: `{summary['unique_stigs_mapped']}`")
-        md.append(f"* **CAT I Critical Requirements Surface**: `{summary['severity_distribution'].get('CAT I', 0)}` components")
-        md.append(f"* **CAT II Medium Requirements Surface**: `{summary['severity_distribution'].get('CAT II', 0)}` components")
-        md.append("")
-
-        # STIG Distribution Table
-        md.append("### 1.1 STIG Applicability Catalog")
-        md.append("")
-        md.append("| Benchmark ID | STIG / SRG Title | Version | Max Severity | Mapped Components |")
-        md.append("| :--- | :--- | :--- | :---: | :---: |")
+        md = [
+            "# DISA STIG & SRG Applicability Matrix",
+            f"> **Generated**: {now}  ",
+            f"> **Source SBOM**: `{os.path.basename(sbom_filename)}`  ",
+            "> **Classification / Use**: Internal Compliance & Security Audit Deliverable (SCR/SCN / FedRAMP / DoD)",
+            "",
+            "---",
+            "",
+            "## 1. Executive Summary",
+            "",
+            f"* **Total SBOM Components Evaluated**: `{summary['total_components']}`",
+            f"* **Applicable DISA STIGs / SRGs Identified**: `{summary['unique_stigs_mapped']}`",
+            f"* **Applicable CAT I Benchmark Scope**: `{summary['severity_distribution'].get('CAT I', 0)}` components (benchmark max severity — not active vulnerability findings)",
+            f"* **Applicable CAT II Benchmark Scope**: `{summary['severity_distribution'].get('CAT II', 0)}` components (benchmark max severity — not active vulnerability findings)",
+            "",
+            "### 1.1 STIG Applicability Catalog",
+            "",
+            "| Benchmark ID | STIG / SRG Title | Version | Max Severity | Mapped Components |",
+            "| :--- | :--- | :--- | :---: | :---: |",
+        ]
 
         for stig_id, count in summary["stig_distribution"].items():
-            # Find matching catalog info
-            info = next((v for v in DISA_STIG_CATALOG.values() if v["id"] == stig_id), {})
+            info = CATALOG_BY_ID.get(stig_id, {})
             title = info.get("title", stig_id)
             ver = info.get("version", "N/A")
             sev = info.get("max_severity", "N/A")
             md.append(f"| `{stig_id}` | **{title}** | {ver} | `{sev}` | **{count}** |")
 
-        md.append("")
-        md.append("---")
-        md.append("")
-
-        # NIST Control Traceability
-        md.append("## 2. NIST SP 800-53 Control Coverage")
-        md.append("The mapped STIG baselines mandate compliance checks against the following NIST SP 800-53 controls:")
-        md.append("")
-        controls_formatted = ", ".join([f"`{c}`" for c in summary["mapped_nist_controls"]])
-        md.append(f"> {controls_formatted}")
-        md.append("")
-        md.append("---")
-        md.append("")
-
-        # Detailed Matrix Table
-        md.append("## 3. Component-to-STIG Traceability Matrix")
-        md.append("")
-        md.append("| Component Name | Version | Type | Mapped DISA STIG / SRG | Severity | NIST Controls | Resolution Rationale |")
-        md.append("| :--- | :--- | :--- | :--- | :---: | :--- | :--- |")
+        md.extend([
+            "",
+            "---",
+            "",
+            "## 2. NIST SP 800-53 Control Coverage",
+            "The mapped STIG baselines mandate compliance checks against the following NIST SP 800-53 controls:",
+            "",
+            f"> {', '.join(f'`{c}`' for c in summary['mapped_nist_controls'])}",
+            "",
+            "---",
+            "",
+            "## 3. Component-to-STIG Traceability Matrix",
+            "",
+            "| Component Name | Version | Type | Mapped DISA STIG / SRG | Severity | NIST Controls | Resolution Rationale |",
+            "| :--- | :--- | :--- | :--- | :---: | :--- | :--- |",
+        ])
 
         for m in sorted(mappings, key=lambda x: (x.stig_info.get("max_severity", ""), x.component.name)):
             c = m.component
@@ -706,7 +778,7 @@ class ReportGenerator:
 
         md.append("")
         md.append("---")
-        md.append("*Artifact produced by GRCx (`sbom_analyzer.py`)*")
+        md.append("*Artifact produced by GRC-xMINI (`sbom_analyzer.py`)*")
         return "\n".join(md)
 
     @staticmethod
@@ -717,9 +789,9 @@ class ReportGenerator:
     ) -> str:
         payload = {
             "metadata": {
-                "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "generated_at": utc_now_iso(),
                 "source_sbom": os.path.basename(sbom_filename),
-                "analyzer": "sbom_analyzer.py (GRCx)",
+                "analyzer": "sbom_analyzer.py (GRC-xMINI)",
             },
             "summary": summary,
             "mappings": [m.to_dict() for m in mappings],
@@ -728,7 +800,6 @@ class ReportGenerator:
 
     @staticmethod
     def to_csv(mappings: List[STIGMapping]) -> str:
-        import io
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
@@ -769,20 +840,26 @@ class ReportGenerator:
 
 def build_cli() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="DISA STIG & SRG SBOM Applicability Analyzer (GRCx)",
+        description="DISA STIG & SRG SBOM Applicability Analyzer (GRC-xMINI)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python3 sbom_analyzer.py --sbom /path/to/sbom.json --format markdown -o stig_matrix.md
   python3 sbom_analyzer.py --sbom cyclonedx.json --format json -o stig_applicability.json
   python3 sbom_analyzer.py --sbom spdx.json --format csv -o stig_export.csv
+  python3 sbom_analyzer.py --catalog-dump
         """,
     )
-    parser.add_argument(
+    src_group = parser.add_mutually_exclusive_group(required=True)
+    src_group.add_argument(
         "--sbom",
         "-s",
-        required=True,
         help="Path to the input SBOM file (CycloneDX or SPDX JSON format).",
+    )
+    src_group.add_argument(
+        "--catalog-dump",
+        action="store_true",
+        help="Print the internal DISA STIG / SRG reference catalog as JSON and exit.",
     )
     parser.add_argument(
         "--output",
@@ -795,11 +872,6 @@ Examples:
         choices=["markdown", "json", "csv", "summary"],
         default="markdown",
         help="Output format (default: markdown).",
-    )
-    parser.add_argument(
-        "--catalog-dump",
-        action="store_true",
-        help="Print the internal DISA STIG / SRG reference catalog and exit.",
     )
     return parser
 
@@ -822,16 +894,13 @@ def main() -> None:
     mappings = analyzer.analyze()
     summary = analyzer.generate_summary()
 
-    if args.format == "markdown":
-        output_data = ReportGenerator.to_markdown(mappings, summary, sbom_filename=args.sbom)
-    elif args.format == "json":
-        output_data = ReportGenerator.to_json(mappings, summary, sbom_filename=args.sbom)
-    elif args.format == "csv":
-        output_data = ReportGenerator.to_csv(mappings)
-    elif args.format == "summary":
-        output_data = json.dumps(summary, indent=2)
-    else:
-        output_data = ReportGenerator.to_markdown(mappings, summary, sbom_filename=args.sbom)
+    formatters = {
+        "markdown": lambda: ReportGenerator.to_markdown(mappings, summary, sbom_filename=args.sbom),
+        "json": lambda: ReportGenerator.to_json(mappings, summary, sbom_filename=args.sbom),
+        "csv": lambda: ReportGenerator.to_csv(mappings),
+        "summary": lambda: json.dumps(summary, indent=2),
+    }
+    output_data = formatters[args.format]()
 
     if args.output:
         try:

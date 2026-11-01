@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.4.0 — Yokota) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.4.1 — Yokota) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -42,7 +42,7 @@ from typing import Dict, List, Optional, Set, Tuple
 # Constants & FedRAMP Column Definitions
 # ---------------------------------------------------------------------------
 
-# ---- Match mode for this build (no CLI flag needed) ------------------------
+# ---- Default match mode for this build (overridable via --match-mode) ------
 # "legacy": Apps Script behavior - match on Weakness Name + Description only.
 # "strict": plugin/source ID + host, unscanned hosts kept open for review.
 MATCH_MODE = "legacy"
@@ -560,11 +560,16 @@ def detect_scanner_type(records: List[Dict[str, str]], explicit_scanner: Optiona
     return "tenable"
 
 
-def get_first_field(row: Dict[str, str], candidates: List[str], default: str = "") -> str:
+def get_first_field(
+    row: Dict[str, str],
+    candidates: List[str],
+    default: str = "",
+    lower_map: Optional[Dict[str, str]] = None,
+) -> str:
     """Case-insensitive lookup across candidate column names."""
-    lower_map = {k.lower().strip(): v for k, v in row.items()}
+    lmap = lower_map if lower_map is not None else {k.lower().strip(): v for k, v in row.items()}
     for cand in candidates:
-        val = lower_map.get(cand.lower().strip(), "")
+        val = lmap.get(cand.lower().strip(), "")
         if val != "":
             return val.strip()
     return default
@@ -776,6 +781,81 @@ def collect_scanned_assets(records: List[Dict[str, str]]) -> Tuple[Set[str], Dic
 # Normalization of Tenable & AWS Inspector Rows -> Logical POA&M Entries
 # ---------------------------------------------------------------------------
 
+def _merge_into_existing_entry(existing: Dict[str, object], entry: Dict[str, object]) -> None:
+    """
+    Merges `entry` into `existing` for the same (Vulnerability Source ID + Base Asset),
+    ensuring identical merge semantics for both in-file and cross-file deduplication:
+      - Aggregates port/protocol asset_identifier lines and _asset_aliases
+      - Aggregates supporting_documents
+      - Preserves earliest original_detection_date and highest original_risk_rating,
+        recomputing _sla_date_obj / scheduled_completion_date when either changes
+      - Merges CVEs, BOD 22-01 / KEV tracking status & earliest due date, and remediation text
+    """
+    # Merge asset_identifier (different port, protocol, or display format)
+    curr_asset = str(existing.get("asset_identifier", ""))
+    new_asset = str(entry.get("asset_identifier", ""))
+    if new_asset and new_asset not in curr_asset.split("\n"):
+        existing["asset_identifier"] = f"{curr_asset}\n{new_asset}" if curr_asset else new_asset
+
+    # Merge asset aliases
+    existing_aliases: Set[str] = set(existing.get("_asset_aliases", set()))
+    existing_aliases.update(entry.get("_asset_aliases", set()))
+    existing["_asset_aliases"] = existing_aliases
+
+    # Merge supporting documents (scan filenames)
+    curr_supp = str(existing.get("supporting_documents", ""))
+    new_supp = str(entry.get("supporting_documents", ""))
+    if new_supp:
+        existing_parts = [p.strip() for p in curr_supp.split(",") if p.strip()]
+        for np in [p.strip() for p in new_supp.split(",") if p.strip()]:
+            if np not in existing_parts:
+                existing_parts.append(np)
+        existing["supporting_documents"] = ", ".join(existing_parts)
+
+    # Keep earliest detection date
+    det_date = entry.get("_det_date_obj")
+    needs_sla_recalc = False
+    if det_date and (not existing.get("_det_date_obj") or det_date < existing["_det_date_obj"]):
+        existing["_det_date_obj"] = det_date
+        existing["original_detection_date"] = format_date_iso(det_date)
+        needs_sla_recalc = True
+
+    # Keep highest severity
+    new_risk = str(entry.get("original_risk_rating", ""))
+    curr_risk = str(existing.get("original_risk_rating", ""))
+    if RISK_ORDER.get(new_risk, 99) < RISK_ORDER.get(curr_risk, 99):
+        existing["original_risk_rating"] = new_risk
+        needs_sla_recalc = True
+
+    # Recalculate SLA date if detection date or risk changed
+    if needs_sla_recalc and existing.get("_det_date_obj"):
+        new_sla = compute_sla_date(existing["_det_date_obj"], str(existing["original_risk_rating"]))
+        existing["_sla_date_obj"] = new_sla
+        existing["scheduled_completion_date"] = format_date_iso(new_sla)
+
+    # Merge remediation info if existing was blank
+    if not str(existing.get("remediation_plan", "")).strip() and str(entry.get("remediation_plan", "")).strip():
+        existing["remediation_plan"] = entry["remediation_plan"]
+    if not str(existing.get("_raw_solution", "")).strip() and str(entry.get("_raw_solution", "")).strip():
+        existing["_raw_solution"] = entry["_raw_solution"]
+    if not str(existing.get("_see_also", "")).strip() and str(entry.get("_see_also", "")).strip():
+        existing["_see_also"] = entry["_see_also"]
+
+    # Merge CVEs
+    cve_existing = set(c.strip() for c in str(existing.get("cve", "")).split(",") if c.strip())
+    cve_new = set(c.strip() for c in str(entry.get("cve", "")).split(",") if c.strip())
+    merged_cves = sorted(cve_existing.union(cve_new))
+    if merged_cves:
+        existing["cve"] = ", ".join(merged_cves)
+
+    # Merge BOD 22-01 status
+    if str(entry.get("bod_22_01_tracking", "")).strip().lower() == "yes":
+        existing["bod_22_01_tracking"] = "Yes"
+        if entry.get("bod_22_01_due_date"):
+            if not existing.get("bod_22_01_due_date") or entry["bod_22_01_due_date"] < existing["bod_22_01_due_date"]:
+                existing["bod_22_01_due_date"] = entry["bod_22_01_due_date"]
+
+
 def normalize_scan_rows(
     records: List[Dict[str, str]],
     scanner_type: str,
@@ -793,22 +873,23 @@ def normalize_scan_rows(
     kev_db = kev_catalog if kev_catalog is not None else load_cisa_kev_catalog()
 
     for row in records:
+        row_lc = {k.lower().strip(): v for k, v in row.items()}
         row_aliases = extract_row_asset_aliases(row)
         if scanner_type == "tenable":
-            raw_risk = get_first_field(row, ["Risk", "Severity", "Risk Factor", "VPR Severity"])
+            raw_risk = get_first_field(row, ["Risk", "Severity", "Risk Factor", "VPR Severity"], lower_map=row_lc)
             risk = normalize_risk(raw_risk)
             if not risk:
                 continue
             if strict_fedramp_risk and risk == "Critical":
                 risk = "High"
 
-            plugin_id = get_first_field(row, ["Plugin ID", "Plugin", "PluginID"])
+            plugin_id = get_first_field(row, ["Plugin ID", "Plugin", "PluginID"], lower_map=row_lc)
             if plugin_id.endswith(".0"):
                 plugin_id = plugin_id[:-2]
-            name = get_first_field(row, ["Name", "Plugin Name", "Title"], default=f"Tenable Plugin {plugin_id}")
-            synopsis = get_first_field(row, ["Synopsis"])
-            desc = get_first_field(row, ["Description", "Summary"])
-            plugin_out = get_first_field(row, ["Plugin Output", "Output"])
+            name = get_first_field(row, ["Name", "Plugin Name", "Title"], default=f"Tenable Plugin {plugin_id}", lower_map=row_lc)
+            synopsis = get_first_field(row, ["Synopsis"], lower_map=row_lc)
+            desc = get_first_field(row, ["Description", "Summary"], lower_map=row_lc)
+            plugin_out = get_first_field(row, ["Plugin Output", "Output"], lower_map=row_lc)
             full_desc = desc or synopsis or name
             if synopsis and desc and synopsis not in desc:
                 full_desc = f"{synopsis}\n\n{desc}"
@@ -816,17 +897,17 @@ def normalize_scan_rows(
                 snippet = plugin_out[:400] + ("..." if len(plugin_out) > 400 else "")
                 full_desc = f"{full_desc}\n\n[Scanner Evidence]: {snippet}"
 
-            host = get_first_field(row, ["Host", "IP Address", "DNS Name", "FQDN", "Asset", "NetBIOS Name"], default="unknown-host")
-            port = get_first_field(row, ["Port"])
-            proto = get_first_field(row, ["Protocol"])
-            solution = get_first_field(row, ["Solution", "Remediation", "Recommendation"])
-            see_also = get_first_field(row, ["See Also", "References", "URL"])
-            raw_cve = get_first_field(row, ["CVE", "CVEs"])
+            host = get_first_field(row, ["Host", "IP Address", "DNS Name", "FQDN", "Asset", "NetBIOS Name"], default="unknown-host", lower_map=row_lc)
+            port = get_first_field(row, ["Port"], lower_map=row_lc)
+            proto = get_first_field(row, ["Protocol"], lower_map=row_lc)
+            solution = get_first_field(row, ["Solution", "Remediation", "Recommendation"], lower_map=row_lc)
+            see_also = get_first_field(row, ["See Also", "References", "URL"], lower_map=row_lc)
+            raw_cve = get_first_field(row, ["CVE", "CVEs"], lower_map=row_lc)
             cves = extract_cves(raw_cve, f"{name} {desc}")
 
             # Note: Never use 'Plugin Publication Date' here (that is when Tenable authored the plugin, not host detection)
-            first_seen_str = get_first_field(row, ["First Discovered", "First Seen", "Discovery Date", "Original Detection Date"])
-            last_seen_str = get_first_field(row, ["Last Observed", "Last Seen", "Status Date"])
+            first_seen_str = get_first_field(row, ["First Discovered", "First Seen", "Discovery Date", "Original Detection Date"], lower_map=row_lc)
+            last_seen_str = get_first_field(row, ["Last Observed", "Last Seen", "Status Date"], lower_map=row_lc)
             det_date = parse_any_date(first_seen_str) or parse_any_date(last_seen_str, fallback=today) or today
             stat_date = parse_any_date(last_seen_str, fallback=today) or today
 
@@ -841,39 +922,39 @@ def normalize_scan_rows(
 
         else:
             # AWS Inspector
-            raw_risk = get_first_field(row, ["Severity", "Original Risk Rating", "Risk"])
+            raw_risk = get_first_field(row, ["Severity", "Original Risk Rating", "Risk"], lower_map=row_lc)
             risk = normalize_risk(raw_risk)
             if not risk:
                 continue
             if strict_fedramp_risk and risk == "Critical":
                 risk = "High"
 
-            vuln_id = get_first_field(row, ["Vulnerability ID", "CVE", "Plugin ID", "Finding ID"])
-            finding_arn = get_first_field(row, ["Finding ARN", "ARN"])
-            title = get_first_field(row, ["Title", "Finding Title", "Weakness Name"], default=vuln_id or "AWS Inspector Finding")
-            desc = get_first_field(row, ["Description", "Weakness Description"], default=title)
-            pkg = get_first_field(row, ["Affected Packages", "Package", "Package Name", "Vulnerable Package"])
-            file_path = get_first_field(row, ["File Path", "Package Path"])
+            vuln_id = get_first_field(row, ["Vulnerability ID", "CVE", "Plugin ID", "Finding ID"], lower_map=row_lc)
+            finding_arn = get_first_field(row, ["Finding ARN", "ARN"], lower_map=row_lc)
+            title = get_first_field(row, ["Title", "Finding Title", "Weakness Name"], default=vuln_id or "AWS Inspector Finding", lower_map=row_lc)
+            desc = get_first_field(row, ["Description", "Weakness Description"], default=title, lower_map=row_lc)
+            pkg = get_first_field(row, ["Affected Packages", "Package", "Package Name", "Vulnerable Package"], lower_map=row_lc)
+            file_path = get_first_field(row, ["File Path", "Package Path"], lower_map=row_lc)
             full_desc = desc
             if pkg:
                 full_desc += f"\n\nAffected Package(s): {pkg}"
             if file_path:
                 full_desc += f" ({file_path})"
 
-            resource_id = get_first_field(row, ["Resource ID", "Instance ID", "Asset Identifier", "Asset ID", "AWS Account ID"], default="aws-resource")
-            resource_type = get_first_field(row, ["Resource Type"])
+            resource_id = get_first_field(row, ["Resource ID", "Instance ID", "Asset Identifier", "Asset ID", "AWS Account ID"], default="aws-resource", lower_map=row_lc)
+            resource_type = get_first_field(row, ["Resource Type"], lower_map=row_lc)
             asset_base = extract_base_asset(resource_id) or resource_id.strip().lower()
             asset_display = f"{resource_id} ({resource_type})" if resource_type and resource_type not in resource_id else resource_id
 
-            solution = get_first_field(row, ["Remediation", "Recommendation", "Remediation Plan", "Fixed Version"])
-            fix_avail = get_first_field(row, ["Fix Available", "FixAvailable"])
-            pkg_mgr = get_first_field(row, ["Package Manager", "Vendor", "Platform"])
-            see_also = get_first_field(row, ["Vendor Advisory", "Reference URLs", "URL", "See Also"])
-            raw_cve = get_first_field(row, ["CVE", "Vulnerability ID"])
+            solution = get_first_field(row, ["Remediation", "Recommendation", "Remediation Plan", "Fixed Version"], lower_map=row_lc)
+            fix_avail = get_first_field(row, ["Fix Available", "FixAvailable"], lower_map=row_lc)
+            pkg_mgr = get_first_field(row, ["Package Manager", "Vendor", "Platform"], lower_map=row_lc)
+            see_also = get_first_field(row, ["Vendor Advisory", "Reference URLs", "URL", "See Also"], lower_map=row_lc)
+            raw_cve = get_first_field(row, ["CVE", "Vulnerability ID"], lower_map=row_lc)
             cves = extract_cves(raw_cve, f"{title} {desc}")
 
-            first_seen_str = get_first_field(row, ["First Observed At", "First Seen", "Created At", "Original Detection Date"])
-            last_seen_str = get_first_field(row, ["Last Observed At", "Last Seen", "Updated At", "Status Date"])
+            first_seen_str = get_first_field(row, ["First Observed At", "First Seen", "Created At", "Original Detection Date"], lower_map=row_lc)
+            last_seen_str = get_first_field(row, ["Last Observed At", "Last Seen", "Updated At", "Status Date"], lower_map=row_lc)
             det_date = parse_any_date(first_seen_str, fallback=today) or today
             stat_date = parse_any_date(last_seen_str, fallback=today) or today
 
@@ -891,38 +972,10 @@ def normalize_scan_rows(
 
         # Deduplication key: 1 row per (Vulnerability Source ID + Base Asset Identifier)
         dedup_key = (source_id.strip().lower(), asset_base.strip().lower())
-
-        if dedup_key in grouped:
-            existing = grouped[dedup_key]
-            # Merge additional port/protocol on the same asset if different
-            curr_asset = str(existing["asset_identifier"])
-            if asset_display not in curr_asset.split("\n"):
-                existing["asset_identifier"] = f"{curr_asset}\n{asset_display}"
-            existing_aliases: Set[str] = set(existing.get("_asset_aliases", set()))
-            existing_aliases.update(row_aliases or [asset_base])
-            existing["_asset_aliases"] = existing_aliases
-
-            needs_sla_recalc = False
-            # Keep earliest detection date
-            if det_date < existing["_det_date_obj"]:
-                existing["_det_date_obj"] = det_date
-                existing["original_detection_date"] = format_date_iso(det_date)
-                needs_sla_recalc = True
-            # Keep highest severity if multiple records for same vuln+asset
-            if RISK_ORDER.get(risk, 99) < RISK_ORDER.get(str(existing["original_risk_rating"]), 99):
-                existing["original_risk_rating"] = risk
-                needs_sla_recalc = True
-            # Recompute SLA date whenever detection date or severity changed during merge
-            if needs_sla_recalc:
-                new_sla = compute_sla_date(existing["_det_date_obj"], str(existing["original_risk_rating"]))
-                existing["_sla_date_obj"] = new_sla
-                existing["scheduled_completion_date"] = format_date_iso(new_sla)
-            continue
-
         sla_date = compute_sla_date(det_date, risk)
         controls = infer_nist_controls(name, full_desc, cves)
 
-        grouped[dedup_key] = {
+        candidate_entry: Dict[str, object] = {
             "_dedup_key": dedup_key,
             "_asset_aliases": set(row_aliases or [asset_base]),
             "_scanner_type": scanner_type,
@@ -960,6 +1013,11 @@ def normalize_scan_rows(
             "cve": cves,
         }
 
+        if dedup_key in grouped:
+            _merge_into_existing_entry(grouped[dedup_key], candidate_entry)
+        else:
+            grouped[dedup_key] = candidate_entry
+
     return list(grouped.values())
 
 
@@ -968,7 +1026,7 @@ def merge_scan_entries(entry_lists: List[List[Dict[str, object]]]) -> List[Dict[
     Combine normalized POA&M findings across up to 5 scan files.
     Enforces 1 POA&M row per unique (Vulnerability + Asset) combination,
     preserving earliest detection dates, highest risk ratings, and aggregating
-    asset identifiers, aliases, and supporting document filenames.
+    asset identifiers, aliases, CVEs, BOD 22-01 flags, and supporting document filenames.
     """
     if not entry_lists:
         return []
@@ -988,71 +1046,7 @@ def merge_scan_entries(entry_lists: List[List[Dict[str, object]]]) -> List[Dict[
                 item["_asset_aliases"] = set(entry.get("_asset_aliases", set()))
                 grouped[dedup_key] = item
             else:
-                existing = grouped[dedup_key]
-
-                # Merge asset_identifier (different port, protocol, or display format)
-                curr_asset = str(existing.get("asset_identifier", ""))
-                new_asset = str(entry.get("asset_identifier", ""))
-                if new_asset and new_asset not in curr_asset.split("\n"):
-                    existing["asset_identifier"] = f"{curr_asset}\n{new_asset}" if curr_asset else new_asset
-
-                # Merge asset aliases
-                existing_aliases: Set[str] = set(existing.get("_asset_aliases", set()))
-                existing_aliases.update(entry.get("_asset_aliases", set()))
-                existing["_asset_aliases"] = existing_aliases
-
-                # Merge supporting documents (scan filenames)
-                curr_supp = str(existing.get("supporting_documents", ""))
-                new_supp = str(entry.get("supporting_documents", ""))
-                if new_supp:
-                    existing_parts = [p.strip() for p in curr_supp.split(",") if p.strip()]
-                    for np in [p.strip() for p in new_supp.split(",") if p.strip()]:
-                        if np not in existing_parts:
-                            existing_parts.append(np)
-                    existing["supporting_documents"] = ", ".join(existing_parts)
-
-                # Keep earliest detection date
-                det_date = entry.get("_det_date_obj")
-                needs_sla_recalc = False
-                if det_date and (not existing.get("_det_date_obj") or det_date < existing["_det_date_obj"]):
-                    existing["_det_date_obj"] = det_date
-                    existing["original_detection_date"] = format_date_iso(det_date)
-                    needs_sla_recalc = True
-
-                # Keep highest severity
-                new_risk = str(entry.get("original_risk_rating", ""))
-                curr_risk = str(existing.get("original_risk_rating", ""))
-                if RISK_ORDER.get(new_risk, 99) < RISK_ORDER.get(curr_risk, 99):
-                    existing["original_risk_rating"] = new_risk
-                    needs_sla_recalc = True
-
-                # Recalculate SLA date if detection date or risk changed
-                if needs_sla_recalc and existing.get("_det_date_obj"):
-                    new_sla = compute_sla_date(existing["_det_date_obj"], str(existing["original_risk_rating"]))
-                    existing["_sla_date_obj"] = new_sla
-                    existing["scheduled_completion_date"] = format_date_iso(new_sla)
-
-                # Merge remediation info if existing was blank
-                if not str(existing.get("remediation_plan", "")).strip() and str(entry.get("remediation_plan", "")).strip():
-                    existing["remediation_plan"] = entry["remediation_plan"]
-                if not str(existing.get("_raw_solution", "")).strip() and str(entry.get("_raw_solution", "")).strip():
-                    existing["_raw_solution"] = entry["_raw_solution"]
-                if not str(existing.get("_see_also", "")).strip() and str(entry.get("_see_also", "")).strip():
-                    existing["_see_also"] = entry["_see_also"]
-
-                # Merge CVEs
-                cve_existing = set(c.strip() for c in str(existing.get("cve", "")).split(",") if c.strip())
-                cve_new = set(c.strip() for c in str(entry.get("cve", "")).split(",") if c.strip())
-                merged_cves = sorted(cve_existing.union(cve_new))
-                if merged_cves:
-                    existing["cve"] = ", ".join(merged_cves)
-
-                # Merge BOD 22-01 status
-                if str(entry.get("bod_22_01_tracking", "")).strip().lower() == "yes":
-                    existing["bod_22_01_tracking"] = "Yes"
-                    if entry.get("bod_22_01_due_date"):
-                        if not existing.get("bod_22_01_due_date") or entry["bod_22_01_due_date"] < existing["bod_22_01_due_date"]:
-                            existing["bod_22_01_due_date"] = entry["bod_22_01_due_date"]
+                _merge_into_existing_entry(grouped[dedup_key], entry)
 
     return list(grouped.values())
 
@@ -1851,14 +1845,17 @@ def write_poam_workbook(
         if not is_closed_template and not strict_fedramp_risk:
             dvs = s_root.find("main:dataValidations", ns)
             if dvs is not None:
+                orr_start = f"{L['original_risk_rating']}{start_row}"
+                adj_start = f"{L['adjusted_risk_rating']}{start_row}"
                 for dv in dvs.findall("main:dataValidation", ns):
                     sqref = dv.attrib.get("sqref", "")
+                    sqref_starts = {tok.split(":")[0].upper() for tok in sqref.split() if tok}
                     f1 = dv.find("main:formula1", ns)
                     if f1 is not None and f1.text:
-                        if f"{L['original_risk_rating']}{start_row}" in sqref:
+                        if orr_start.upper() in sqref_starts:
                             dv.set("prompt", "Low, Moderate, High, Critical")
                             f1.text = '"Low,Moderate,High,Critical"'
-                        elif f"{L['adjusted_risk_rating']}{start_row}" in sqref:
+                        elif adj_start.upper() in sqref_starts:
                             dv.set("prompt", "Low, Moderate, High, Critical, N/A")
                             f1.text = '"Low,Moderate,High,Critical,N/A"'
 
@@ -1878,6 +1875,36 @@ def write_poam_workbook(
             calc_pr.set("fullCalcOnLoad", "1")
             updated_wb_bytes = serialize_xml_preserving_root_ns(wb_root, orig_wb_bytes)
 
+        # Clean calcChain.xml references from xl/_rels/workbook.xml.rels and [Content_Types].xml
+        updated_wb_rels_bytes: Optional[bytes] = None
+        if "xl/_rels/workbook.xml.rels" in zin.namelist():
+            orig_rels_bytes = zin.read("xl/_rels/workbook.xml.rels")
+            register_xml_namespaces(orig_rels_bytes)
+            rels_root = ET.fromstring(orig_rels_bytes)
+            for rel_el in list(rels_root):
+                target_attr = rel_el.attrib.get("Target", "")
+                type_attr = rel_el.attrib.get("Type", "")
+                if target_attr.endswith("calcChain.xml") or type_attr.endswith("/calcChain"):
+                    rels_root.remove(rel_el)
+            updated_wb_rels_bytes = serialize_xml_preserving_root_ns(rels_root, orig_rels_bytes)
+
+        updated_ct_bytes: Optional[bytes] = None
+        if "[Content_Types].xml" in zin.namelist():
+            orig_ct_bytes = zin.read("[Content_Types].xml")
+            register_xml_namespaces(orig_ct_bytes)
+            ct_root = ET.fromstring(orig_ct_bytes)
+            for child_el in list(ct_root):
+                if child_el.attrib.get("PartName", "").endswith("/xl/calcChain.xml"):
+                    ct_root.remove(child_el)
+            updated_ct_bytes = serialize_xml_preserving_root_ns(ct_root, orig_ct_bytes)
+
+        ss_bytes_out = (
+            serialize_xml_preserving_root_ns(ss_root, orig_ss_bytes)
+            if orig_ss_bytes
+            else ET.tostring(ss_root, encoding="utf-8", xml_declaration=True)
+        )
+        wrote_shared_strings = False
+
         # Write updated archive
         with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zout:
             for item in zin.infolist():
@@ -1885,19 +1912,22 @@ def write_poam_workbook(
                     xml_bytes = serialize_xml_preserving_root_ns(s_root, sheet_xml_bytes)
                     zout.writestr(item, xml_bytes)
                 elif item.filename == "xl/sharedStrings.xml":
-                    ss_bytes = (
-                        serialize_xml_preserving_root_ns(ss_root, orig_ss_bytes)
-                        if orig_ss_bytes
-                        else ET.tostring(ss_root, encoding="utf-8", xml_declaration=True)
-                    )
-                    zout.writestr(item, ss_bytes)
+                    zout.writestr(item, ss_bytes_out)
+                    wrote_shared_strings = True
                 elif item.filename == "xl/workbook.xml" and updated_wb_bytes is not None:
                     zout.writestr(item, updated_wb_bytes)
+                elif item.filename == "xl/_rels/workbook.xml.rels" and updated_wb_rels_bytes is not None:
+                    zout.writestr(item, updated_wb_rels_bytes)
+                elif item.filename == "[Content_Types].xml" and updated_ct_bytes is not None:
+                    zout.writestr(item, updated_ct_bytes)
                 elif item.filename == "xl/calcChain.xml":
                     # Omit stale calcChain.xml so Excel recalculates cleanly on open
                     continue
                 else:
                     zout.writestr(item, zin.read(item.filename))
+
+            if not wrote_shared_strings and shared_strings:
+                zout.writestr("xl/sharedStrings.xml", ss_bytes_out)
 
 
 # ---------------------------------------------------------------------------
@@ -1947,7 +1977,7 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRC-xMINI (v1.4.0 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRC-xMINI (v1.4.1 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:
@@ -2185,8 +2215,9 @@ def display_detected_files(
     exclude_paths: Optional[List[str]] = None,
 ) -> List[str]:
     """
-    Display a numbered list of eligible files in `scans_dir` (or sample fallback if empty)
-    and return their paths.
+    Display a numbered list of eligible files in `scans_dir` and return their paths.
+    Never automatically populates sample test fixtures into interactive choices so
+    production runs cannot accidentally ingest `testing/sample-scans/` data.
     """
     rel_scans = os.path.relpath(scans_dir, REPO_ROOT)
     rel_display = f"{rel_scans}/" if not rel_scans.startswith("..") else scans_dir
@@ -2198,13 +2229,7 @@ def display_detected_files(
             print(f"      [{idx}] {os.path.basename(fpath)}")
         return files
 
-    print(f"  [*] Designated drop-in folder '{rel_display}' is currently empty (drop {'/'.join(extensions)} files into '{rel_display}' any time).")
-    sample_files = list_eligible_files(SAMPLE_SCANS_DIR, extensions, exclude_paths=exclude_paths)
-    if sample_files:
-        print(f"  [*] Sample files available in 'testing/sample-scans/':")
-        for idx, fpath in enumerate(sample_files, start=1):
-            print(f"      [{idx}] {os.path.basename(fpath)}  (sample)")
-        return sample_files
+    print(f"  [*] Designated drop-off folder '{rel_display}' is currently empty (drop {'/'.join(extensions)} files into '{rel_display}' any time).")
     return []
 
 
@@ -2370,9 +2395,9 @@ def main() -> int:
         choices=["strict", "legacy"],
         default=MATCH_MODE,
         help=(
-            "How previous OPEN entries are matched to the new scan. 'strict' (default): plugin/source ID + host, "
-            "with unscanned hosts kept open for review. 'legacy': reproduces the old Google Apps Scripts - match on "
-            "Weakness Name + Description only; anything absent from the scan is closed."
+            "How previous OPEN entries are matched to the new scan. 'legacy' (default): reproduces company policy / "
+            "Google Apps Script behavior - match on Weakness Name + Description only; anything absent from the scan is closed. "
+            "'strict': plugin/source ID + host, with unscanned hosts kept open for review."
         ),
     )
     parser.add_argument(
@@ -2389,13 +2414,14 @@ def main() -> int:
 
     scans_dir = os.path.abspath(args.dropoff_dir)
     os.makedirs(scans_dir, exist_ok=True)
-    fallback_dirs = [DEFAULT_DROPOFF_DIR, LEGACY_SCANS_DIR, SAMPLE_SCANS_DIR, REPO_ROOT]
+    # Only search designated drop-off and legacy scans directories (never sample-scans or repo root)
+    fallback_dirs = [DEFAULT_DROPOFF_DIR, LEGACY_SCANS_DIR]
 
     today = parse_any_date(args.reference_date) if args.reference_date else datetime.date.today()
     if not today:
         today = datetime.date.today()
 
-    # 1. Resolve Scan Input Paths (from CLI argument or interactive prompt in scans/)
+    # 1. Resolve Scan Input Paths (from CLI argument or interactive prompt in artifacts/drop-off/)
     raw_scan_args: List[str] = []
     if args.scans:
         for s in args.scans:
@@ -2428,14 +2454,21 @@ def main() -> int:
             )
             if not resolved:
                 avail = [os.path.basename(p) for p in list_eligible_files(scans_dir, SCAN_EXTENSIONS)]
-                avail_hint = f" Available in scans/: {', '.join(avail)}" if avail else " Drop your file into the 'scans/' folder and pass just its filename."
-                print(f"[ERROR] Scan file not found: '{raw_arg}' (searched ./scans/ and direct path).{avail_hint}", file=sys.stderr)
+                avail_hint = (
+                    f" Available in artifacts/drop-off/: {', '.join(avail)}"
+                    if avail
+                    else " Drop your file into the 'artifacts/drop-off/' folder and pass just its filename."
+                )
+                print(
+                    f"[ERROR] Scan file not found: '{raw_arg}' (searched ./artifacts/drop-off/ and direct path).{avail_hint}",
+                    file=sys.stderr,
+                )
                 return 1
             if resolved not in scan_paths:
                 scan_paths.append(resolved)
     else:
         if sys.stdin.isatty():
-            print("\n=== GRCx Standalone FedRAMP POA&M Scan Transformer ===")
+            print("\n=== GRC-xMINI Standalone FedRAMP POA&M Scan Transformer ===")
             while len(scan_paths) < MAX_SCAN_FILES:
                 scan_idx = len(scan_paths) + 1
                 label = (
@@ -2451,15 +2484,15 @@ def main() -> int:
                 )
                 if scan_idx == 1:
                     prompt_msg = (
-                        f"[?] Select scan file by number [1-{len(choices)}] or enter filename in scans/ (.csv/.xlsx): "
+                        f"[?] Select scan file by number [1-{len(choices)}] or enter filename in artifacts/drop-off/ (.csv/.xlsx): "
                         if choices
-                        else "[?] Enter scan filename in scans/ (with or without .csv/.xlsx extension): "
+                        else "[?] Enter scan filename in artifacts/drop-off/ (with or without .csv/.xlsx extension): "
                     )
                 else:
                     prompt_msg = (
-                        f"[?] Select additional scan file #{scan_idx} by number [1-{len(choices)}] or enter filename in scans/ (.csv/.xlsx): "
+                        f"[?] Select additional scan file #{scan_idx} by number [1-{len(choices)}] or enter filename in artifacts/drop-off/ (.csv/.xlsx): "
                         if choices
-                        else f"[?] Enter additional scan file #{scan_idx} filename in scans/ (with or without .csv/.xlsx extension): "
+                        else f"[?] Enter additional scan file #{scan_idx} filename in artifacts/drop-off/ (with or without .csv/.xlsx extension): "
                     )
 
                 user_scan = input(prompt_msg).strip()
@@ -2481,7 +2514,7 @@ def main() -> int:
                     fallback_dirs=fallback_dirs,
                 )
                 if not resolved:
-                    print(f"[ERROR] Scan file not found in scans/: '{user_scan}'", file=sys.stderr)
+                    print(f"[ERROR] Scan file not found in artifacts/drop-off/: '{user_scan}'", file=sys.stderr)
                     return 1
 
                 if resolved in scan_paths:
@@ -2502,10 +2535,10 @@ def main() -> int:
     if not scan_paths:
         parser.error(
             f"A scan file (.csv or .xlsx) is required (up to {MAX_SCAN_FILES} scans supported). "
-            "Drop it in 'scans/' and pass --scan <filename> or run interactively."
+            "Drop it in 'artifacts/drop-off/' and pass --scan <filename> or run interactively."
         )
 
-    # 2. Request Previously Filled-Out OPEN FedRAMP POA&M Form (if not provided via flag)
+    # 2. Request Previously Filled-Out OPEN & CLOSED FedRAMP POA&M Forms (if not provided via flag)
     prev_open_path = ""
     if args.previous_open is not None:
         if args.previous_open.strip().lower() not in ("", "none", "null", "false", "-"):
@@ -2516,7 +2549,7 @@ def main() -> int:
                 fallback_dirs=fallback_dirs,
             )
             if not resolved_prev:
-                print(f"[ERROR] Previous OPEN POA&M file not found in scans/: '{args.previous_open}'", file=sys.stderr)
+                print(f"[ERROR] Previous OPEN POA&M file not found in artifacts/drop-off/: '{args.previous_open}'", file=sys.stderr)
                 return 1
             prev_open_path = resolved_prev
     elif not args.no_previous and sys.stdin.isatty():
@@ -2528,10 +2561,10 @@ def main() -> int:
             exclude_paths=scan_paths,
         )
         prev_prompt = (
-            f"[?] Select previous OPEN FedRAMP POA&M by number [1-{len(poam_choices)}], enter filename in scans/,\n"
+            f"[?] Select previous OPEN FedRAMP POA&M by number [1-{len(poam_choices)}], enter filename in artifacts/drop-off/,\n"
             f"    or press Enter if none (initial baseline): "
             if poam_choices
-            else "[?] Enter previous OPEN FedRAMP POA&M filename in scans/ (.xlsx) to reconcile\n"
+            else "[?] Enter previous OPEN FedRAMP POA&M filename in artifacts/drop-off/ (.xlsx) to reconcile\n"
                  "    Open -> Closed transitions (or press Enter if none / initial baseline): "
         )
         user_prev = input(prev_prompt).strip()
@@ -2545,23 +2578,55 @@ def main() -> int:
                 fallback_dirs=fallback_dirs,
             )
             if not resolved_prev:
-                print(f"[ERROR] Previous OPEN POA&M file not found in scans/: '{user_prev}'", file=sys.stderr)
+                print(f"[ERROR] Previous OPEN POA&M file not found in artifacts/drop-off/: '{user_prev}'", file=sys.stderr)
                 return 1
             prev_open_path = resolved_prev
 
-    # Also resolve --previous-closed through scans/ if provided
+    # Also resolve --previous-closed through artifacts/drop-off/ (or prompt interactively)
     prev_closed_path = ""
-    if args.previous_closed:
-        resolved_closed = resolve_input_file(
-            args.previous_closed,
+    if args.previous_closed is not None:
+        if args.previous_closed.strip().lower() not in ("", "none", "null", "false", "-"):
+            resolved_closed = resolve_input_file(
+                args.previous_closed,
+                scans_dir=scans_dir,
+                extensions=POAM_EXTENSIONS,
+                fallback_dirs=fallback_dirs,
+            )
+            if not resolved_closed:
+                print(f"[ERROR] Previous CLOSED POA&M file not found in artifacts/drop-off/: '{args.previous_closed}'", file=sys.stderr)
+                return 1
+            prev_closed_path = resolved_closed
+    elif args.previous_open is None and not args.no_previous and sys.stdin.isatty():
+        excluded_for_closed = list(scan_paths) + ([prev_open_path] if prev_open_path else [])
+        closed_choices = display_detected_files(
             scans_dir=scans_dir,
             extensions=POAM_EXTENSIONS,
-            fallback_dirs=fallback_dirs,
+            label="Previous CLOSED POA&M workbooks (.xlsx)",
+            exclude_paths=excluded_for_closed,
         )
-        if not resolved_closed:
-            print(f"[ERROR] Previous CLOSED POA&M file not found in scans/: '{args.previous_closed}'", file=sys.stderr)
-            return 1
-        prev_closed_path = resolved_closed
+        closed_prompt = (
+            f"[?] Select previous CLOSED FedRAMP POA&M by number [1-{len(closed_choices)}], enter filename in artifacts/drop-off/,\n"
+            f"    or press Enter if none: "
+            if closed_choices
+            else "[?] Enter previous CLOSED FedRAMP POA&M filename in artifacts/drop-off/ (.xlsx) to preserve\n"
+                 "    closed history & prevent POA&M ID reuse (or press Enter if none): "
+        )
+        user_closed = input(closed_prompt).strip()
+        if user_closed and user_closed.lower() not in ("none", "null", "false", "-"):
+            live_closed_choices = closed_choices or list_eligible_files(
+                scans_dir, POAM_EXTENSIONS, exclude_paths=excluded_for_closed
+            )
+            resolved_closed = resolve_input_file(
+                user_closed,
+                scans_dir=scans_dir,
+                extensions=POAM_EXTENSIONS,
+                numbered_choices=live_closed_choices,
+                fallback_dirs=fallback_dirs,
+            )
+            if not resolved_closed:
+                print(f"[ERROR] Previous CLOSED POA&M file not found in artifacts/drop-off/: '{user_closed}'", file=sys.stderr)
+                return 1
+            prev_closed_path = resolved_closed
 
     # 3. Load and Normalize Scan Findings
     per_file_entries: List[List[Dict[str, object]]] = []
@@ -2661,10 +2726,10 @@ def main() -> int:
             else:
                 print(
                     f"[*] Non-interactive session detected with --draft-remediations=ask: "
-                    f"auto-drafting {len(missing_remediation_entries)} missing Remediation Plans "
-                    f"(pass --draft-remediations n to leave blank)."
+                    f"leaving {len(missing_remediation_entries)} missing Remediation Plans blank "
+                    f"(pass --draft-remediations y to auto-draft)."
                 )
-                choice = "y"
+                choice = "n"
 
         if choice == "y":
             for e in missing_remediation_entries:

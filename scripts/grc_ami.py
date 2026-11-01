@@ -5,102 +5,102 @@ grc_ami.py - GRC Amazon Machine Image (AMI) Ingestion & Cold-Mount Lifecycle Man
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Phase 1 (Pull & Verify) & Phase 2 (Restore / Cold-Mount) Core Orchestrator
-Target Frameworks: NIST SP 800-53 (SC-12, SC-13, SI-7, CM-6), FedRAMP High, DISA STIG
+Target Frameworks: NIST SP 800-53 (SC-12, SC-13, SC-28, SI-7, CM-6), FedRAMP High, DISA STIG
 Architecture Pattern: EBS Snapshot Cold-Mount (Zero Untrusted Execution)
 
 Purpose:
   Provides the operational CLI and orchestration engine for auditing AMIs out-of-band:
     - Verifies AMI metadata, root EBS snapshot integrity, and KMS encryption compliance.
-    - Provisions ephemeral secondary EBS volumes from root snapshots.
-    - Executes chroot-safe, read-only cold mounts (`ro,noload,noexec,nosuid`) without booting untrusted code.
+    - Provisions ephemeral secondary EBS volumes from root snapshots with automatic rollback.
+    - Executes read-only cold mounts (`ro,norecovery,nouuid,noexec,nosuid` on XFS or
+      `ro,noload,noexec,nosuid` on ext4) without booting untrusted code.
     - Extracts OS release identifiers (`/etc/os-release`) to map applicable DISA STIG profiles.
     - Emits formal `ami_provenance.json` audit manifests for FedRAMP / DoD SCR packages.
-    - Orchestrates downstream security scanners (OpenSCAP, Syft, sbom_analyzer, crypto_lib_scan).
     - Guarantees complete ephemeral teardown (`grc ami clean`) to eliminate cloud sprawl.
-
-Design Rule Adherence:
-  - Out-of-Band (OOB) & Fail-Open: Never gates main VM image build pipelines.
-  - Zero Untrusted Execution: Cold-mounting prevents code execution, daemon activation, and state mutation.
-  - Ephemeral Lifecycle: Volumes and mount points exist solely for analysis and are destroyed post-audit.
-  - Cloud-Native & Offline Modes: Native AWS API execution with full mock/offline emulation support.
 """
 
 import argparse
-import datetime
-import hashlib
 import json
 import os
-import re
-import shutil
 import subprocess
 import sys
-import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
-# Optional boto3 import; fallback to AWS CLI or Mock Mode if unavailable
+# Optional boto3 import; fallback to AWS CLI if unavailable
 try:
     import boto3
-    from botocore.exceptions import ClientError, BotoCoreError
+    from botocore.exceptions import BotoCoreError, ClientError
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
 
-# Import mock fixture generators from grc_test engine (Engine #7)
 try:
-    from grc_test import generate_mock_ami_metadata, create_mock_rootfs, generate_mock_ebs_volume
+    from grc_common import safe_rmtree, utc_now_iso
+    from grc_fixtures import (
+        create_mock_rootfs,
+        generate_mock_ami_metadata,
+        generate_mock_ebs_volume,
+    )
 except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from grc_test import generate_mock_ami_metadata, create_mock_rootfs, generate_mock_ebs_volume
+    from grc_common import safe_rmtree, utc_now_iso
+    from grc_fixtures import (
+        create_mock_rootfs,
+        generate_mock_ami_metadata,
+        generate_mock_ebs_volume,
+    )
 
 
 # ==============================================================================
 # OS TO DISA STIG BENCHMARK RESOLVER
 # ==============================================================================
 
+DEFAULT_SCAP_PROFILE = "xccdf_org.ssgproject.content_profile_stig"
+
 OS_STIG_MAPPING: Dict[str, Dict[str, str]] = {
     "rhel-9": {
         "benchmark_id": "U_RHEL_9_STIG",
         "benchmark_title": "Red Hat Enterprise Linux 9 STIG",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
     "rhel-8": {
         "benchmark_id": "U_RHEL_8_STIG",
         "benchmark_title": "Red Hat Enterprise Linux 8 STIG",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-rhel8-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
     "amzn-2023": {
         "benchmark_id": "U_AL2023_STIG",
         "benchmark_title": "Amazon Linux 2023 STIG",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-al2023-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
     "amzn-2": {
         "benchmark_id": "U_AL2_STIG",
         "benchmark_title": "Amazon Linux 2 STIG",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-al2-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
     "ubuntu-22.04": {
         "benchmark_id": "U_Canonical_Ubuntu_22.04_LTS_STIG",
         "benchmark_title": "Canonical Ubuntu 22.04 LTS STIG",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
     "ubuntu-20.04": {
         "benchmark_id": "U_Canonical_Ubuntu_20.04_LTS_STIG",
         "benchmark_title": "Canonical Ubuntu 20.04 LTS STIG",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-ubuntu2004-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
     "rocky-9": {
         "benchmark_id": "U_RHEL_9_STIG",
         "benchmark_title": "Red Hat Enterprise Linux 9 STIG (Rocky Linux 9 Compatible)",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-rl9-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     },
 }
 
@@ -112,20 +112,33 @@ def resolve_os_stig(os_id: str, version_id: str) -> Dict[str, str]:
     full_key = f"{os_id_clean}-{version_id}"
     major_key = f"{os_id_clean}-{major_ver}"
 
-    if full_key in OS_STIG_MAPPING:
-        return OS_STIG_MAPPING[full_key]
-    if major_key in OS_STIG_MAPPING:
-        return OS_STIG_MAPPING[major_key]
-    if os_id_clean in OS_STIG_MAPPING:
-        return OS_STIG_MAPPING[os_id_clean]
+    for candidate in (full_key, major_key, os_id_clean):
+        if candidate in OS_STIG_MAPPING:
+            return dict(OS_STIG_MAPPING[candidate])
 
-    # Default fallback
     return {
         "benchmark_id": "U_Generic_Linux_OS_SRG",
         "benchmark_title": f"Generic Linux OS Security Requirements Guide ({os_id} {version_id})",
         "scap_datastream": "/usr/share/xml/scap/ssg/content/ssg-generic-ds.xml",
-        "default_profile": "xccdf_org.ssgproject.content_profile_stig",
+        "default_profile": DEFAULT_SCAP_PROFILE,
     }
+
+
+def _kms_key_matches(actual_kms: Optional[str], expected_kms: str) -> bool:
+    """
+    Compares KMS Key ID or ARN using exact equality on either the full ARN
+    or the trailing key UUID/alias (never arbitrary substring matching).
+    """
+    if not actual_kms or not expected_kms:
+        return False
+    actual = actual_kms.strip()
+    expected = expected_kms.strip()
+    if actual == expected:
+        return True
+    # Allow matching the key UUID portion of an ARN (e.g. 'arn:aws:kms:...:key/<id>')
+    if "/" in actual and actual.rsplit("/", 1)[-1] == expected:
+        return True
+    return False
 
 
 # ==============================================================================
@@ -147,6 +160,7 @@ class GRCAMIManager:
         device_name: str = "/dev/xvdf",
         partition: Optional[str] = None,
         mock_mode: bool = False,
+        allow_unencrypted: bool = False,
     ):
         self.ami_id = ami_id.strip()
         self.region = region
@@ -154,10 +168,11 @@ class GRCAMIManager:
         self.device_name = device_name
         self.partition = partition
         self.mock_mode = mock_mode
+        self.allow_unencrypted = allow_unencrypted
         self.session_id = str(uuid.uuid4())
 
         self.workspace_root = (
-            workspace_root.resolve()
+            Path(workspace_root).resolve()
             if workspace_root
             else Path(f"./ephemeral_ami_workspace_{self.session_id[:8]}").resolve()
         )
@@ -166,7 +181,7 @@ class GRCAMIManager:
         # Runtime state
         self.ephemeral_volume_id: Optional[str] = None
         self.ami_metadata: Dict[str, Any] = {}
-        self.storage_provenance: Dict[str, Any] = {}
+        self.last_mount_options: str = "ro,norecovery,nouuid,noexec,nosuid"
 
     # --------------------------------------------------------------------------
     # PHASE 1: PULL & VERIFY
@@ -179,9 +194,9 @@ class GRCAMIManager:
     ) -> Dict[str, Any]:
         """
         Executes Phase 1 (Pull & Verify):
-          1. Resolves AMI metadata via AWS EC2 API or mock engine.
+          1. Resolves AMI metadata via AWS EC2 API or explicit `--mock` mode.
           2. Verifies root EBS snapshot existence and availability.
-          3. Checks AWS KMS encryption compliance (NIST SP 800-53 SC-12/13).
+          3. Enforces EBS encryption compliance (NIST SP 800-53 SC-12/13/28).
           4. Emits structured verification record.
         """
         print(f"[*] Starting Pull & Verify for AMI: {self.ami_id} (Region: {self.region})")
@@ -190,7 +205,7 @@ class GRCAMIManager:
         self.ami_metadata = metadata
 
         root_snap_id = metadata.get("root_snapshot_id")
-        encrypted = metadata.get("encrypted", False)
+        encrypted = bool(metadata.get("encrypted", False))
         kms_key_id = metadata.get("kms_key_id")
         arch = metadata.get("architecture", "unknown")
         image_name = metadata.get("name", "unknown")
@@ -202,16 +217,23 @@ class GRCAMIManager:
         if kms_key_id:
             print(f"    -> KMS Key ID / ARN: {kms_key_id}")
 
-        # Verification checks
+        # SC-12 / SC-13 / SC-28 Encryption enforcement
+        if not encrypted and not self.allow_unencrypted:
+            raise ValueError(
+                f"AMI '{self.ami_id}' root snapshot '{root_snap_id}' is UNENCRYPTED "
+                f"(NIST SP 800-53 SC-28 violation). Pass --allow-unencrypted to override."
+            )
+
+        # Baseline verification checks
         if expected_snapshot:
-            if root_snap_id != expected_snapshot:
+            if root_snap_id != expected_snapshot.strip():
                 raise ValueError(
                     f"Root snapshot mismatch! Expected '{expected_snapshot}', found '{root_snap_id}'."
                 )
             print("    -> Root snapshot verified against baseline: MATCH")
 
         if expected_kms_key:
-            if not kms_key_id or expected_kms_key not in kms_key_id:
+            if not _kms_key_matches(kms_key_id, expected_kms_key):
                 raise ValueError(
                     f"KMS Key mismatch! Expected '{expected_kms_key}', found '{kms_key_id}'."
                 )
@@ -231,7 +253,7 @@ class GRCAMIManager:
             "virtualization_type": metadata.get("virtualization_type"),
             "ena_support": metadata.get("ena_support", False),
             "status": metadata.get("state", "available"),
-            "verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "verified_at": utc_now_iso(),
             "mock_mode": self.mock_mode,
         }
 
@@ -249,14 +271,20 @@ class GRCAMIManager:
         force: bool = False,
     ) -> Dict[str, Any]:
         """
-        Executes Phase 2 (Restore / Cold-Mount):
+        Executes Phase 2 (Restore / Cold-Mount) with automatic volume rollback on error:
           1. Verifies AMI integrity and storage attributes.
           2. Creates an ephemeral EBS volume from the root snapshot.
           3. Attaches volume as secondary block device to audit worker host.
-          4. Mounts secondary filesystem with read-only flags (ro,noload,noexec,nosuid).
+          4. Mounts secondary filesystem with read-only cold-mount flags.
           5. Reads `/etc/os-release` and maps DISA STIG profile.
           6. Emits `ami_provenance.json` in workspace root.
         """
+        if not self.mock_mode and not self.worker_id:
+            raise ValueError(
+                "In live AWS mode, --worker-id is required to attach and cold-mount an EBS volume "
+                "(or pass --mock for offline simulation)."
+            )
+
         # Step 1: Verification
         verification = self.verify_ami(
             expected_snapshot=expected_snapshot,
@@ -273,7 +301,7 @@ class GRCAMIManager:
                 print(f"[*] Removing existing workspace directory: {self.workspace_root}")
                 if self.mount_point.exists() and os.path.ismount(self.mount_point):
                     self._unmount_filesystem(self.mount_point)
-                shutil.rmtree(self.workspace_root)
+                safe_rmtree(self.workspace_root, allowed_markers=("ami_provenance.json", "mnt"))
             else:
                 raise FileExistsError(
                     f"Workspace '{self.workspace_root}' already exists. Use --force to overwrite."
@@ -283,18 +311,32 @@ class GRCAMIManager:
         self.mount_point.mkdir(parents=True, exist_ok=True)
         print(f"[*] Initialized ephemeral workspace: {self.workspace_root}")
 
-        # Step 3: Provision Ephemeral Volume from Snapshot
-        volume_id = self._create_ephemeral_volume(root_snap_id)
-        self.ephemeral_volume_id = volume_id
+        # Steps 3–5: Provision, Attach, and Mount with automatic rollback on failure
+        volume_id: Optional[str] = None
+        mounted = False
+        try:
+            volume_id = self._create_ephemeral_volume(root_snap_id)
+            self.ephemeral_volume_id = volume_id
 
-        # Step 4: Attach Volume as Secondary Block Device
-        actual_device = self._attach_ephemeral_volume(volume_id)
+            actual_device = self._attach_ephemeral_volume(volume_id)
+            mount_dev = self.partition if self.partition else actual_device
+            self._mount_filesystem(mount_dev, self.mount_point, volume_id=volume_id)
+            mounted = True
+        except Exception:
+            if mounted:
+                try:
+                    self._unmount_filesystem(self.mount_point)
+                except Exception:
+                    pass
+            if volume_id:
+                print(f"[WARN] Rolling back ephemeral EBS volume {volume_id} after restore failure...", file=sys.stderr)
+                try:
+                    self._detach_and_delete_volume(volume_id)
+                except Exception as cleanup_err:
+                    print(f"[ERROR] Volume rollback failed for {volume_id}: {cleanup_err}", file=sys.stderr)
+            raise
 
-        # Step 5: Mount Read-Only with Cold-Mount Flags
-        mount_dev = self.partition if self.partition else actual_device
-        self._mount_filesystem(mount_dev, self.mount_point)
-
-        # Step 6: Identify Target OS Distribution
+        # Step 6: Identify Target OS Distribution & Map STIG
         os_info = self._identify_target_os(self.mount_point)
         stig_mapping = resolve_os_stig(os_info["os_id"], os_info["version_id"])
         os_info["applicable_stig_benchmark"] = stig_mapping["benchmark_id"]
@@ -326,11 +368,11 @@ class GRCAMIManager:
                 "attached_device": actual_device,
                 "mounted_device_or_partition": mount_dev,
                 "workspace_mount_path": str(self.mount_point),
-                "mount_options": "ro,noload,noexec,nosuid",
-                "mounted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "mount_options": self.last_mount_options,
+                "mounted_at": utc_now_iso(),
             },
             "os_identification": os_info,
-            "restored_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "restored_at": utc_now_iso(),
             "status": "COLD_MOUNTED",
             "ephemeral": True,
             "mock_mode": self.mock_mode,
@@ -342,7 +384,7 @@ class GRCAMIManager:
             json.dump(provenance, f, indent=2)
 
         print(f"[*] Cryptographic provenance manifest generated: {manifest_path.name}")
-        print(f"[SUCCESS] AMI successfully cold-mounted and ready for Phase 3 (Analyze).")
+        print("[SUCCESS] AMI successfully cold-mounted and ready for Phase 3 (Analyze).")
         return provenance
 
     # --------------------------------------------------------------------------
@@ -356,12 +398,25 @@ class GRCAMIManager:
     ) -> None:
         """
         Executes Phase 5 (Clean / Teardown):
-          1. Unmounts secondary cold-mount filesystem.
-          2. Detaches ephemeral secondary EBS volume from worker instance.
-          3. Deletes the temporary EBS volume in AWS.
-          4. Cleans up local mount point directory.
+          1. Reads `ami_provenance.json` (honoring recorded `mock_mode` if present).
+          2. Unmounts secondary cold-mount filesystem.
+          3. Detaches & deletes temporary EBS volume in AWS.
+          4. Safely cleans up local workspace directory.
         """
         print(f"[*] Starting Ephemeral Teardown for workspace: {self.workspace_root}")
+
+        target_vol = volume_id or self.ephemeral_volume_id
+        prov_path = self.workspace_root / "ami_provenance.json"
+        if prov_path.exists():
+            try:
+                with open(prov_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if not target_vol:
+                        target_vol = data.get("cold_mount_execution", {}).get("ephemeral_volume_id")
+                    if data.get("mock_mode") is True:
+                        self.mock_mode = True
+            except Exception:
+                pass
 
         # 1. Unmount if mounted
         if self.mount_point.exists():
@@ -369,15 +424,6 @@ class GRCAMIManager:
                 self._unmount_filesystem(self.mount_point)
 
         # 2. Detach & Delete EBS Volume
-        target_vol = volume_id or self.ephemeral_volume_id
-        if not target_vol and (self.workspace_root / "ami_provenance.json").exists():
-            try:
-                with open(self.workspace_root / "ami_provenance.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    target_vol = data.get("cold_mount_execution", {}).get("ephemeral_volume_id")
-            except Exception:
-                pass
-
         if target_vol:
             self._detach_and_delete_volume(target_vol)
 
@@ -387,11 +433,11 @@ class GRCAMIManager:
                 print("    -> Preserving audit evidence deliverables in workspace.")
                 if self.mount_point.exists():
                     try:
-                        self.mount_point.rmdir()
-                    except OSError:
+                        safe_rmtree(self.mount_point, allowed_markers=("etc", "usr"))
+                    except Exception:
                         pass
             else:
-                shutil.rmtree(self.workspace_root)
+                safe_rmtree(self.workspace_root, allowed_markers=("ami_provenance.json", "mnt"))
                 print("    -> Workspace directory completely purged.")
 
         print("[SUCCESS] AMI audit workspace teardown and cleanup complete.")
@@ -401,10 +447,11 @@ class GRCAMIManager:
     # --------------------------------------------------------------------------
 
     def _fetch_ami_metadata(self) -> Dict[str, Any]:
-        """Queries AMI details from EC2 or mock engine."""
+        """Queries AMI details from EC2 or explicit `--mock` mode (never silent fallback)."""
         if self.mock_mode:
             return self._mock_ami_metadata()
 
+        boto_err: Optional[Exception] = None
         if HAS_BOTO3:
             try:
                 ec2 = boto3.client("ec2", region_name=self.region)
@@ -412,12 +459,14 @@ class GRCAMIManager:
                 images = resp.get("Images", [])
                 if not images:
                     raise FileNotFoundError(f"AMI '{self.ami_id}' not found in region '{self.region}'")
-                img = images[0]
-                return self._parse_ec2_image(img)
+                return self._parse_ec2_image(images[0])
+            except FileNotFoundError:
+                raise
             except (ClientError, BotoCoreError) as e:
-                print(f"[WARN] boto3 call failed ({e}); attempting AWS CLI fallback...", file=sys.stderr)
+                boto_err = e
+                print(f"[WARN] boto3 call failed ({e}); attempting AWS CLI...", file=sys.stderr)
 
-        # Fallback to AWS CLI
+        # Try AWS CLI
         try:
             cmd = [
                 "aws", "ec2", "describe-images",
@@ -431,12 +480,19 @@ class GRCAMIManager:
             if not images:
                 raise FileNotFoundError(f"AMI '{self.ami_id}' not found in region '{self.region}'")
             return self._parse_ec2_image(images[0])
-        except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError) as e:
-            if not self.mock_mode:
-                print(f"[WARN] AWS CLI call failed ({e}). Defaulting to Mock Mode for testing.", file=sys.stderr)
-                self.mock_mode = True
-                return self._mock_ami_metadata()
-            raise RuntimeError(f"Failed to query AMI {self.ami_id}: {e}")
+        except FileNotFoundError as e:
+            if getattr(e, "filename", None) == "aws":
+                raise RuntimeError(
+                    f"Failed to query AMI '{self.ami_id}': AWS CLI ('aws') is not installed "
+                    f"(and boto3 {'failed: ' + str(boto_err) if boto_err else 'is not installed'}). "
+                    f"Pass --mock only when running offline simulations."
+                )
+            raise
+        except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+            err_detail = getattr(e, "stderr", None) or str(e)
+            raise RuntimeError(
+                f"Failed to query AMI '{self.ami_id}' in region '{self.region}': {err_detail.strip()}"
+            )
 
     def _parse_ec2_image(self, img: Dict[str, Any]) -> Dict[str, Any]:
         """Extracts normalized metadata from EC2 DescribeImages response."""
@@ -447,13 +503,25 @@ class GRCAMIManager:
         kms_key = None
         vol_size = 30
 
+        # Pass 1: Match exact RootDeviceName
+        matched_bdm = None
         for bdm in block_devices:
-            ebs = bdm.get("Ebs", {})
-            if bdm.get("DeviceName") == root_device or not root_snap:
-                root_snap = ebs.get("SnapshotId")
-                encrypted = ebs.get("Encrypted", False)
-                kms_key = ebs.get("KmsKeyId")
-                vol_size = ebs.get("VolumeSize", 30)
+            if bdm.get("DeviceName") == root_device and "Ebs" in bdm:
+                matched_bdm = bdm
+                break
+        # Pass 2: Fallback to first EBS mapping only if RootDeviceName didn't match
+        if not matched_bdm:
+            for bdm in block_devices:
+                if "Ebs" in bdm:
+                    matched_bdm = bdm
+                    break
+
+        if matched_bdm:
+            ebs = matched_bdm.get("Ebs", {})
+            root_snap = ebs.get("SnapshotId")
+            encrypted = ebs.get("Encrypted", False)
+            kms_key = ebs.get("KmsKeyId")
+            vol_size = ebs.get("VolumeSize", 30)
 
         return {
             "image_id": img.get("ImageId"),
@@ -473,20 +541,57 @@ class GRCAMIManager:
         }
 
     def _mock_ami_metadata(self) -> Dict[str, Any]:
-        """Delegates synthetic AMI metadata generation to the grc_test engine."""
+        """Delegates synthetic AMI metadata generation to `grc_fixtures`."""
         return generate_mock_ami_metadata(self.ami_id, self.region)
 
+    def _resolve_worker_az(self) -> str:
+        """Resolves the Availability Zone of `self.worker_id` so the EBS volume is created in the same AZ."""
+        default_az = f"{self.region}a"
+        if self.mock_mode or not self.worker_id:
+            return default_az
+
+        if HAS_BOTO3:
+            try:
+                ec2 = boto3.client("ec2", region_name=self.region)
+                resp = ec2.describe_instances(InstanceIds=[self.worker_id])
+                for resv in resp.get("Reservations", []):
+                    for inst in resv.get("Instances", []):
+                        az = inst.get("Placement", {}).get("AvailabilityZone")
+                        if az:
+                            return az
+            except Exception:
+                pass
+
+        try:
+            cmd = [
+                "aws", "ec2", "describe-instances",
+                "--instance-ids", self.worker_id,
+                "--query", "Reservations[0].Instances[0].Placement.AvailabilityZone",
+                "--output", "text",
+                "--region", self.region,
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            az = res.stdout.strip()
+            if az and az != "None":
+                return az
+        except Exception:
+            pass
+
+        return default_az
+
     def _create_ephemeral_volume(self, snapshot_id: str) -> str:
-        """Provisions an ephemeral EBS volume from the root snapshot."""
+        """Provisions an ephemeral EBS volume from the root snapshot in the worker's AZ."""
         if self.mock_mode:
             mock_vol = generate_mock_ebs_volume(snapshot_id)
             print(f"[*] [MOCK] Provisioned ephemeral EBS volume: {mock_vol} (from {snapshot_id})")
             return mock_vol
 
-        print(f"[*] Provisioning ephemeral EBS volume from snapshot: {snapshot_id}")
+        target_az = self._resolve_worker_az()
+        print(f"[*] Provisioning ephemeral EBS volume from snapshot: {snapshot_id} (AZ: {target_az})")
+        worker_tag = self.worker_id or "unknown-worker"
         tags = [
             {"Key": "GRC-Audit-Session", "Value": self.session_id},
-            {"Key": "Ephemeral-Worker", "Value": self.worker_id or "unknown-worker"},
+            {"Key": "Ephemeral-Worker", "Value": worker_tag},
             {"Key": "PurgeAfter", "Value": "4h"},
         ]
 
@@ -495,7 +600,7 @@ class GRCAMIManager:
             resp = ec2.create_volume(
                 SnapshotId=snapshot_id,
                 VolumeType="gp3",
-                AvailabilityZone=f"{self.region}a",
+                AvailabilityZone=target_az,
                 TagSpecifications=[{"ResourceType": "volume", "Tags": tags}],
             )
             vol_id = resp["VolumeId"]
@@ -504,13 +609,19 @@ class GRCAMIManager:
             waiter.wait(VolumeIds=[vol_id])
             return vol_id
 
-        # AWS CLI fallback
+        # AWS CLI fallback with identical 3 tags
+        tag_spec = (
+            f"ResourceType=volume,Tags=["
+            f"{{Key=GRC-Audit-Session,Value={self.session_id}}},"
+            f"{{Key=Ephemeral-Worker,Value={worker_tag}}},"
+            f"{{Key=PurgeAfter,Value=4h}}]"
+        )
         cmd = [
             "aws", "ec2", "create-volume",
             "--snapshot-id", snapshot_id,
             "--volume-type", "gp3",
-            "--availability-zone", f"{self.region}a",
-            "--tag-specifications", f"ResourceType=volume,Tags=[{{Key=GRC-Audit-Session,Value={self.session_id}}}]",
+            "--availability-zone", target_az,
+            "--tag-specifications", tag_spec,
             "--region", self.region,
             "--output", "json",
         ]
@@ -525,9 +636,12 @@ class GRCAMIManager:
 
     def _attach_ephemeral_volume(self, volume_id: str) -> str:
         """Attaches the secondary EBS volume to the audit worker instance."""
-        if self.mock_mode or not self.worker_id:
+        if self.mock_mode:
             print(f"[*] [MOCK] Attached volume {volume_id} to worker as {self.device_name}")
             return self.device_name
+
+        if not self.worker_id:
+            raise ValueError("Cannot attach EBS volume without --worker-id in live AWS mode.")
 
         print(f"[*] Attaching volume {volume_id} to worker {self.worker_id} at {self.device_name}")
         if HAS_BOTO3:
@@ -556,21 +670,72 @@ class GRCAMIManager:
         )
         return self.device_name
 
-    def _mount_filesystem(self, device: str, mount_path: Path) -> None:
-        """Mounts secondary volume partition with cold-mount flags: ro,noload,noexec,nosuid."""
-        print(f"[*] Mounting {device} at {mount_path} with options: ro,noload,noexec,nosuid")
+    def _resolve_block_device(self, requested_device: str, volume_id: Optional[str] = None) -> str:
+        """Resolves AWS Nitro NVMe `/dev/disk/by-id/...` symlink if `/dev/xvdf` is mapped as NVMe."""
+        if os.path.exists(requested_device):
+            return requested_device
+        if volume_id:
+            clean_vol = volume_id.replace("-", "")
+            by_id = f"/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_{clean_vol}"
+            if os.path.exists(by_id):
+                return by_id
+        return requested_device
+
+    def _detect_fs_type(self, device: str) -> str:
+        """Detects filesystem type (`xfs`, `ext4`, etc.) via `blkid`."""
+        try:
+            res = subprocess.run(
+                ["blkid", "-o", "value", "-s", "TYPE", device],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            fs = res.stdout.strip().lower()
+            if fs:
+                return fs
+        except Exception:
+            pass
+        return "xfs"
+
+    def _mount_filesystem(
+        self,
+        device: str,
+        mount_path: Path,
+        volume_id: Optional[str] = None,
+    ) -> None:
+        """
+        Mounts secondary volume partition read-only with filesystem-appropriate cold-mount flags:
+          - XFS (RHEL 8/9, AL2023 default): `ro,norecovery,nouuid,noexec,nosuid`
+          - ext3/ext4 (Ubuntu/Debian):      `ro,noload,noexec,nosuid`
+        """
         if self.mock_mode:
-            # Create synthetic mock rootfs structure for local testing
+            self.last_mount_options = "ro,norecovery,nouuid,noexec,nosuid"
+            print(f"[*] Mounting {device} at {mount_path} with options: {self.last_mount_options}")
             self._create_mock_rootfs(mount_path)
             print("    -> [MOCK] Synthetic root filesystem initialized at mount point.")
             return
 
-        cmd = ["mount", "-o", "ro,noload,noexec,nosuid", device, str(mount_path)]
-        try:
-            subprocess.run(cmd, capture_output=True, text=True, check=True)
-            print("    -> Secondary filesystem mounted read-only.")
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Cold-mount failed: {e.stderr}")
+        resolved_dev = self._resolve_block_device(device, volume_id=volume_id)
+        fs_type = self._detect_fs_type(resolved_dev)
+
+        if fs_type == "xfs":
+            option_candidates = ["ro,norecovery,nouuid,noexec,nosuid", "ro,noload,noexec,nosuid"]
+        else:
+            option_candidates = ["ro,noload,noexec,nosuid", "ro,norecovery,nouuid,noexec,nosuid"]
+
+        last_err = ""
+        for opts in option_candidates:
+            print(f"[*] Mounting {resolved_dev} at {mount_path} with options: {opts}")
+            cmd = ["mount", "-o", opts, resolved_dev, str(mount_path)]
+            try:
+                subprocess.run(cmd, capture_output=True, text=True, check=True)
+                self.last_mount_options = opts
+                print("    -> Secondary filesystem mounted read-only.")
+                return
+            except subprocess.CalledProcessError as e:
+                last_err = (e.stderr or e.stdout or str(e)).strip()
+
+        raise RuntimeError(f"Cold-mount failed on {resolved_dev}: {last_err}")
 
     def _unmount_filesystem(self, mount_path: Path) -> None:
         """Unmounts the filesystem safely."""
@@ -624,7 +789,7 @@ class GRCAMIManager:
         )
 
     def _identify_target_os(self, mount_path: Path) -> Dict[str, Any]:
-        """Parses /etc/os-release or /etc/system-release from mounted rootfs."""
+        """Parses /etc/os-release or /usr/lib/os-release from mounted rootfs."""
         os_release = mount_path / "etc" / "os-release"
         alt_release = mount_path / "usr" / "lib" / "os-release"
 
@@ -656,7 +821,7 @@ class GRCAMIManager:
         }
 
     def _create_mock_rootfs(self, mount_path: Path) -> None:
-        """Delegates synthetic root filesystem fixture generation to the grc_test engine."""
+        """Delegates synthetic root filesystem fixture generation to `grc_fixtures`."""
         create_mock_rootfs(mount_path)
 
 
@@ -667,7 +832,7 @@ class GRCAMIManager:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="grc ami",
-        description="GRC Amazon Machine Image (AMI) Review Lifecycle Manager (Cold-Mount Pattern)",
+        description="GRC-xMINI Amazon Machine Image (AMI) Review Lifecycle Manager (Cold-Mount Pattern)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:
@@ -694,6 +859,7 @@ Examples:
     verify_parser.add_argument("--region", default="us-east-1", help="AWS region (defaults to us-east-1)")
     verify_parser.add_argument("--expected-snapshot", default=None, help="Expected root EBS snapshot ID to validate")
     verify_parser.add_argument("--expected-kms-key", default=None, help="Expected KMS Key ID / ARN to validate")
+    verify_parser.add_argument("--allow-unencrypted", action="store_true", help="Do not fail verification if root EBS snapshot is unencrypted")
     verify_parser.add_argument("--mock", action="store_true", help="Execute in local mock/simulation mode without AWS API")
     verify_parser.add_argument("--json", action="store_true", help="Output verification results as raw JSON")
 
@@ -708,7 +874,8 @@ Examples:
     restore_parser.add_argument("--device", default="/dev/xvdf", help="Target secondary block device name (default: /dev/xvdf)")
     restore_parser.add_argument("--partition", default=None, help="Specific partition to mount (e.g., /dev/xvdf1)")
     restore_parser.add_argument("--expected-snapshot", default=None, help="Expected snapshot ID")
-    restore_parser.add_argument("--expected-kms-key", default=None, help="Expected KMS Key ID")
+    restore_parser.add_argument("--expected-kms-key", default=None, help="Expected KMS Key ID / ARN")
+    restore_parser.add_argument("--allow-unencrypted", action="store_true", help="Allow restoring an unencrypted root snapshot")
     restore_parser.add_argument("--force", "-f", action="store_true", help="Overwrite existing workspace directory")
     restore_parser.add_argument("--mock", action="store_true", help="Execute in local mock/simulation mode without AWS API")
     restore_parser.add_argument("--json", action="store_true", help="Output restoration summary as raw JSON")
@@ -736,6 +903,7 @@ def main() -> None:
                 ami_id=args.ami_id,
                 region=args.region,
                 mock_mode=args.mock,
+                allow_unencrypted=args.allow_unencrypted,
             )
             result = manager.verify_ami(
                 expected_snapshot=args.expected_snapshot,
@@ -753,6 +921,7 @@ def main() -> None:
                 device_name=args.device,
                 partition=args.partition,
                 mock_mode=args.mock,
+                allow_unencrypted=args.allow_unencrypted,
             )
             result = manager.restore_ami(
                 expected_snapshot=args.expected_snapshot,

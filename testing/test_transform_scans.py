@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRC-xMINI (v1.4.0 — Yokota) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRC-xMINI (v1.4.1 — Yokota) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:
@@ -698,12 +698,14 @@ class TestTransformScansEngine(unittest.TestCase):
         # 3. Select scan 2 (aws_inspector_scan.csv)
         # 4. Add additional scan? 'n'
         # 5. Select previous OPEN FedRAMP POA&M: "" (none)
-        # 6. Draft remediation plans? 'n'
+        # 6. Select previous CLOSED FedRAMP POA&M: "" (none)
+        # 7. Draft remediation plans? 'n'
         simulated_inputs = [
             t_path,
             "y",
             i_path,
             "n",
+            "",
             "",
             "n",
         ]
@@ -713,6 +715,69 @@ class TestTransformScansEngine(unittest.TestCase):
                 with mock.patch("sys.argv", ["grc transform", "--dry-run"]):
                     exit_code = ts.main()
                     self.assertEqual(exit_code, 0)
+
+    def test_in_file_duplicate_merge_preserves_cves_and_kev_status(self) -> None:
+        """Verifies P1 fix: in-file duplicate rows for the same plugin+host merge CVEs and KEV status."""
+        kev_catalog = {
+            "CVE-2024-6387": {
+                "cveID": "CVE-2024-6387",
+                "dateAdded": "2024-07-09",
+                "dueDate": "2024-07-30",
+            }
+        }
+        records = [
+            {
+                "Plugin ID": "192814",
+                "CVE": "CVE-2024-0001",
+                "Risk": "High",
+                "Host": "10.0.0.10",
+                "Port": "22",
+                "Protocol": "tcp",
+                "Name": "OpenSSH Multi-Port Finding",
+                "First Discovered": "2026-10-01",
+            },
+            {
+                "Plugin ID": "192814",
+                "CVE": "CVE-2024-6387",
+                "Risk": "Critical",
+                "Host": "10.0.0.10",
+                "Port": "2222",
+                "Protocol": "tcp",
+                "Name": "OpenSSH Multi-Port Finding",
+                "First Discovered": "2026-09-15",
+            },
+        ]
+        entries = ts.normalize_scan_rows(
+            records=records,
+            scanner_type="tenable",
+            scan_filename="scan.csv",
+            today=self.today,
+            default_poc="SecOps",
+            kev_catalog=kev_catalog,
+        )
+        self.assertEqual(len(entries), 1)
+        merged = entries[0]
+        self.assertIn("CVE-2024-0001", merged["cve"])
+        self.assertIn("CVE-2024-6387", merged["cve"])
+        self.assertEqual(merged["bod_22_01_tracking"], "Yes")
+        self.assertEqual(merged["bod_22_01_due_date"], "2024-07-30")
+
+    def test_calcchain_relationships_removed_from_xlsx_archive(self) -> None:
+        """Verifies P1 fix: dropping xl/calcChain.xml also cleans workbook.xml.rels and [Content_Types].xml."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_xlsx = os.path.join(tmpdir, "OPEN FedRAMP-POAM.xlsx")
+            ts.write_poam_workbook(
+                template_path=self.open_template,
+                output_path=out_xlsx,
+                entries=[],
+                is_closed_template=False,
+            )
+            with zipfile.ZipFile(out_xlsx, "r") as zf:
+                self.assertNotIn("xl/calcChain.xml", zf.namelist())
+                rels_xml = zf.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+                ct_xml = zf.read("[Content_Types].xml").decode("utf-8")
+                self.assertNotIn("calcChain.xml", rels_xml)
+                self.assertNotIn("/xl/calcChain.xml", ct_xml)
 
     def test_cli_multi_scan_flag_and_max_limit(self) -> None:
         """Verify passing multiple --scan flags and erroring when exceeding MAX_SCAN_FILES."""

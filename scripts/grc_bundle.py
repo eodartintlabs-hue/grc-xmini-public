@@ -8,7 +8,7 @@ Pipeline Role: Phase 1 (Pull & Verify) & Phase 2 (Restore) Core Orchestrator
 Target Frameworks: NIST SP 800-53 (SI-7, CM-6, SC-12), FedRAMP, DISA STIG
 
 Purpose:
-  Provides the operational CLI implementation for GRCx ("The GRC eXperience"):
+  Provides the operational CLI implementation for GRC-xMINI ("The GRC eXperience"):
     - Verifies cryptographic integrity (SHA-256) of incoming release bundles.
     - Validates bundle structure via `git bundle verify`.
     - Restores and unpacks the Git bundle into an isolated, ephemeral workspace.
@@ -17,38 +17,69 @@ Purpose:
     - Provides safe workspace teardown to uphold ephemeral hygiene rules.
 
 Design Rule Adherence:
-  - Fail-Open & OOB: Never gates main deployment pipelines.
+  - Out-of-Band (OOB): Operates on exported bundles without gating main deployment pipelines.
   - Ephemeral Lifecycle: Workspaces are created on-demand and wiped after evidence generation.
   - Read-Only Ingestion: Preserves immutable integrity of audit inputs.
 """
 
 import argparse
-import datetime
-import hashlib
 import json
 import os
-import shutil
+import re
 import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+
+try:
+    from grc_common import safe_rmtree, sha256_file, utc_now_iso
+except ImportError:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from grc_common import safe_rmtree, sha256_file, utc_now_iso
+
+_HEX_HASH_RE = re.compile(r"^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$")
 
 
 # ==============================================================================
-# CRYPTOGRAPHIC INTEGRITY UTILITIES
+# CRYPTOGRAPHIC INTEGRITY & WORKSPACE CLEANUP UTILITIES
 # ==============================================================================
 
 def compute_sha256(file_path: Path, block_size: int = 65536) -> str:
     """Computes the hex-encoded SHA-256 checksum of a file in chunks."""
-    sha256 = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        while True:
-            data = f.read(block_size)
-            if not data:
-                break
-            sha256.update(data)
-    return sha256.hexdigest()
+    return sha256_file(file_path, block_size=block_size)
+
+
+def clean_ephemeral_workspace(
+    workspace_root: Path,
+    bundle_path: Optional[Path] = None,
+    remove_bundle: bool = False,
+) -> None:
+    """
+    Executes guarded workspace teardown without requiring an existing bundle instance:
+      1. Verifies the target workspace is not a protected system/repo path and contains
+         an ephemeral marker (`bundle_provenance.json` or `.git`) before removal.
+      2. Optionally deletes the processed bundle file if `remove_bundle=True` and the
+         bundle file exists (refusing to delete `.py` scripts).
+    """
+    ws_resolved = Path(workspace_root).resolve()
+    if ws_resolved.exists():
+        print(f"[*] Destroying ephemeral workspace: {ws_resolved}")
+        safe_rmtree(ws_resolved, allowed_markers=("bundle_provenance.json", ".git"))
+        print("    -> Workspace directory deleted.")
+
+    if remove_bundle and bundle_path is not None:
+        b_resolved = Path(bundle_path).resolve()
+        if b_resolved == Path(__file__).resolve() or b_resolved.suffix == ".py":
+            raise ValueError(f"Refusing to delete Python script as bundle: {b_resolved}")
+        if b_resolved.exists():
+            print(f"[*] Deleting processed bundle: {b_resolved}")
+            b_resolved.unlink()
+            print("    -> Bundle file deleted.")
+        else:
+            print(f"[WARN] Bundle file slated for deletion does not exist: {b_resolved}", file=sys.stderr)
+
+    print("[SUCCESS] Ephemeral cleanup complete.")
 
 
 # ==============================================================================
@@ -59,12 +90,12 @@ class GRCBundleManager:
     """Manages the verification, extraction, and provenance recording of Git bundles."""
 
     def __init__(self, bundle_path: Path, workspace_root: Optional[Path] = None):
-        self.bundle_path = bundle_path.resolve()
+        self.bundle_path = Path(bundle_path).resolve()
         if not self.bundle_path.exists():
             raise FileNotFoundError(f"Target bundle file does not exist: {self.bundle_path}")
 
         self.workspace_root = (
-            workspace_root.resolve()
+            Path(workspace_root).resolve()
             if workspace_root
             else self.bundle_path.parent / "ephemeral_workspace"
         )
@@ -87,13 +118,10 @@ class GRCBundleManager:
             expected_clean = expected_sha256.strip().lower()
             if self.bundle_sha256.lower() != expected_clean:
                 checksum_verified = False
-                print(
-                    f"[ERROR] SHA-256 mismatch!\n"
-                    f"        Expected: {expected_clean}\n"
-                    f"        Computed: {self.bundle_sha256}",
-                    file=sys.stderr,
+                raise ValueError(
+                    f"Bundle cryptographic integrity verification failed: "
+                    f"expected {expected_clean}, computed {self.bundle_sha256}"
                 )
-                raise ValueError("Bundle cryptographic integrity verification failed.")
             print("    -> Cryptographic checksum verified against session baseline: MATCH")
 
         # Execute git bundle verify
@@ -104,11 +132,11 @@ class GRCBundleManager:
                 text=True,
                 check=True,
             )
-            raw_verify_output = result.stdout or result.stderr
+            raw_verify_output = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
             print("    -> Git bundle object verification: VALID")
         except subprocess.CalledProcessError as e:
-            print(f"[ERROR] `git bundle verify` failed:\n{e.stderr}", file=sys.stderr)
-            raise RuntimeError(f"Git bundle verification failed: {e.stderr}")
+            err_msg = (e.stderr or e.stdout or str(e)).strip()
+            raise RuntimeError(f"Git bundle verification failed: {err_msg}")
 
         # Parse available references from verification output
         refs = self._parse_bundle_refs(raw_verify_output)
@@ -121,7 +149,7 @@ class GRCBundleManager:
             "checksum_verified": checksum_verified,
             "git_bundle_valid": True,
             "contained_references": refs,
-            "verified_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "verified_at": utc_now_iso(),
         }
 
     def restore_bundle(
@@ -139,6 +167,9 @@ class GRCBundleManager:
           4. Checks out the designated tag or branch.
           5. Captures commit provenance and creates `bundle_provenance.json`.
         """
+        if target_ref and target_ref.strip().startswith("-"):
+            raise ValueError(f"Invalid target git reference (must not start with '-'): {target_ref}")
+
         # Step 1: Verification
         verification = self.verify_bundle(expected_sha256=expected_sha256)
 
@@ -146,7 +177,7 @@ class GRCBundleManager:
         if self.workspace_root.exists():
             if force:
                 print(f"[*] Removing existing workspace directory: {self.workspace_root}")
-                shutil.rmtree(self.workspace_root)
+                safe_rmtree(self.workspace_root, allowed_markers=("bundle_provenance.json", ".git"))
             else:
                 raise FileExistsError(
                     f"Workspace destination '{self.workspace_root}' already exists. "
@@ -166,22 +197,22 @@ class GRCBundleManager:
             )
             print("    -> Cloned bundle repository successfully.")
         except subprocess.CalledProcessError as e:
-            print(f"[ERROR] Failed to clone Git bundle:\n{e.stderr}", file=sys.stderr)
-            raise RuntimeError(f"Failed to extract Git bundle: {e.stderr}")
+            err_msg = (e.stderr or e.stdout or str(e)).strip()
+            raise RuntimeError(f"Failed to extract Git bundle: {err_msg}")
 
         # Step 4: Checkout target tag/branch if specified
         if target_ref:
             try:
                 subprocess.run(
-                    ["git", "-C", str(self.workspace_root), "checkout", target_ref],
+                    ["git", "-C", str(self.workspace_root), "checkout", target_ref, "--"],
                     capture_output=True,
                     text=True,
                     check=True,
                 )
                 print(f"    -> Checked out reference: {target_ref}")
             except subprocess.CalledProcessError as e:
-                print(f"[ERROR] Failed to checkout ref '{target_ref}':\n{e.stderr}", file=sys.stderr)
-                raise RuntimeError(f"Failed to checkout ref '{target_ref}': {e.stderr}")
+                err_msg = (e.stderr or e.stdout or str(e)).strip()
+                raise RuntimeError(f"Failed to checkout ref '{target_ref}': {err_msg}")
 
         # Step 5: Gather commit metadata
         commit_info = self._get_commit_metadata(self.workspace_root)
@@ -200,7 +231,7 @@ class GRCBundleManager:
             "workspace_path": str(self.workspace_root),
             "checked_out_ref": target_ref or commit_info["ref"],
             "commit_metadata": commit_info,
-            "restored_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "restored_at": utc_now_iso(),
             "status": "RESTORED",
             "ephemeral": True,
             "verification": verification,
@@ -216,26 +247,16 @@ class GRCBundleManager:
             self._apply_read_only(self.workspace_root)
             print("    -> Applied read-only filesystem permissions across source tree.")
 
-        print(f"[SUCCESS] Bundle successfully restored and ready for Phase 3 (Analyze).")
+        print("[SUCCESS] Bundle successfully restored and ready for Phase 3 (Analyze).")
         return provenance
 
     def clean_workspace(self, remove_bundle: bool = False) -> None:
-        """
-        Executes workspace teardown:
-          Destroys the ephemeral workspace and optionally deletes the bundle file
-          to satisfy the ephemeral lifecycle rule.
-        """
-        if self.workspace_root.exists():
-            print(f"[*] Destroying ephemeral workspace: {self.workspace_root}")
-            shutil.rmtree(self.workspace_root)
-            print("    -> Workspace directory deleted.")
-
-        if remove_bundle and self.bundle_path.exists():
-            print(f"[*] Deleting processed bundle: {self.bundle_path}")
-            self.bundle_path.unlink()
-            print("    -> Bundle file deleted.")
-
-        print("[SUCCESS] Ephemeral cleanup complete.")
+        """Delegates workspace teardown to `clean_ephemeral_workspace`."""
+        clean_ephemeral_workspace(
+            workspace_root=self.workspace_root,
+            bundle_path=self.bundle_path,
+            remove_bundle=remove_bundle,
+        )
 
     # --------------------------------------------------------------------------
     # INTERNAL HELPERS
@@ -246,15 +267,14 @@ class GRCBundleManager:
         for line in verify_output.splitlines():
             line = line.strip()
             # Standard git bundle verify output lists refs like:
-            # <sha> refs/heads/main
-            # <sha> refs/tags/v1.0.0
+            # <sha1-or-sha256> refs/heads/main
             parts = line.split()
-            if len(parts) >= 2 and len(parts[0]) == 40:
+            if len(parts) >= 2 and _HEX_HASH_RE.match(parts[0]):
                 refs.append({"commit": parts[0], "ref": parts[1]})
         return refs
 
     def _get_commit_metadata(self, repo_path: Path) -> Dict[str, Any]:
-        fmt = "%H%n%h%n%an%n%ae%n%ad%n%s%n%D"
+        fmt = "%H%x00%h%x00%an%x00%ae%x00%ad%x00%s%x00%D"
         try:
             res = subprocess.run(
                 ["git", "-C", str(repo_path), "log", "-1", f"--format={fmt}"],
@@ -262,15 +282,15 @@ class GRCBundleManager:
                 text=True,
                 check=True,
             )
-            lines = res.stdout.strip().splitlines()
+            parts = res.stdout.strip().split("\x00")
             return {
-                "commit_hash": lines[0] if len(lines) > 0 else "",
-                "short_hash": lines[1] if len(lines) > 1 else "",
-                "author_name": lines[2] if len(lines) > 2 else "",
-                "author_email": lines[3] if len(lines) > 3 else "",
-                "author_date": lines[4] if len(lines) > 4 else "",
-                "subject": lines[5] if len(lines) > 5 else "",
-                "ref": lines[6] if len(lines) > 6 else "HEAD",
+                "commit_hash": parts[0] if len(parts) > 0 else "",
+                "short_hash": parts[1] if len(parts) > 1 else "",
+                "author_name": parts[2] if len(parts) > 2 else "",
+                "author_email": parts[3] if len(parts) > 3 else "",
+                "author_date": parts[4] if len(parts) > 4 else "",
+                "subject": parts[5] if len(parts) > 5 else "",
+                "ref": parts[6] if (len(parts) > 6 and parts[6]) else "HEAD",
             }
         except subprocess.CalledProcessError:
             return {
@@ -284,9 +304,11 @@ class GRCBundleManager:
             }
 
     def _apply_read_only(self, path: Path) -> None:
-        """Makes source files read-only while keeping directories traversable."""
+        """Makes source files read-only while keeping directories traversable and preserving .github/."""
         for root, dirs, files in os.walk(path):
-            if ".git" in root:
+            # Prune .git directory only (not .github or .gitlab)
+            dirs[:] = [d for d in dirs if d != ".git"]
+            if ".git" in Path(root).parts:
                 continue
             for f in files:
                 f_path = Path(root) / f
@@ -303,7 +325,7 @@ class GRCBundleManager:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="grc bundle",
-        description="GRCx Bundle Lifecycle Manager (Pull, Verify, Restore, and Clean)",
+        description="GRC-xMINI Bundle Lifecycle Manager (Pull, Verify, Restore, and Clean)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:
@@ -335,7 +357,7 @@ Examples:
         "-w",
         type=Path,
         default=None,
-        help="Destination directory for workspace restoration (defaults to ./ephemeral_workspace)",
+        help="Destination directory for workspace restoration (defaults to <bundle_dir>/ephemeral_workspace)",
     )
     restore_parser.add_argument(
         "--ref",
@@ -433,12 +455,11 @@ def main() -> None:
                 print(json.dumps(result, indent=2))
 
         elif args.action == "clean":
-            dummy_bundle = args.delete_bundle if args.delete_bundle else Path("/tmp/dummy")
-            manager = GRCBundleManager(
-                bundle_path=dummy_bundle if dummy_bundle.exists() else Path(__file__),
+            clean_ephemeral_workspace(
                 workspace_root=args.workspace,
+                bundle_path=args.delete_bundle,
+                remove_bundle=bool(args.delete_bundle),
             )
-            manager.clean_workspace(remove_bundle=bool(args.delete_bundle))
 
     except Exception as e:
         print(f"[FATAL] Operation failed: {e}", file=sys.stderr)

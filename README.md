@@ -30,7 +30,7 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.0 (Yokota Series)
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.1 (Yokota Series)
  {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
@@ -51,7 +51,7 @@
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.4.0 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.4.1 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Test Corpus**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)  
@@ -293,7 +293,7 @@ In high-assurance compliance automation, a scanner that outputs zero findings is
 
 | Active Milestone | Series Codename | Status | Summary of Active Capabilities | Full Roadmap & Release Docs |
 | :--- | :--- | :--- | :--- | :--- |
-| **`v1.4.0 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Documentation Hygiene, Rebranding & Navigation Fork**: Renamed guides to `transform_scans-guide.md`, `grc_bundle-guide.md`, and `grc-xtest-guide.md`; rebranded test harness to `GRC-xTEST` supporting both bundle and scan fixtures; added dual-platform (macOS / Windows) desktop navigation instructions; updated patch ledgers to reverse-chronological order. | See **[`hygiene/`](hygiene/)** |
+| **`v1.4.1 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Yokota Code Review Phase 1 (P0/P1 Security & Data-Integrity Patch)**: Resolved all 6 P0 and 4 P1 Top-10 audit findings across all 7 engines; extracted shared `grc_common.py` and `grc_fixtures.py` modules; upgraded `grc_test.py` and `testing/test_code_review_regressions.py` to 29 content-invariant unit & regression tests. | See **[`hygiene/`](hygiene/)** |
 
 > 🗺️ **Looking Ahead to Future Milestones?**  
 > Planned releases—including the upcoming **`v1.3.5 — Sasebo`** (Universal Workstation Portability & `./grc doctor`) and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:
