@@ -638,18 +638,34 @@ def load_scan_records(scan_path: str) -> List[Dict[str, str]]:
 
 
 def detect_scanner_type(records: List[Dict[str, str]], explicit_scanner: Optional[str] = None) -> str:
-    """Detect whether the input scan is 'tenable' or 'inspector'."""
-    if explicit_scanner and explicit_scanner.lower() in ("tenable", "inspector", "aws", "nessus"):
-        return "tenable" if explicit_scanner.lower() in ("tenable", "nessus") else "inspector"
+    """Detect whether the input scan is 'tenable', 'inspector', 'qualys', or 'wiz'."""
+    if explicit_scanner and explicit_scanner.lower() in ("tenable", "inspector", "aws", "nessus", "qualys", "wiz"):
+        exp = explicit_scanner.lower()
+        if exp in ("tenable", "nessus"):
+            return "tenable"
+        elif exp in ("inspector", "aws"):
+            return "inspector"
+        elif exp == "qualys":
+            return "qualys"
+        elif exp == "wiz":
+            return "wiz"
     if not records:
         return "tenable"
     headers_lower = {k.lower() for k in records[0].keys()}
     tenable_markers = {"plugin id", "plugin", "plugin name", "synopsis", "plugin output", "see also"}
     inspector_markers = {"finding arn", "arn", "vulnerability id", "resource id", "fix available", "inspector score", "package manager"}
-    t_hits = len(headers_lower & tenable_markers)
-    i_hits = len(headers_lower & inspector_markers)
-    if i_hits > t_hits:
-        return "inspector"
+    qualys_markers = {"qid", "vuln status", "threat", "impact", "times detected"}
+    wiz_markers = {"wiz", "wiz id", "project name", "asset type", "asset name", "vulnerability name", "fixed version"}
+
+    scores = {
+        "tenable": len(headers_lower & tenable_markers),
+        "inspector": len(headers_lower & inspector_markers),
+        "qualys": len(headers_lower & qualys_markers),
+        "wiz": len(headers_lower & wiz_markers),
+    }
+    best_scanner = max(scores, key=lambda k: scores[k])
+    if scores[best_scanner] > 0:
+        return best_scanner
     return "tenable"
 
 
@@ -826,11 +842,15 @@ def extract_row_asset_aliases(row: Dict[str, str]) -> List[str]:
     candidate_cols = [
         "Host",
         "IP Address",
+        "IP",
         "DNS Name",
+        "DNS",
         "FQDN",
         "Asset",
         "NetBIOS Name",
         "Resource ID",
+        "Resource Name",
+        "Asset Name",
         "Instance ID",
         "Asset Identifier",
         "Asset ID",
@@ -1106,9 +1126,166 @@ class InspectorAdapter:
         }
 
 
+class QualysAdapter:
+    """Adapter that normalizes a raw Qualys VMDR row into intermediate fields."""
+
+    @staticmethod
+    def parse_row(
+        row: Dict[str, str],
+        row_lc: Dict[str, str],
+        today: datetime.date,
+        kev_db: Dict[str, Dict[str, str]],
+        strict_fedramp_risk: bool,
+    ) -> Optional[Dict[str, Any]]:
+        raw_risk = get_first_field(row, ["Severity", "Risk", "Severity Level"], lower_map=row_lc)
+        risk = normalize_risk(raw_risk)
+        if not risk:
+            if raw_risk == "5":
+                risk = "Critical"
+            elif raw_risk == "4":
+                risk = "High"
+            elif raw_risk == "3":
+                risk = "Moderate"
+            elif raw_risk in ("2", "1"):
+                risk = "Low"
+            else:
+                return None
+        if strict_fedramp_risk and risk == "Critical":
+            risk = "High"
+
+        qid = get_first_field(row, ["QID", "Plugin ID", "Vuln ID"], lower_map=row_lc)
+        if qid.endswith(".0"):
+            qid = qid[:-2]
+        title = get_first_field(row, ["Title", "Name", "Vulnerability Title"], default=f"Qualys QID {qid}", lower_map=row_lc)
+        threat = get_first_field(row, ["Threat", "Description", "Synopsis"], lower_map=row_lc)
+        impact = get_first_field(row, ["Impact"], lower_map=row_lc)
+        results = get_first_field(row, ["Results", "Output", "Evidence"], lower_map=row_lc)
+        full_desc = threat or title
+        if impact and impact not in full_desc:
+            full_desc = f"{full_desc}\n\nImpact: {impact}"
+        if results:
+            snippet = results[:400] + ("..." if len(results) > 400 else "")
+            full_desc = f"{full_desc}\n\n[Scanner Evidence]: {snippet}"
+
+        raw_host = get_first_field(row, ["IP", "IP Address", "Host", "DNS", "DNS Name", "NetBIOS"], lower_map=row_lc)
+        port = get_first_field(row, ["Port"], lower_map=row_lc)
+        proto = get_first_field(row, ["Protocol"], lower_map=row_lc)
+        host = raw_host or "unknown-host"
+        solution = get_first_field(row, ["Solution", "Remediation", "Recommendation"], lower_map=row_lc)
+        see_also = get_first_field(row, ["Vendor Reference", "See Also", "URL", "References"], lower_map=row_lc)
+        raw_cve = get_first_field(row, ["CVE ID", "CVE", "CVEs"], lower_map=row_lc)
+        cves = extract_cves(raw_cve, f"{title} {threat}")
+
+        first_seen_str = get_first_field(row, ["First Detected", "First Discovered", "First Seen", "Original Detection Date"], lower_map=row_lc)
+        last_seen_str = get_first_field(row, ["Last Detected", "Last Observed", "Last Seen", "Status Date"], lower_map=row_lc)
+        det_date = parse_any_date(first_seen_str) or parse_any_date(last_seen_str, fallback=today) or today
+        stat_date = parse_any_date(last_seen_str, fallback=today) or today
+
+        is_kev, kev_due_str = resolve_bod_22_01_status(row, cves, det_date, kev_db)
+
+        source_id = qid or cves.split(",")[0].strip() or title
+        if not raw_host and (port and port != "0" and proto):
+            asset_base = f"unknown-host:{port}/{proto.lower()}"
+        else:
+            asset_base = extract_base_asset(host) or host.strip().lower()
+        asset_display = f"{host} ({port}/{proto.upper()})" if (port and port != "0" and proto) else host
+
+        return {
+            "risk": risk,
+            "source_id": source_id,
+            "name": title,
+            "full_desc": full_desc,
+            "asset_base": asset_base,
+            "asset_display": asset_display,
+            "detector_source": "Qualys VMDR",
+            "solution": solution,
+            "see_also": see_also,
+            "cves": cves,
+            "det_date": det_date,
+            "stat_date": stat_date,
+            "is_kev": is_kev,
+            "kev_due_str": kev_due_str,
+            "vendor_dep": "No",
+            "vendor_prod": "",
+        }
+
+
+class WizAdapter:
+    """Adapter that normalizes a raw Wiz vulnerability row into intermediate fields."""
+
+    @staticmethod
+    def parse_row(
+        row: Dict[str, str],
+        row_lc: Dict[str, str],
+        today: datetime.date,
+        kev_db: Dict[str, Dict[str, str]],
+        strict_fedramp_risk: bool,
+    ) -> Optional[Dict[str, Any]]:
+        raw_risk = get_first_field(row, ["Severity", "Risk", "Vulnerability Severity"], lower_map=row_lc)
+        risk = normalize_risk(raw_risk)
+        if not risk:
+            return None
+        if strict_fedramp_risk and risk == "Critical":
+            risk = "High"
+
+        vuln_id = get_first_field(row, ["Vulnerability ID", "Vuln ID", "Finding ID", "CVE"], lower_map=row_lc)
+        title = get_first_field(row, ["Name", "Vulnerability Name", "Title"], default=vuln_id or "Wiz Vulnerability Finding", lower_map=row_lc)
+        desc = get_first_field(row, ["Description", "Summary"], default=title, lower_map=row_lc)
+        pkg = get_first_field(row, ["Package Name", "Package", "Vulnerable Package"], lower_map=row_lc)
+        file_path = get_first_field(row, ["File Path", "Package Path"], lower_map=row_lc)
+        full_desc = desc
+        if pkg:
+            full_desc += f"\n\nAffected Package(s): {pkg}"
+        if file_path:
+            full_desc += f" ({file_path})"
+
+        resource_id = get_first_field(row, ["Asset Name", "Resource Name", "Resource ID", "Asset ID"], lower_map=row_lc) or "wiz-asset"
+        resource_type = get_first_field(row, ["Asset Type", "Resource Type"], lower_map=row_lc)
+        asset_base = extract_base_asset(resource_id) or resource_id.strip().lower()
+        asset_display = f"{resource_id} ({resource_type})" if resource_type and resource_type not in resource_id else resource_id
+
+        solution = get_first_field(row, ["Remediation", "Recommendation", "Fixed Version", "Solution"], lower_map=row_lc)
+        fix_avail = get_first_field(row, ["Fix Available", "FixAvailable", "Has Fix"], lower_map=row_lc)
+        see_also = get_first_field(row, ["Reference URLs", "Vendor Advisory", "See Also", "URL"], lower_map=row_lc)
+        raw_cve = get_first_field(row, ["CVE", "CVEs", "Vulnerability ID"], lower_map=row_lc)
+        cves = extract_cves(raw_cve, f"{title} {desc}")
+
+        first_seen_str = get_first_field(row, ["First Detected", "First Observed At", "First Seen", "Created At"], lower_map=row_lc)
+        last_seen_str = get_first_field(row, ["Last Detected", "Last Observed At", "Last Seen", "Status Date"], lower_map=row_lc)
+        det_date = parse_any_date(first_seen_str, fallback=today) or today
+        stat_date = parse_any_date(last_seen_str, fallback=today) or today
+
+        is_kev, kev_due_str = resolve_bod_22_01_status(row, cves, det_date, kev_db)
+        source_id = vuln_id or cves.split(",")[0].strip() or title
+
+        vendor_dep = "Yes" if fix_avail.lower() in ("no", "false") else "No"
+        vendor_prod = get_first_field(row, ["Vendor", "Vendor Product Name"], lower_map=row_lc) if vendor_dep == "Yes" else ""
+
+        return {
+            "risk": risk,
+            "source_id": source_id,
+            "name": title,
+            "full_desc": full_desc,
+            "asset_base": asset_base,
+            "asset_display": asset_display,
+            "detector_source": "Wiz",
+            "solution": solution,
+            "see_also": see_also,
+            "cves": cves,
+            "det_date": det_date,
+            "stat_date": stat_date,
+            "is_kev": is_kev,
+            "kev_due_str": kev_due_str,
+            "vendor_dep": vendor_dep,
+            "vendor_prod": vendor_prod,
+        }
+
+
 SCANNER_ADAPTERS = {
     "tenable": TenableAdapter,
     "inspector": InspectorAdapter,
+    "qualys": QualysAdapter,
+    "wiz": WizAdapter,
 }
 
 
@@ -1720,6 +1897,8 @@ def build_remediation_plan_with_urls(entry: Dict[str, object]) -> str:
     detector = str(entry.get("detector_source", "")).lower()
     scanner_type = str(entry.get("_scanner_type", "")).lower()
     is_tenable = "tenable" in detector or "nessus" in detector or scanner_type == "tenable"
+    is_qualys = "qualys" in detector or scanner_type == "qualys"
+    is_wiz = "wiz" in detector or scanner_type == "wiz"
 
     source_id = str(entry.get("source_identifier", "")).strip()
     cve_str = str(entry.get("cve", "")).strip()
@@ -1753,6 +1932,50 @@ def build_remediation_plan_with_urls(entry: Dict[str, object]) -> str:
         return (
             f"Remediation Action: {base_action}\n\n"
             f"Official Tenable & Vendor Remediation References:\n{url_block}"
+        )
+    elif is_qualys:
+        # Official Qualys VMDR Remediation URLs
+        for u in extract_urls(see_also):
+            if u not in urls:
+                urls.append(u)
+        for c in cves[:2]:
+            nvd_url = f"https://nvd.nist.gov/vuln/detail/{c}"
+            if nvd_url not in urls:
+                urls.append(nvd_url)
+        if not urls:
+            urls.append("https://blog.qualys.com/vulnerabilities-threat-research")
+
+        base_action = (
+            raw_solution
+            if raw_solution
+            else f"Apply the vendor-supplied security update or configuration hardening to remediate '{weakness_name}' and verify closure via follow-on Qualys VMDR scan."
+        )
+        url_block = "\n".join(f"• {u}" for u in urls)
+        return (
+            f"Remediation Action: {base_action}\n\n"
+            f"Official Qualys & Vendor Remediation References:\n{url_block}"
+        )
+    elif is_wiz:
+        # Official Wiz Cloud Security Remediation URLs
+        for u in extract_urls(see_also):
+            if u not in urls:
+                urls.append(u)
+        for c in cves[:2]:
+            nvd_url = f"https://nvd.nist.gov/vuln/detail/{c}"
+            if nvd_url not in urls:
+                urls.append(nvd_url)
+        if not urls:
+            urls.append("https://www.wiz.io/vulnerability-database")
+
+        base_action = (
+            raw_solution
+            if raw_solution
+            else f"Remediate the vulnerable package/workload configuration for '{weakness_name}', rebuild the affected container or AMI image, and verify closure in Wiz."
+        )
+        url_block = "\n".join(f"• {u}" for u in urls)
+        return (
+            f"Remediation Action: {base_action}\n\n"
+            f"Official Wiz Cloud & Vendor Remediation References:\n{url_block}"
         )
     else:
         # Official AWS Inspector & ALAS / CVE Remediation URLs
@@ -2848,7 +3071,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--scanner",
-        choices=["auto", "tenable", "inspector"],
+        choices=["auto", "tenable", "inspector", "qualys", "wiz"],
         default="auto",
         help="Scanner source type (default: auto-detect from column headers).",
     )
