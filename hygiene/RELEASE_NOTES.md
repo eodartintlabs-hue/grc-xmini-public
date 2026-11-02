@@ -19,7 +19,7 @@
 
 > **Project**: GRCx — The GRC eXperience  
 > **Current release**: `v1.4.3 — Yokota` (Restricted Beta / Integration Testing)  
-> **Maintainer**: Byron Turner ([`@eodartintlabs-hue`](https://github.com/eodartintlabs-hue))  
+> **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
 ---
