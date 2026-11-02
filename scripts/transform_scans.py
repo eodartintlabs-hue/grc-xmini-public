@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.4.2 — Yokota) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.4.3 — Yokota) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -160,7 +160,7 @@ def _norm_header(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", str(text).lower())
 
 
-def detect_poam_id_col(rows: List[Dict[str, str]], max_header_row: int = 10) -> Optional[int]:
+def detect_poam_id_col(rows: List[Dict[str, str]], max_header_row: int = 15) -> Optional[int]:
     """
     Find the 0-based column index of the 'POAM ID' / 'POA&M ID' header within the first
     `max_header_row` rows of a worksheet (rows as returned by read_xlsx_rows).
@@ -175,6 +175,57 @@ def detect_poam_id_col(rows: List[Dict[str, str]], max_header_row: int = 10) -> 
             if _norm_header(val) in ("poamid", "poamitemid"):
                 return col_to_idx(key)
     return None
+
+
+def detect_poam_header_and_start_row(
+    rows: List[Dict[str, str]],
+    is_closed_template: bool = False,
+    max_header_row: int = 15,
+) -> Tuple[int, int]:
+    """
+    Dynamically detect (header_row_num, start_data_row_num) from worksheet rows.
+    Supports:
+      - 4-row-header Open POA&M templates (POAM ID on Row 1 -> data on Row 5)
+      - Official 5-worksheet FedRAMP v3.x POA&M templates (CSP metadata on Rows 1-4,
+        POAM ID on Row 5, Guidance/Examples/Mandatory on Rows 6-8 -> data on Row 9)
+      - Closed POA&M templates (POAM ID on Row 2 -> data on Row 3)
+    """
+    header_row_num: Optional[int] = None
+    poam_col_let: str = "A" if is_closed_template else "B"
+
+    for r in rows:
+        r_num = int(r.get("_row_num", "0") or 0)
+        if r_num == 0 or r_num > max_header_row:
+            continue
+        for key, val in r.items():
+            if key.startswith("_"):
+                continue
+            if _norm_header(val) in ("poamid", "poamitemid"):
+                header_row_num = r_num
+                poam_col_let = key
+                break
+        if header_row_num is not None:
+            break
+
+    if header_row_num is None:
+        header_row_num = 2 if is_closed_template else 1
+
+    start_data_row = (header_row_num + 1) if is_closed_template else (header_row_num + 4)
+
+    for r in rows:
+        r_num = int(r.get("_row_num", "0") or 0)
+        if header_row_num < r_num <= header_row_num + 5:
+            col_a_norm = _norm_header(r.get("A", ""))
+            poam_val = str(r.get(poam_col_let, "")).strip()
+            poam_norm = _norm_header(poam_val)
+            if (
+                col_a_norm in ("guidance", "example", "examples", "mandatoryorsituational")
+                or poam_norm in ("guidance", "example", "examples", "mandatory", "situational", "mandatoryorsituational")
+                or poam_val.startswith(("Assign a unique identifier", "VS-001-AC(2)"))
+            ):
+                start_data_row = max(start_data_row, r_num + 1)
+
+    return header_row_num, start_data_row
 
 
 def resolve_col_letters(rows: List[Dict[str, str]], is_closed_template: bool, label: str = "") -> List[str]:
@@ -282,42 +333,72 @@ def serialize_xml_preserving_root_ns(root_el: ET.Element, original_xml_bytes: by
     return xml_out
 
 
-def resolve_sheet_path(z: zipfile.ZipFile, sheet_index: int = 0) -> str:
+def get_workbook_sheets(z: zipfile.ZipFile) -> List[Tuple[str, str]]:
     """
-    Resolve the archive path of worksheet `sheet_index` via xl/workbook.xml and
-    xl/_rels/workbook.xml.rels, handling both relative ('worksheets/sheet1.xml')
-    and root-relative ('/xl/worksheets/sheet1.xml') relationship targets.
+    Return an ordered list of (sheet_name, archive_target_path) for all worksheets
+    declared in xl/workbook.xml and xl/_rels/workbook.xml.rels.
+    Handles standard and Strict OpenXML namespaces as well as relative or root-relative targets.
     """
-    ns = {"main": MAIN_NS, "r": REL_NS}
     names = set(z.namelist())
+    out: List[Tuple[str, str]] = []
     if "xl/workbook.xml" in names and "xl/_rels/workbook.xml.rels" in names:
         try:
             wb_root = ET.fromstring(z.read("xl/workbook.xml"))
             rels_root = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
             rel_map = {
                 rel.attrib["Id"]: rel.attrib["Target"]
-                for rel in rels_root
-                if "Id" in rel.attrib and "Target" in rel.attrib
+                for rel in rels_root.iter()
+                if rel.tag.endswith("Relationship") and "Id" in rel.attrib and "Target" in rel.attrib
             }
-            sheets = wb_root.findall(".//main:sheet", ns)
-            if sheets:
-                chosen_sheet = sheets[min(sheet_index, len(sheets) - 1)]
-                rid = chosen_sheet.attrib.get(f"{{{REL_NS}}}id", "")
+            sheet_elems = [el for el in wb_root.iter() if el.tag.endswith("sheet")]
+            for idx, sh in enumerate(sheet_elems):
+                s_name = sh.attrib.get("name", f"Sheet{idx + 1}")
+                rid = ""
+                for attr_k, attr_v in sh.attrib.items():
+                    if attr_k.endswith("}id") or attr_k in ("r:id", "id"):
+                        rid = attr_v
+                        break
                 raw_target = rel_map.get(rid, "")
                 if raw_target:
                     clean_target = raw_target.lstrip("/")
                     if not clean_target.startswith("xl/"):
                         clean_target = "xl/" + clean_target
                     if clean_target in names:
-                        return clean_target
+                        out.append((s_name, clean_target))
         except ET.ParseError:
             pass
 
+    if out:
+        return out
+
     if "xl/worksheets/sheet1.xml" in names:
-        return "xl/worksheets/sheet1.xml"
+        return [("Sheet1", "xl/worksheets/sheet1.xml")]
     for name in sorted(names):
         if name.startswith("xl/worksheets/sheet") and name.endswith(".xml"):
-            return name
+            out.append((os.path.splitext(os.path.basename(name))[0], name))
+    return out or [("Sheet1", "xl/worksheets/sheet1.xml")]
+
+
+def get_workbook_sheet_names(xlsx_path: str) -> List[str]:
+    """Return the ordered list of worksheet tab names in an .xlsx file."""
+    if not xlsx_path or not os.path.isfile(xlsx_path):
+        return []
+    try:
+        with zipfile.ZipFile(xlsx_path, "r") as z:
+            return [name for name, _ in get_workbook_sheets(z)]
+    except (zipfile.BadZipFile, OSError):
+        return []
+
+
+def resolve_sheet_path(z: zipfile.ZipFile, sheet_index: int = 0) -> str:
+    """
+    Resolve the archive path of worksheet `sheet_index` (default: 0, strictly the first
+    worksheet in the workbook) via xl/workbook.xml and xl/_rels/workbook.xml.rels.
+    """
+    sheets = get_workbook_sheets(z)
+    if sheets:
+        clamped_idx = min(max(0, sheet_index), len(sheets) - 1)
+        return sheets[clamped_idx][1]
     return "xl/worksheets/sheet1.xml"
 
 
@@ -1157,21 +1238,50 @@ def merge_scan_entries(entry_lists: List[List[Dict[str, object]]]) -> List[Dict[
 # Reading Previous OPEN & CLOSED FedRAMP POA&M Workbooks
 # ---------------------------------------------------------------------------
 
-def load_existing_poam_workbook(xlsx_path: str, is_closed_template: bool = False) -> List[Dict[str, object]]:
+def load_existing_poam_workbook(
+    xlsx_path: str,
+    is_closed_template: bool = False,
+    sheet_index: Optional[int] = None,
+) -> List[Dict[str, object]]:
     """
     Parse an existing OPEN or CLOSED FedRAMP POA&M .xlsx file and return its populated rows.
+    By default (`sheet_index=0` for uploaded workbooks), strictly reads ONLY the first worksheet
+    (`sheet_index=0`) and ignores all remaining worksheets (e.g. Tabs 2-5 of the 5-sheet FedRAMP template).
     """
     if not xlsx_path or not os.path.isfile(xlsx_path):
         return []
 
-    rows = read_xlsx_rows(xlsx_path, sheet_index=0)
+    sheet_names = get_workbook_sheet_names(xlsx_path)
+    if sheet_index is not None:
+        target_sheet_idx = sheet_index
+    elif (
+        is_closed_template
+        and len(sheet_names) == 2
+        and "open" in sheet_names[0].lower()
+        and "closed" in sheet_names[1].lower()
+    ):
+        target_sheet_idx = 1
+    else:
+        target_sheet_idx = 0
+        if len(sheet_names) > 1:
+            print(
+                f"[*] Multi-worksheet workbook '{os.path.basename(xlsx_path)}' has {len(sheet_names)} worksheets; "
+                f"reading only Worksheet #1 ('{sheet_names[0]}') and ignoring remaining {len(sheet_names) - 1} worksheet(s)."
+            )
+
+    rows = read_xlsx_rows(xlsx_path, sheet_index=target_sheet_idx)
     col_letters = resolve_col_letters(rows, is_closed_template, label=os.path.basename(xlsx_path))
-    min_data_row = 3 if is_closed_template else 5
+    _, min_data_row = detect_poam_header_and_start_row(rows, is_closed_template=is_closed_template)
 
     entries: List[Dict[str, object]] = []
     for r in rows:
         r_num = int(r.get("_row_num", "0"))
         if r_num < min_data_row:
+            continue
+
+        # Never treat template Guidance / Examples / Mandatory instruction rows as POA&M data
+        col_a_norm = _norm_header(r.get("A", ""))
+        if col_a_norm in ("guidance", "example", "examples", "mandatoryorsituational"):
             continue
 
         entry: Dict[str, object] = {}
@@ -1181,8 +1291,13 @@ def load_existing_poam_workbook(xlsx_path: str, is_closed_template: bool = False
                 val = val[:-2]
             entry[field_name] = val
 
-        # Never treat a repeated header row as data
-        if _norm_header(str(entry.get("poam_id", ""))) == "poamid":
+        # Never treat a repeated header row or template instruction row as data
+        poam_id_str = str(entry.get("poam_id", "")).strip()
+        poam_id_norm = _norm_header(poam_id_str)
+        if (
+            poam_id_norm in ("poamid", "poamitemid", "mandatory", "situational", "guidance", "examples", "cloudserviceprovider")
+            or poam_id_str.startswith(("Assign a unique identifier", "VS-001-AC(2)"))
+        ):
             continue
 
         # Check if this row is actually populated with a POA&M entry
@@ -1680,11 +1795,12 @@ def discover_template_styles(
     start_row: int,
     is_closed_template: bool,
     field_cols: Optional[Dict[str, str]] = None,
+    header_row: Optional[int] = None,
 ) -> Dict[str, str]:
     """
-    Inspect the template's existing data row (`start_row`) and `xl/styles.xml` before
-    rebuilding rows so style indices (`default`, `date`, `sla`, and `row_ht`) are
-    discovered dynamically from the template rather than blindly hard-coded.
+    Inspect the template's existing header row (`header_row`), data row (`start_row`),
+    and `xl/styles.xml` before rebuilding rows so style indices (`header`, `default`,
+    `date`, `sla`, and `row_ht`) are discovered dynamically from the template.
     """
     ns = {"main": MAIN_NS}
     date_num_fmts = {"14", "15", "16", "17", "22", "164", "165", "166"}
@@ -1701,15 +1817,24 @@ def discover_template_styles(
         except ET.ParseError:
             pass
 
+    header_style = "3" if is_closed_template else "1"
     default_style = "2"
     date_style = "2" if is_closed_template else "21"
     sla_style = "2" if is_closed_template else "22"
     row_ht = "15.75" if is_closed_template else "18.0"
+    hdr_row_target = header_row if header_row is not None else (2 if is_closed_template else 1)
+    poam_col = (field_cols or {}).get("poam_id", "A" if is_closed_template else "B")
 
     sheet_data = s_root.find("main:sheetData", ns)
     if sheet_data is not None:
         for r_el in sheet_data.findall("main:row", ns):
             r_num = int(r_el.attrib.get("r", "0"))
+            if r_num == hdr_row_target:
+                for c_el in r_el.findall("main:c", ns):
+                    col_let, _ = split_cell_ref(c_el.attrib.get("r", ""))
+                    if col_let == poam_col and "s" in c_el.attrib:
+                        header_style = c_el.attrib["s"]
+                        break
             if r_num == start_row:
                 if r_el.attrib.get("ht"):
                     row_ht = r_el.attrib["ht"]
@@ -1728,8 +1853,7 @@ def discover_template_styles(
                     if m_style and style_is_date.get(m_style, True):
                         sla_style = m_style
                 else:
-                    # In CLOSED template, Row 3 is an example row (s="4") and Row 4+ uses s="2"
-                    default_style = cell_styles.get((field_cols or {}).get("poam_id", "A"), default_style)
+                    default_style = cell_styles.get(poam_col, default_style)
                 break
 
         if is_closed_template:
@@ -1738,7 +1862,7 @@ def discover_template_styles(
                 if int(r_el.attrib.get("r", "0")) == start_row + 1:
                     for c_el in r_el.findall("main:c", ns):
                         col_let, _ = split_cell_ref(c_el.attrib.get("r", ""))
-                        if col_let == (field_cols or {}).get("poam_id", "A") and "s" in c_el.attrib:
+                        if col_let == poam_col and "s" in c_el.attrib:
                             default_style = c_el.attrib["s"]
                             date_style = default_style
                             sla_style = default_style
@@ -1746,12 +1870,156 @@ def discover_template_styles(
                     break
 
     return {
+        "header": header_style,
         "default": default_style,
         "date": date_style,
         "sla": sla_style,
         "row_ht": row_ht,
         "date_is_numeric": "1" if (not is_closed_template and style_is_date.get(date_style, True)) else "0",
     }
+
+
+def _populate_worksheet_element(
+    s_root: ET.Element,
+    entries: List[Dict[str, object]],
+    start_row: int,
+    col_letters: List[str],
+    tpl_styles: Dict[str, str],
+    is_closed_template: bool,
+    strict_fedramp_risk: bool,
+    get_or_add_shared_string,
+) -> None:
+    """
+    Populate a worksheet XML root element (`s_root`) starting at `start_row` while
+    preserving all header rows `< start_row`, formulas, dimensions, and data validations.
+    """
+    ns = {"main": MAIN_NS, "r": REL_NS}
+    first_col_idx = col_to_idx(col_letters[0])
+    L = dict(zip(POAM_FIELDS, col_letters))
+
+    sheet_data = s_root.find("main:sheetData", ns)
+    if sheet_data is None:
+        return
+
+    default_style = tpl_styles["default"]
+    date_style = tpl_styles["date"]
+    sla_style = tpl_styles["sla"]
+    row_ht = tpl_styles["row_ht"]
+    store_numeric_dates = tpl_styles["date_is_numeric"] == "1"
+
+    # Keep header rows (< start_row) intact, remove existing blank/template rows >= start_row
+    existing_rows = list(sheet_data.findall("main:row", ns))
+    for r_el in existing_rows:
+        r_num = int(r_el.attrib.get("r", "0"))
+        if r_num >= start_row:
+            sheet_data.remove(r_el)
+
+    # Build populated rows + a buffer of clean blank formatted rows
+    total_rows_to_write = max(len(entries) + 25, 100)
+    last_written_row = start_row + total_rows_to_write - 1
+
+    for offset in range(total_rows_to_write):
+        r_num = start_row + offset
+        row_attribs = {"r": str(r_num), "ht": row_ht, "customHeight": "1"}
+        r_el = ET.SubElement(sheet_data, f"{{{MAIN_NS}}}row", row_attribs)
+
+        entry = entries[offset] if offset < len(entries) else None
+
+        # Any margin columns left of the POAM ID column (none when the ID is in column A)
+        for pad_idx in range(first_col_idx):
+            ET.SubElement(r_el, f"{{{MAIN_NS}}}c", {"r": f"{idx_to_col(pad_idx)}{r_num}", "s": default_style})
+
+        for field_name, col_let in zip(POAM_FIELDS, col_letters):
+            cell_ref = f"{col_let}{r_num}"
+
+            if is_closed_template:
+                c_style = default_style
+            else:
+                if field_name == "scheduled_completion_date":
+                    c_style = sla_style
+                elif field_name in DATE_FIELDS:
+                    c_style = date_style
+                else:
+                    c_style = default_style
+
+            c_el = ET.SubElement(r_el, f"{{{MAIN_NS}}}c", {"r": cell_ref, "s": c_style})
+
+            if not is_closed_template and field_name == "scheduled_completion_date":
+                f_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}f")
+                det_c = f"{L['original_detection_date']}{r_num}"
+                orr_c = f"{L['original_risk_rating']}{r_num}"
+                adj_c = f"{L['adjusted_risk_rating']}{r_num}"
+                flg_c = f"{L['risk_adjustment']}{r_num}"
+                if strict_fedramp_risk:
+                    f_el.text = (
+                        f'IF(OR({adj_c}="N/A",ISBLANK({adj_c}),{flg_c}<>"Yes"),'
+                        f'IF({orr_c}="High",{det_c}+30,'
+                        f'IF({orr_c}="Moderate",{det_c}+90,IF({orr_c}="Low",{det_c}+180,""))),'
+                        f'IF({adj_c}="High",{det_c}+30,'
+                        f'IF({adj_c}="Moderate",{det_c}+90,IF({adj_c}="Low",{det_c}+180,""))))'
+                    )
+                else:
+                    f_el.text = (
+                        f'IF(OR({adj_c}="N/A",ISBLANK({adj_c}),{flg_c}<>"Yes"),'
+                        f'IF(OR({orr_c}="Critical",{orr_c}="High"),{det_c}+30,'
+                        f'IF({orr_c}="Moderate",{det_c}+90,IF({orr_c}="Low",{det_c}+180,""))),'
+                        f'IF(OR({adj_c}="Critical",{adj_c}="High"),{det_c}+30,'
+                        f'IF({adj_c}="Moderate",{det_c}+90,IF({adj_c}="Low",{det_c}+180,""))))'
+                    )
+                if entry is not None:
+                    d_obj = parse_any_date(str(entry.get(field_name, "")))
+                    if d_obj:
+                        v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
+                        v_el.text = str(date_to_excel_serial(d_obj))
+                continue
+
+            if entry is None:
+                continue
+
+            raw_val = str(entry.get(field_name, "")).strip()
+            if not raw_val:
+                continue
+
+            if field_name in DATE_FIELDS:
+                d_obj = parse_any_date(raw_val)
+                if d_obj and store_numeric_dates:
+                    v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
+                    v_el.text = str(date_to_excel_serial(d_obj))
+                else:
+                    str_val = format_date_iso(d_obj) if d_obj else raw_val
+                    c_el.set("t", "s")
+                    v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
+                    v_el.text = str(get_or_add_shared_string(str_val))
+            elif field_name == "source_identifier" and re.match(r"^\d+$", raw_val):
+                v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
+                v_el.text = raw_val
+            else:
+                c_el.set("t", "s")
+                v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
+                v_el.text = str(get_or_add_shared_string(raw_val))
+
+    # Update <dimension ref="..."/> if present on worksheet
+    dim_el = s_root.find("main:dimension", ns)
+    if dim_el is not None:
+        dim_el.set("ref", f"A1:{col_letters[-1]}{last_written_row}")
+
+    # In OPEN template, unless --strict-fedramp-risk is enabled, allow 'Critical' in Risk Rating dropdowns
+    if not is_closed_template and not strict_fedramp_risk:
+        dvs = s_root.find("main:dataValidations", ns)
+        if dvs is not None:
+            orr_start = f"{L['original_risk_rating']}{start_row}"
+            adj_start = f"{L['adjusted_risk_rating']}{start_row}"
+            for dv in dvs.findall("main:dataValidation", ns):
+                sqref = dv.attrib.get("sqref", "")
+                sqref_starts = {tok.split(":")[0].upper() for tok in sqref.split() if tok}
+                f1 = dv.find("main:formula1", ns)
+                if f1 is not None and f1.text:
+                    if orr_start.upper() in sqref_starts:
+                        dv.set("prompt", "Low, Moderate, High, Critical")
+                        f1.text = '"Low,Moderate,High,Critical"'
+                    elif adj_start.upper() in sqref_starts:
+                        dv.set("prompt", "Low, Moderate, High, Critical, N/A")
+                        f1.text = '"Low,Moderate,High,Critical,N/A"'
 
 
 def write_poam_workbook(
@@ -1762,26 +2030,21 @@ def write_poam_workbook(
     strict_fedramp_risk: bool = False,
 ) -> None:
     """
-    Populate either the OPEN FedRAMP POA&M template (Row 5+, Cols B..AB) or the
-    CLOSED LEGACY FedRAMP POA&M template (Row 3+, Cols A..AA) while preserving
-    all native XML namespaces, formatting, styles, drawings, and data validations.
+    Populate either the OPEN FedRAMP POA&M template or the CLOSED LEGACY FedRAMP POA&M
+    template into a single-tab workbook while preserving all native XML namespaces,
+    formatting, styles, drawings, and data validations.
     """
     ns = {"main": MAIN_NS, "r": REL_NS}
-    start_row = 3 if is_closed_template else 5
-
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
-    # Detect where the POAM ID column sits in THIS template so output lines up with its headers
-    col_letters = resolve_col_letters(
-        read_xlsx_rows(template_path, sheet_index=0), is_closed_template, label=os.path.basename(template_path)
-    )
-    first_col_idx = col_to_idx(col_letters[0])
-    L = dict(zip(POAM_FIELDS, col_letters))  # field name -> column letter in this template
+    tpl_rows = read_xlsx_rows(template_path, sheet_index=0)
+    hdr_row, start_row = detect_poam_header_and_start_row(tpl_rows, is_closed_template=is_closed_template)
+    col_letters = resolve_col_letters(tpl_rows, is_closed_template, label=os.path.basename(template_path))
+    L = dict(zip(POAM_FIELDS, col_letters))
 
     with zipfile.ZipFile(template_path, "r") as zin:
         target_sheet_path = resolve_sheet_path(zin, sheet_index=0)
 
-        # Load sharedStrings.xml with full namespace preservation
         shared_strings: List[str] = []
         ss_index_map: Dict[str, int] = {}
         orig_ss_bytes = b""
@@ -1812,139 +2075,27 @@ def write_poam_workbook(
             t_el.text = s_val
             return idx
 
-        # Parse target worksheet XML with full namespace preservation
         sheet_xml_bytes = zin.read(target_sheet_path)
         register_xml_namespaces(sheet_xml_bytes)
         s_root = ET.fromstring(sheet_xml_bytes)
-        sheet_data = s_root.find("main:sheetData", ns)
 
-        # Discover cell styles and row height from template before removing rows >= start_row
-        tpl_styles = discover_template_styles(zin, s_root, start_row, is_closed_template, L)
-        default_style = tpl_styles["default"]
-        date_style = tpl_styles["date"]
-        sla_style = tpl_styles["sla"]
-        row_ht = tpl_styles["row_ht"]
-        store_numeric_dates = tpl_styles["date_is_numeric"] == "1"
+        tpl_styles = discover_template_styles(
+            zin, s_root, start_row, is_closed_template, L, header_row=hdr_row
+        )
+        _populate_worksheet_element(
+            s_root=s_root,
+            entries=entries,
+            start_row=start_row,
+            col_letters=col_letters,
+            tpl_styles=tpl_styles,
+            is_closed_template=is_closed_template,
+            strict_fedramp_risk=strict_fedramp_risk,
+            get_or_add_shared_string=get_or_add_shared_string,
+        )
 
-        # Keep header rows (< start_row) intact, remove existing blank/template rows >= start_row
-        existing_rows = list(sheet_data.findall("main:row", ns))
-        for r_el in existing_rows:
-            r_num = int(r_el.attrib.get("r", "0"))
-            if r_num >= start_row:
-                sheet_data.remove(r_el)
-
-        # Build populated rows + a buffer of clean blank formatted rows
-        total_rows_to_write = max(len(entries) + 25, 100)
-        last_written_row = start_row + total_rows_to_write - 1
-
-        for offset in range(total_rows_to_write):
-            r_num = start_row + offset
-            row_attribs = {"r": str(r_num), "ht": row_ht, "customHeight": "1"}
-            r_el = ET.SubElement(sheet_data, f"{{{MAIN_NS}}}row", row_attribs)
-
-            entry = entries[offset] if offset < len(entries) else None
-
-            # Any margin columns left of the POAM ID column (none when the ID is in column A)
-            for pad_idx in range(first_col_idx):
-                ET.SubElement(r_el, f"{{{MAIN_NS}}}c", {"r": f"{idx_to_col(pad_idx)}{r_num}", "s": default_style})
-
-            for field_name, col_let in zip(POAM_FIELDS, col_letters):
-                cell_ref = f"{col_let}{r_num}"
-
-                if is_closed_template:
-                    c_style = default_style
-                else:
-                    if field_name == "scheduled_completion_date":
-                        c_style = sla_style
-                    elif field_name in DATE_FIELDS:
-                        c_style = date_style
-                    else:
-                        c_style = default_style
-
-                c_el = ET.SubElement(r_el, f"{{{MAIN_NS}}}c", {"r": cell_ref, "s": c_style})
-
-                if not is_closed_template and field_name == "scheduled_completion_date":
-                    f_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}f")
-                    det_c = f"{L['original_detection_date']}{r_num}"
-                    orr_c = f"{L['original_risk_rating']}{r_num}"
-                    adj_c = f"{L['adjusted_risk_rating']}{r_num}"
-                    flg_c = f"{L['risk_adjustment']}{r_num}"
-                    if strict_fedramp_risk:
-                        f_el.text = (
-                            f'IF(OR({adj_c}="N/A",ISBLANK({adj_c}),{flg_c}<>"Yes"),'
-                            f'IF({orr_c}="High",{det_c}+30,'
-                            f'IF({orr_c}="Moderate",{det_c}+90,IF({orr_c}="Low",{det_c}+180,""))),'
-                            f'IF({adj_c}="High",{det_c}+30,'
-                            f'IF({adj_c}="Moderate",{det_c}+90,IF({adj_c}="Low",{det_c}+180,""))))'
-                        )
-                    else:
-                        f_el.text = (
-                            f'IF(OR({adj_c}="N/A",ISBLANK({adj_c}),{flg_c}<>"Yes"),'
-                            f'IF(OR({orr_c}="Critical",{orr_c}="High"),{det_c}+30,'
-                            f'IF({orr_c}="Moderate",{det_c}+90,IF({orr_c}="Low",{det_c}+180,""))),'
-                            f'IF(OR({adj_c}="Critical",{adj_c}="High"),{det_c}+30,'
-                            f'IF({adj_c}="Moderate",{det_c}+90,IF({adj_c}="Low",{det_c}+180,""))))'
-                        )
-                    if entry is not None:
-                        d_obj = parse_any_date(str(entry.get(field_name, "")))
-                        if d_obj:
-                            v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
-                            v_el.text = str(date_to_excel_serial(d_obj))
-                    continue
-
-                if entry is None:
-                    continue
-
-                raw_val = str(entry.get(field_name, "")).strip()
-                if not raw_val:
-                    continue
-
-                if field_name in DATE_FIELDS:
-                    d_obj = parse_any_date(raw_val)
-                    if d_obj and store_numeric_dates:
-                        v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
-                        v_el.text = str(date_to_excel_serial(d_obj))
-                    else:
-                        str_val = format_date_iso(d_obj) if d_obj else raw_val
-                        c_el.set("t", "s")
-                        v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
-                        v_el.text = str(get_or_add_shared_string(str_val))
-                elif field_name == "source_identifier" and re.match(r"^\d+$", raw_val):
-                    v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
-                    v_el.text = raw_val
-                else:
-                    c_el.set("t", "s")
-                    v_el = ET.SubElement(c_el, f"{{{MAIN_NS}}}v")
-                    v_el.text = str(get_or_add_shared_string(raw_val))
-
-        # Update <dimension ref="..."/> if present on worksheet
-        dim_el = s_root.find("main:dimension", ns)
-        if dim_el is not None:
-            dim_el.set("ref", f"A1:{col_letters[-1]}{last_written_row}")
-
-        # In OPEN template, unless --strict-fedramp-risk is enabled, allow 'Critical' in Risk Rating dropdowns
-        if not is_closed_template and not strict_fedramp_risk:
-            dvs = s_root.find("main:dataValidations", ns)
-            if dvs is not None:
-                orr_start = f"{L['original_risk_rating']}{start_row}"
-                adj_start = f"{L['adjusted_risk_rating']}{start_row}"
-                for dv in dvs.findall("main:dataValidation", ns):
-                    sqref = dv.attrib.get("sqref", "")
-                    sqref_starts = {tok.split(":")[0].upper() for tok in sqref.split() if tok}
-                    f1 = dv.find("main:formula1", ns)
-                    if f1 is not None and f1.text:
-                        if orr_start.upper() in sqref_starts:
-                            dv.set("prompt", "Low, Moderate, High, Critical")
-                            f1.text = '"Low,Moderate,High,Critical"'
-                        elif adj_start.upper() in sqref_starts:
-                            dv.set("prompt", "Low, Moderate, High, Critical, N/A")
-                            f1.text = '"Low,Moderate,High,Critical,N/A"'
-
-        # Update sharedStrings count attributes
         ss_root.set("count", str(len(shared_strings)))
         ss_root.set("uniqueCount", str(len(shared_strings)))
 
-        # Ensure fullCalcOnLoad="1" on <calcPr> in xl/workbook.xml so Excel recalculates formulas on open
         updated_wb_bytes: Optional[bytes] = None
         if "xl/workbook.xml" in zin.namelist():
             orig_wb_bytes = zin.read("xl/workbook.xml")
@@ -1956,7 +2107,6 @@ def write_poam_workbook(
             calc_pr.set("fullCalcOnLoad", "1")
             updated_wb_bytes = serialize_xml_preserving_root_ns(wb_root, orig_wb_bytes)
 
-        # Clean calcChain.xml references from xl/_rels/workbook.xml.rels and [Content_Types].xml
         updated_wb_rels_bytes: Optional[bytes] = None
         if "xl/_rels/workbook.xml.rels" in zin.namelist():
             orig_rels_bytes = zin.read("xl/_rels/workbook.xml.rels")
@@ -1986,7 +2136,6 @@ def write_poam_workbook(
         )
         wrote_shared_strings = False
 
-        # Write updated archive
         with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zout:
             for item in zin.infolist():
                 if item.filename == target_sheet_path:
@@ -2002,10 +2151,308 @@ def write_poam_workbook(
                 elif item.filename == "[Content_Types].xml" and updated_ct_bytes is not None:
                     zout.writestr(item, updated_ct_bytes)
                 elif item.filename == "xl/calcChain.xml":
-                    # Omit stale calcChain.xml so Excel recalculates cleanly on open
                     continue
                 else:
                     zout.writestr(item, zin.read(item.filename))
+
+            if not wrote_shared_strings and shared_strings:
+                zout.writestr("xl/sharedStrings.xml", ss_bytes_out)
+
+
+def write_combined_poam_workbook(
+    open_template_path: str,
+    closed_template_path: str,
+    output_path: str,
+    open_entries: List[Dict[str, object]],
+    closed_entries: List[Dict[str, object]],
+    strict_fedramp_risk: bool = False,
+) -> None:
+    """
+    Build a single combined 2-worksheet FedRAMP POA&M .xlsx workbook (`FedRAMP-POAM.xlsx`):
+      - Tab 1 (`Open POA&M Items`, xl/worksheets/sheet1.xml): populated with `open_entries`
+      - Tab 2 (`Closed POA&M Items`, xl/worksheets/sheet2.xml): populated with `closed_entries`
+    If `open_template_path` has multiple worksheets (e.g. a 5-tab FedRAMP template), only its
+    first worksheet (`sheet_index=0`) is used as Tab 1 and any extra template tabs (3-5) are stripped.
+    """
+    ns = {"main": MAIN_NS, "r": REL_NS}
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+    open_rows = read_xlsx_rows(open_template_path, sheet_index=0)
+    open_hdr_row, open_start_row = detect_poam_header_and_start_row(open_rows, is_closed_template=False)
+    open_col_letters = resolve_col_letters(open_rows, False, label=os.path.basename(open_template_path))
+    open_L = dict(zip(POAM_FIELDS, open_col_letters))
+
+    closed_rows = read_xlsx_rows(closed_template_path, sheet_index=0)
+    closed_hdr_row, closed_start_row = detect_poam_header_and_start_row(closed_rows, is_closed_template=True)
+    closed_col_letters = resolve_col_letters(closed_rows, True, label=os.path.basename(closed_template_path))
+    closed_L = dict(zip(POAM_FIELDS, closed_col_letters))
+
+    with zipfile.ZipFile(open_template_path, "r") as zin_open, zipfile.ZipFile(closed_template_path, "r") as zin_closed:
+        open_sheet_path = resolve_sheet_path(zin_open, sheet_index=0)
+        closed_sheet_path = resolve_sheet_path(zin_closed, sheet_index=0)
+
+        # 1. Load OPEN template sharedStrings.xml as the unified shared string table
+        shared_strings: List[str] = []
+        ss_index_map: Dict[str, int] = {}
+        orig_ss_bytes = b""
+        if "xl/sharedStrings.xml" in zin_open.namelist():
+            orig_ss_bytes = zin_open.read("xl/sharedStrings.xml")
+            register_xml_namespaces(orig_ss_bytes)
+            ss_root = ET.fromstring(orig_ss_bytes)
+            for si in ss_root.findall("main:si", ns):
+                texts = [t.text or "" for t in si.findall(".//main:t", ns)]
+                full_str = "".join(texts)
+                if full_str not in ss_index_map:
+                    ss_index_map[full_str] = len(shared_strings)
+                shared_strings.append(full_str)
+        else:
+            ss_root = ET.Element(f"{{{MAIN_NS}}}sst", {"count": "0", "uniqueCount": "0"})
+
+        # Load CLOSED template sharedStrings so header cells on Closed POA&M Items can be remapped
+        closed_orig_ss: List[str] = []
+        if "xl/sharedStrings.xml" in zin_closed.namelist():
+            closed_ss_root = ET.fromstring(zin_closed.read("xl/sharedStrings.xml"))
+            for si in closed_ss_root.findall("main:si", ns):
+                texts = [t.text or "" for t in si.findall(".//main:t", ns)]
+                closed_orig_ss.append("".join(texts))
+
+        def get_or_add_shared_string(raw_s_val: str) -> int:
+            s_val = sanitize_excel_string(raw_s_val)
+            if s_val in ss_index_map:
+                return ss_index_map[s_val]
+            idx = len(shared_strings)
+            shared_strings.append(s_val)
+            ss_index_map[s_val] = idx
+            si_el = ET.SubElement(ss_root, f"{{{MAIN_NS}}}si")
+            t_el = ET.SubElement(si_el, f"{{{MAIN_NS}}}t")
+            if s_val.startswith(" ") or s_val.endswith(" ") or "\n" in s_val or "\t" in s_val:
+                t_el.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+            t_el.text = s_val
+            return idx
+
+        # 2. Populate Tab 1 (Open POA&M Items -> xl/worksheets/sheet1.xml)
+        open_sheet_bytes = zin_open.read(open_sheet_path)
+        register_xml_namespaces(open_sheet_bytes)
+        open_s_root = ET.fromstring(open_sheet_bytes)
+        open_styles = discover_template_styles(
+            zin_open, open_s_root, open_start_row, False, open_L, header_row=open_hdr_row
+        )
+        _populate_worksheet_element(
+            s_root=open_s_root,
+            entries=open_entries,
+            start_row=open_start_row,
+            col_letters=open_col_letters,
+            tpl_styles=open_styles,
+            is_closed_template=False,
+            strict_fedramp_risk=strict_fedramp_risk,
+            get_or_add_shared_string=get_or_add_shared_string,
+        )
+        open_xml_out = serialize_xml_preserving_root_ns(open_s_root, open_sheet_bytes)
+
+        # 3. Populate Tab 2 (Closed POA&M Items -> xl/worksheets/sheet2.xml)
+        closed_sheet_bytes = zin_closed.read(closed_sheet_path)
+        register_xml_namespaces(closed_sheet_bytes)
+        closed_s_root = ET.fromstring(closed_sheet_bytes)
+        closed_raw_styles = discover_template_styles(
+            zin_closed, closed_s_root, closed_start_row, True, closed_L, header_row=closed_hdr_row
+        )
+
+        # Deselect Tab 2 in <sheetViews> so Tab 1 (Open POA&M Items) is the active sheet on open
+        for sv in closed_s_root.findall(".//main:sheetView", ns):
+            if "tabSelected" in sv.attrib:
+                del sv.attrib["tabSelected"]
+
+        # Remap header rows (< closed_start_row) sharedStrings and style indices to OPEN's styles.xml
+        closed_sheet_data = closed_s_root.find("main:sheetData", ns)
+        if closed_sheet_data is not None:
+            for r_el in closed_sheet_data.findall("main:row", ns):
+                r_num = int(r_el.attrib.get("r", "0"))
+                if r_num < closed_start_row:
+                    for c_el in r_el.findall("main:c", ns):
+                        c_type = c_el.attrib.get("t", "")
+                        v_el = c_el.find("main:v", ns)
+                        if c_type == "s" and v_el is not None and v_el.text is not None:
+                            try:
+                                old_idx = int(v_el.text)
+                                old_str = closed_orig_ss[old_idx] if 0 <= old_idx < len(closed_orig_ss) else v_el.text
+                            except ValueError:
+                                old_str = v_el.text
+                            v_el.text = str(get_or_add_shared_string(old_str))
+                            c_el.set("s", open_styles["header"])
+                        else:
+                            c_el.set("s", open_styles["default"])
+
+        closed_mapped_styles = {
+            "header": open_styles["header"],
+            "default": open_styles["default"],
+            "date": open_styles["default"],
+            "sla": open_styles["default"],
+            "row_ht": closed_raw_styles["row_ht"],
+            "date_is_numeric": "0",
+        }
+        _populate_worksheet_element(
+            s_root=closed_s_root,
+            entries=closed_entries,
+            start_row=closed_start_row,
+            col_letters=closed_col_letters,
+            tpl_styles=closed_mapped_styles,
+            is_closed_template=True,
+            strict_fedramp_risk=strict_fedramp_risk,
+            get_or_add_shared_string=get_or_add_shared_string,
+        )
+        closed_xml_out = serialize_xml_preserving_root_ns(closed_s_root, closed_sheet_bytes)
+
+        # Update sharedStrings count attributes
+        ss_root.set("count", str(len(shared_strings)))
+        ss_root.set("uniqueCount", str(len(shared_strings)))
+        ss_bytes_out = (
+            serialize_xml_preserving_root_ns(ss_root, orig_ss_bytes)
+            if orig_ss_bytes
+            else ET.tostring(ss_root, encoding="utf-8", xml_declaration=True)
+        )
+
+        # 4. Update xl/_rels/workbook.xml.rels to reference exactly sheet1.xml and sheet2.xml
+        orig_rels_bytes = zin_open.read("xl/_rels/workbook.xml.rels")
+        register_xml_namespaces(orig_rels_bytes)
+        rels_root = ET.fromstring(orig_rels_bytes)
+        rel_ns_uri = rels_root.tag.split("}")[0].lstrip("{") if "}" in rels_root.tag else PKG_REL_NS
+        ws_rel_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+
+        # Remove any existing worksheet relationships and stale calcChain relationships
+        used_rids: Set[str] = set()
+        for rel_el in list(rels_root):
+            target_attr = rel_el.attrib.get("Target", "")
+            type_attr = rel_el.attrib.get("Type", "")
+            if (
+                type_attr.endswith("/worksheet")
+                or "worksheets/sheet" in target_attr
+                or target_attr.endswith("calcChain.xml")
+                or type_attr.endswith("/calcChain")
+            ):
+                rels_root.remove(rel_el)
+            elif "Id" in rel_el.attrib:
+                used_rids.add(rel_el.attrib["Id"])
+
+        def _alloc_rid(preferred: str) -> str:
+            if preferred not in used_rids:
+                used_rids.add(preferred)
+                return preferred
+            n = 1
+            while f"rId{n}" in used_rids:
+                n += 1
+            rid = f"rId{n}"
+            used_rids.add(rid)
+            return rid
+
+        rid_open = _alloc_rid("rId5")
+        rid_closed = _alloc_rid("rId6")
+        ET.SubElement(
+            rels_root,
+            f"{{{rel_ns_uri}}}Relationship",
+            {"Id": rid_open, "Type": ws_rel_type, "Target": "worksheets/sheet1.xml"},
+        )
+        ET.SubElement(
+            rels_root,
+            f"{{{rel_ns_uri}}}Relationship",
+            {"Id": rid_closed, "Type": ws_rel_type, "Target": "worksheets/sheet2.xml"},
+        )
+        updated_wb_rels_bytes = serialize_xml_preserving_root_ns(rels_root, orig_rels_bytes)
+
+        # 5. Update xl/workbook.xml to declare strictly Tab 1 (Open POA&M Items) and Tab 2 (Closed POA&M Items)
+        orig_wb_bytes = zin_open.read("xl/workbook.xml")
+        register_xml_namespaces(orig_wb_bytes)
+        wb_root = ET.fromstring(orig_wb_bytes)
+        sheets_el = wb_root.find("main:sheets", ns)
+        if sheets_el is None:
+            sheets_el = ET.SubElement(wb_root, f"{{{MAIN_NS}}}sheets")
+        for old_sh in list(sheets_el):
+            sheets_el.remove(old_sh)
+        ET.SubElement(
+            sheets_el,
+            f"{{{MAIN_NS}}}sheet",
+            {"state": "visible", "name": "Open POA&M Items", "sheetId": "1", f"{{{REL_NS}}}id": rid_open},
+        )
+        ET.SubElement(
+            sheets_el,
+            f"{{{MAIN_NS}}}sheet",
+            {"state": "visible", "name": "Closed POA&M Items", "sheetId": "2", f"{{{REL_NS}}}id": rid_closed},
+        )
+        calc_pr = wb_root.find("main:calcPr", ns)
+        if calc_pr is None:
+            calc_pr = ET.SubElement(wb_root, f"{{{MAIN_NS}}}calcPr")
+        calc_pr.set("fullCalcOnLoad", "1")
+        updated_wb_bytes = serialize_xml_preserving_root_ns(wb_root, orig_wb_bytes)
+
+        # 6. Update [Content_Types].xml for sheet1.xml, sheet2.xml, drawing1.xml, drawing2.xml
+        orig_ct_bytes = zin_open.read("[Content_Types].xml")
+        register_xml_namespaces(orig_ct_bytes)
+        ct_root = ET.fromstring(orig_ct_bytes)
+        ct_ns_uri = ct_root.tag.split("}")[0].lstrip("{") if "}" in ct_root.tag else CONTENT_TYPES_NS
+        ws_ct = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+        dr_ct = "application/vnd.openxmlformats-officedocument.drawing+xml"
+
+        for child_el in list(ct_root):
+            pn = child_el.attrib.get("PartName", "")
+            if (
+                pn.endswith("/xl/calcChain.xml")
+                or pn.startswith("/xl/worksheets/sheet")
+                or pn.startswith("/xl/drawings/drawing")
+            ):
+                ct_root.remove(child_el)
+
+        ET.SubElement(ct_root, f"{{{ct_ns_uri}}}Override", {"ContentType": ws_ct, "PartName": "/xl/worksheets/sheet1.xml"})
+        ET.SubElement(ct_root, f"{{{ct_ns_uri}}}Override", {"ContentType": ws_ct, "PartName": "/xl/worksheets/sheet2.xml"})
+        if "xl/drawings/drawing1.xml" in zin_open.namelist():
+            ET.SubElement(ct_root, f"{{{ct_ns_uri}}}Override", {"ContentType": dr_ct, "PartName": "/xl/drawings/drawing1.xml"})
+            ET.SubElement(ct_root, f"{{{ct_ns_uri}}}Override", {"ContentType": dr_ct, "PartName": "/xl/drawings/drawing2.xml"})
+        updated_ct_bytes = serialize_xml_preserving_root_ns(ct_root, orig_ct_bytes)
+
+        # 7. Write combined 2-tab archive (stripping any extra template sheets 3-5)
+        wrote_shared_strings = False
+        with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin_open.infolist():
+                fn = item.filename
+                if fn == "xl/calcChain.xml":
+                    continue
+                if fn.startswith("xl/worksheets/sheet") and fn != "xl/worksheets/sheet1.xml":
+                    continue
+                if fn.startswith("xl/worksheets/_rels/sheet") and fn != "xl/worksheets/_rels/sheet1.xml.rels":
+                    continue
+                if fn.startswith("xl/drawings/drawing") and fn != "xl/drawings/drawing1.xml":
+                    continue
+
+                if fn == "xl/worksheets/sheet1.xml":
+                    zout.writestr(item, open_xml_out)
+                elif fn == "xl/sharedStrings.xml":
+                    zout.writestr(item, ss_bytes_out)
+                    wrote_shared_strings = True
+                elif fn == "xl/workbook.xml":
+                    zout.writestr(item, updated_wb_bytes)
+                elif fn == "xl/_rels/workbook.xml.rels":
+                    zout.writestr(item, updated_wb_rels_bytes)
+                elif fn == "[Content_Types].xml":
+                    zout.writestr(item, updated_ct_bytes)
+                else:
+                    zout.writestr(item, zin_open.read(fn))
+
+            if "xl/worksheets/sheet1.xml" not in zin_open.namelist():
+                zout.writestr("xl/worksheets/sheet1.xml", open_xml_out)
+            zout.writestr("xl/worksheets/sheet2.xml", closed_xml_out)
+
+            if "xl/drawings/drawing1.xml" in zin_open.namelist():
+                drawing2_bytes = (
+                    zin_closed.read("xl/drawings/drawing1.xml")
+                    if "xl/drawings/drawing1.xml" in zin_closed.namelist()
+                    else zin_open.read("xl/drawings/drawing1.xml")
+                )
+                zout.writestr("xl/drawings/drawing2.xml", drawing2_bytes)
+                sheet2_rels_bytes = (
+                    b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                    b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    b'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" '
+                    b'Target="../drawings/drawing2.xml"/></Relationships>'
+                )
+                zout.writestr("xl/worksheets/_rels/sheet2.xml.rels", sheet2_rels_bytes)
 
             if not wrote_shared_strings and shared_strings:
                 zout.writestr("xl/sharedStrings.xml", ss_bytes_out)
@@ -2058,14 +2505,17 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRC-xMINI (v1.4.2 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRC-xMINI (v1.4.3 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:
         scan_display = ", ".join(os.path.basename(p) for p in source_scan_paths)
         print(f"  Source Scan File(s)     : {scan_display} ({len(source_scan_paths)} file{'s' if len(source_scan_paths) > 1 else ''})")
-    print(f"  Finished OPEN POA&M     : {open_out_path}{' (dry-run)' if dry_run else ''}")
-    print(f"  Finished CLOSED POA&M   : {closed_out_path}{' (dry-run)' if dry_run else ''}")
+    if open_out_path == closed_out_path:
+        print(f"  Finished FedRAMP POA&M  : {open_out_path} [Tab 1: Open POA&M Items | Tab 2: Closed POA&M Items]{' (dry-run)' if dry_run else ''}")
+    else:
+        print(f"  Finished OPEN POA&M     : {open_out_path}{' (dry-run)' if dry_run else ''}")
+        print(f"  Finished CLOSED POA&M   : {closed_out_path}{' (dry-run)' if dry_run else ''}")
     print("-" * 96)
     print(f"  • Total Active OPEN POA&M Entries   : {len(open_entries)}  "
           f"({stats['carry_over_open']} Carried Over, {stats['new_open']} Newly Detected)")
@@ -2120,9 +2570,17 @@ def analyze_and_report_sla(
         if source_scan_paths:
             scans_formatted = ", ".join(f"`{os.path.basename(p)}`" for p in source_scan_paths)
             lines.append(f"- **Source Scan File(s)**: {scans_formatted} ({len(source_scan_paths)} file{'s' if len(source_scan_paths) > 1 else ''})")
+        if open_out_path == closed_out_path:
+            lines.append(
+                f"- **Generated FedRAMP POA&M Workbook**: `{os.path.basename(open_out_path)}` "
+                f"(*Tab 1: Open POA&M Items, Tab 2: Closed POA&M Items*)"
+            )
+        else:
+            lines.extend([
+                f"- **Generated OPEN FedRAMP POA&M**: `{os.path.basename(open_out_path)}`",
+                f"- **Generated CLOSED FedRAMP POA&M**: `{os.path.basename(closed_out_path)}`",
+            ])
         lines.extend([
-            f"- **Generated OPEN FedRAMP POA&M**: `{os.path.basename(open_out_path)}`",
-            f"- **Generated CLOSED FedRAMP POA&M**: `{os.path.basename(closed_out_path)}`",
             f"- **Total Active OPEN Entries**: **{len(open_entries)}** (*{stats['carry_over_open']} Carried Over, {stats['new_open']} Newly Detected*)",
             f"- **Unverified (Asset Not Observed in Scan)**: **{stats.get('unverified_unscanned_open', 0)}** (*Retained in OPEN pending review*)",
             f"- **Entries Moved from OPEN to CLOSED**: **{len(closed_entries_moved)}** (*Total Closed Rows: {len(all_closed_entries)}*)",
@@ -2834,7 +3292,7 @@ def main() -> int:
         else:
             print(f"[*] Left {len(missing_remediation_entries)} missing Remediation Plans blank per user selection.")
 
-    # 6. Write Finished OPEN and CLOSED FedRAMP POA&M Workbooks (skipped in --dry-run mode)
+    # 6. Write Finished Combined FedRAMP POA&M Workbook (OPEN + CLOSED tabs in 1 .xlsx file)
     if args.output_dir:
         out_dir = os.path.abspath(args.output_dir)
     else:
@@ -2845,24 +3303,17 @@ def main() -> int:
             force_legacy=args.legacy_output_naming,
         )
 
-    open_out_path = os.path.join(out_dir, "OPEN FedRAMP-POAM.xlsx")
-    closed_out_path = os.path.join(out_dir, "CLOSED FedRAMP-POAM.xlsx")
+    poam_out_path = os.path.join(out_dir, "FedRAMP-POAM.xlsx")
     summary_md_path = os.path.join(out_dir, "poam_transform_summary.md")
 
     if not args.dry_run:
         os.makedirs(out_dir, exist_ok=True)
-        write_poam_workbook(
-            template_path=args.open_template,
-            output_path=open_out_path,
-            entries=final_open,
-            is_closed_template=False,
-            strict_fedramp_risk=args.strict_fedramp_risk,
-        )
-        write_poam_workbook(
-            template_path=args.closed_template,
-            output_path=closed_out_path,
-            entries=all_closed,
-            is_closed_template=True,
+        write_combined_poam_workbook(
+            open_template_path=args.open_template,
+            closed_template_path=args.closed_template,
+            output_path=poam_out_path,
+            open_entries=final_open,
+            closed_entries=all_closed,
             strict_fedramp_risk=args.strict_fedramp_risk,
         )
 
@@ -2873,8 +3324,8 @@ def main() -> int:
         all_closed_entries=all_closed,
         stats=stats,
         today=today,
-        open_out_path=open_out_path,
-        closed_out_path=closed_out_path,
+        open_out_path=poam_out_path,
+        closed_out_path=poam_out_path,
         summary_md_path=summary_md_path,
         dry_run=args.dry_run,
         source_scan_paths=scan_paths,

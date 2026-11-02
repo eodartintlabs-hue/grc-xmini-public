@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRC-xMINI (The GRC eXperience) — Unified Compliance Test & Verification Engine
-Engine: scripts/grc_test.py (v1.4.2 — Yokota)
+Engine: scripts/grc_test.py (v1.4.3 — Yokota)
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Engine #7 — Test, Mock & Invariant Verification Orchestrator
@@ -118,7 +118,7 @@ class TestEngine:
                 sys.executable, bundle_script, "verify", str(bundle_path),
                 "--expected-sha256", sha256, "--json",
             ]
-            res_verify = subprocess.run(cmd_verify, capture_output=True, text=True)
+            res_verify = subprocess.run(cmd_verify, cwd=REPO_ROOT, capture_output=True, text=True)
             if res_verify.returncode != 0:
                 return self._record("grc_bundle", False, f"verify failed: {res_verify.stderr.strip()}")
 
@@ -130,7 +130,7 @@ class TestEngine:
                 "--expected-sha256", sha256,
                 "--read-only",
             ]
-            res_restore = subprocess.run(cmd_restore, capture_output=True, text=True)
+            res_restore = subprocess.run(cmd_restore, cwd=REPO_ROOT, capture_output=True, text=True)
             if res_restore.returncode != 0:
                 return self._record("grc_bundle", False, f"restore failed: {res_restore.stderr.strip()}")
 
@@ -414,7 +414,7 @@ class TestEngine:
     def run_all(self) -> bool:
         """Executes all engine checks and unit test suites with per-suite crash isolation."""
         print("==================================================================")
-        print("  GRC-xMINI (v1.4.2 — Yokota) · COMPREHENSIVE TEST SUITE")
+        print("  GRC-xMINI (v1.4.3 — Yokota) · COMPREHENSIVE TEST SUITE")
         print("==================================================================")
 
         suite_runners: Dict[str, Callable[[], bool]] = {

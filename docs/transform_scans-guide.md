@@ -20,7 +20,7 @@
 </p>
 
 > **Engine**: [`scripts/transform_scans.py`](../scripts/transform_scans.py) · **CLI Command**: `./grc transform`  
-> **Release Series**: `v1.4.2 — Yokota` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`)*  
+> **Release Series**: `v1.4.3 — Yokota` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`, and unified 2-tab `FedRAMP-POAM.xlsx` + 5-sheet template ingestion in `v1.4.3 — Yokota`)*  
 > **Execution Mode**: **100% Standalone** *(Requires only Python 3.9+ Standard Library — no Docker container, no `.bundle` file, and no `pip install` needed)*
 
 ---
@@ -286,12 +286,11 @@ Running a transformation outputs the itemized SLA Breach & Aging table directly 
 [+] Drafted 5 Remediation Plans with official TENABLE remediation URLs.
 
 ================================================================================================
-  GRC-xMINI (v1.4.1 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
+  GRC-xMINI (v1.4.3 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
 ================================================================================================
   Analysis Reference Date : 2026-10-31
   Source Scan File(s)     : tenable_monthly_scan.csv (1 file)
-  Finished OPEN POA&M     : evidence/poam-tenable_monthly_scan/OPEN FedRAMP-POAM.xlsx
-  Finished CLOSED POA&M   : evidence/poam-tenable_monthly_scan/CLOSED FedRAMP-POAM.xlsx
+  Finished FedRAMP POA&M  : artifacts/pick-up/2026-10-31_143000/FedRAMP-POAM.xlsx [Tab 1: Open POA&M Items | Tab 2: Closed POA&M Items]
 ------------------------------------------------------------------------------------------------
   • Total Active OPEN POA&M Entries   : 65  (5 Carried Over, 60 Newly Detected)
   • Entries Moved OPEN -> CLOSED      : 2   (Total in Closed Workbook: 2)
@@ -317,14 +316,13 @@ Running a transformation outputs the itemized SLA Breach & Aging table directly 
 
 ## 7. Expected Output Files & Where to Find Them
 
-Every transformation run writes three deliverables into `--output-dir` (default: `evidence/poam-<scan-name>/`):
+Every transformation run writes two deliverables into `--output-dir` (default: `artifacts/pick-up/<YYYY-MM-DD_HHMMSS>/`):
 
 | Output File | Format | Purpose |
 | :--- | :--- | :--- |
-| **`OPEN FedRAMP-POAM.xlsx`** | Excel (`.xlsx`) | Official FedRAMP Open POA&M workbook populated with all active findings (`Columns B..AB`, `Row 5+`), preserved detection dates, auto-calculating SLA formulas, dynamic `YYYY-MMM-#####` IDs, and drafted Tenable/AWS remediation URLs. |
-| **`CLOSED FedRAMP-POAM.xlsx`** | Excel (`.xlsx`) | Official FedRAMP Closed POA&M workbook (`Columns A..AA`, `Row 3+`) containing all previously open entries verified as remediated in the new scan. |
+| **`FedRAMP-POAM.xlsx`** | Excel (`.xlsx`) | Single combined 2-worksheet FedRAMP POA&M workbook containing **Tab 1 (`Open POA&M Items`)** populated with all active findings (`Columns B..AB`, preserved detection dates, auto-calculating SLA formulas, dynamic `YYYY-MMM-#####` IDs, and drafted Tenable/AWS remediation URLs) and **Tab 2 (`Closed POA&M Items`)** (`Columns A..AA`) containing all previously open entries verified as remediated in the new scan. |
 | **`poam_transform_summary.md`** | Markdown (`.md`) | Human-readable SLA Breach & Finding Age summary table that can be previewed directly inside **Cursor** (`Cmd+Shift+V` / `Ctrl+Shift+V`). |
 
 All files can be accessed immediately on your workstation under:
-* **macOS / Linux**: `~/Desktop/GRC-x/evidence/poam-<scan-name>/`
-* **Windows**: `%USERPROFILE%\Desktop\GRC-x\evidence\poam-<scan-name>\`
+* **macOS / Linux**: `~/Desktop/GRC-x/artifacts/pick-up/<YYYY-MM-DD_HHMMSS>/`
+* **Windows**: `%USERPROFILE%\Desktop\GRC-x\artifacts\pick-up\<YYYY-MM-DD_HHMMSS>\`

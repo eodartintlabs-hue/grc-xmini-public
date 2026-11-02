@@ -17,7 +17,7 @@
   <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
-> **Current release**: `v1.4.2 — Yokota` (Restricted Beta)  
+> **Current release**: `v1.4.3 — Yokota` (Restricted Beta)  
 > This file covers **planned** work only. For what has already shipped, see [`RELEASE_NOTES.md`](RELEASE_NOTES.md) and [`PATCH_LOG.md`](PATCH_LOG.md). Versioning and codename rules are in [`RELEASING.md`](RELEASING.md).  
 > Plans may change. A feature is only considered delivered once it appears in the release notes.
 
@@ -25,7 +25,7 @@
 
 ## Where things stand
 
-GRC-xMINI `v1.4.2` provides the 5-phase bundle and AMI review pipeline with seven compliance engines (including the absorbed `scripts/grc_test.py` compliance invariant engine, shared `scripts/grc_common.py` / `scripts/grc_fixtures.py` utilities, and externalized `rules/severity_policy.json` & `rules/stig_catalog.json` catalogs), plus the standalone multi-scan Tenable / AWS Inspector scan-to-FedRAMP POA&M transformer (`./grc transform`) operating across `artifacts/drop-off` and `artifacts/pick-up` with timestamped deliverable outputs (`YYYY-MM-DD_HHMMSS`), comprehensive repository hygiene, GRC-xTEST integration fixtures, and dual desktop navigation pathways. The remaining `v1.x` beta work focuses on workstation portability. `v2.0.0` marks general availability.
+GRC-xMINI `v1.4.3` provides the 5-phase bundle and AMI review pipeline with seven compliance engines (including the absorbed `scripts/grc_test.py` compliance invariant engine, shared `scripts/grc_common.py` / `scripts/grc_fixtures.py` utilities, and externalized `rules/severity_policy.json` & `rules/stig_catalog.json` catalogs), plus the standalone multi-scan Tenable / AWS Inspector scan-to-FedRAMP POA&M transformer (`./grc transform`) operating across `artifacts/drop-off` and `artifacts/pick-up` with unified 2-tab `FedRAMP-POAM.xlsx` workbooks (`Open POA&M Items` + `Closed POA&M Items`), timestamped deliverable outputs (`YYYY-MM-DD_HHMMSS`), comprehensive repository hygiene, GRC-xTEST integration fixtures, and dual desktop navigation pathways. The remaining `v1.x` beta work focuses on workstation portability. `v2.0.0` marks general availability.
 
 ```mermaid
 flowchart LR

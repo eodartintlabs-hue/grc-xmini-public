@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.4.2 — Yokota` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.4.3 — Yokota` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner ([`@eodartintlabs-hue`](https://github.com/eodartintlabs-hue))  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.4.3`](#v143--yokota) | Yokota | 2026-11-01 | Bug fix | `_TBD after tagging_` | Multi-worksheet FedRAMP v3.1 POA&M template ingestion (strict Worksheet #1 reading + dynamic header/guidance row skipping) and unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/` |
 | [`v1.4.2`](#v142--yokota) | Yokota | 2026-11-01 | Bug fix | `7b05926` | Code Review Phase 2 (Externalized policy catalogs `rules/severity_policy.json` & `rules/stig_catalog.json`, `Ec2Backend` strategy pattern, `PoamIdAllocator`, `TenableAdapter`/`InspectorAdapter`, `@dataclass` models, 34 unit tests, and Bold White `GRCx` logo update) |
 | [`v1.4.1`](#v141--yokota) | Yokota | 2026-11-01 | Bug fix | `c8c629f` | Code Review Phase 1 (P0/P1 security & compliance integrity fixes across all 7 engines, `grc_common.py`, `grc_fixtures.py`, and 29 regression tests) |
 | [`v1.4.0`](#v140--yokota) | Yokota | 2026-11-01 | Minor | `4e88635` | GRC-xMINI rebrand under GRC-x Initiative, grc_test engine #7, artifacts drop-off/pick-up, and purple MINI logo |
@@ -44,6 +45,27 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.4.3 — Yokota
+
+**Multi-Worksheet FedRAMP POA&M Ingestion & Unified 2-Tab Output Workbook (`FedRAMP-POAM.xlsx`)** · November 01, 2026 · Tag `v1.4.3`
+
+### FedRAMP v3.1 5-Sheet Template Support & Single-Workbook Deliverable
+
+1. **Multi-Worksheet FedRAMP POA&M Template Ingestion (`scripts/transform_scans.py`)**:
+   - Added `get_workbook_sheets()`, `get_workbook_sheet_names()`, and updated `resolve_sheet_path(z, sheet_index=0)` to resolve worksheets in exact `<sheets>` tab order from `xl/workbook.xml` and `xl/_rels/workbook.xml.rels` across both standard and Strict OpenXML namespaces.
+   - Updated `load_existing_poam_workbook()` so uploaded multi-worksheet FedRAMP workbooks (such as the 5-tab `Open POA&M Items`, `Closed POA&M Items`, `Configuration Findings`, `PL-2 Findings`, `Record of Changes` template) strictly read **only Worksheet #1 (`sheet_index=0`)** and ignore all remaining tabs.
+   - Added `detect_poam_header_and_start_row()` and row-level instruction filters so FedRAMP v3.1 templates with `POAM ID` on Row 5 and `Guidance` / `Examples` / `Mandatory or Situational` on Rows 6–8 automatically start reading/writing data at Row 9 and never mistake template instruction rows for open vulnerabilities.
+2. **Unified 2-Tab `FedRAMP-POAM.xlsx` Output Workbook in `artifacts/pick-up/` (`scripts/transform_scans.py`)**:
+   - Added `_populate_worksheet_element()` and `write_combined_poam_workbook()` to generate a single combined 2-worksheet `.xlsx` deliverable named **`FedRAMP-POAM.xlsx`** inside `artifacts/pick-up/<YYYY-MM-DD_HHMMSS>/`:
+     - **Tab 1 (`Open POA&M Items`, `xl/worksheets/sheet1.xml`)**: Active carry-over and newly detected Open POA&M entries with auto-calculating SLA formulas (`fullCalcOnLoad="1"`), FedRAMP header banner/logo, and risk rating dropdown validations.
+     - **Tab 2 (`Closed POA&M Items`, `xl/worksheets/sheet2.xml`)**: Newly closed and historical Closed POA&M entries with unified `xl/sharedStrings.xml` indices, mapped `xl/styles.xml` cell formatting, and isolated drawing relationships (`xl/drawings/drawing2.xml`).
+   - Automatic closed-tab carry-forward: When a previously generated 2-tab `FedRAMP-POAM.xlsx` is supplied via `--previous-open` (without `--previous-closed`), `transform_scans.py` automatically loads existing closed items from Tab 2 (`Closed POA&M Items`).
+3. **Regression Tests & Documentation (`testing/test_transform_scans.py`, `scripts/grc_test.py`, `README.md`, `COMMANDS.md`, `docs/transform_scans-guide.md`)**:
+   - Added `test_five_worksheet_fedramp_template_reads_only_first_worksheet_and_skips_guidance_rows` and `test_combined_fedramp_poam_workbook_contains_open_and_closed_tabs_in_single_file` in `testing/test_transform_scans.py` (36 unit tests + all 7 compliance engines passing via `./grc test`).
+   - Added `cwd=REPO_ROOT` to `grc_bundle` subprocess calls in `scripts/grc_test.py`.
 
 ---
 

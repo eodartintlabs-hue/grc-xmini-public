@@ -30,7 +30,7 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.2 (Yokota Series)
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.3 (Yokota Series)
  {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
@@ -51,7 +51,7 @@
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.4.2 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.4.3 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Test Corpus**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)  
@@ -211,7 +211,7 @@ Bundled via [`docker/Dockerfile.scanner`](docker/Dockerfile.scanner) and orchest
 ### 5.2 Native Python Compliance Engines (`scripts/`)
 Zero-dependency Python 3 engines that power both standalone GRC analyst workflows and the 5-phase `.bundle`/`AMI` audit pipeline:
 
-* **[`transform_scans.py`](scripts/transform_scans.py)** *(Standalone GRC Analyst Engine — `./grc transform`)*: Ingests **Tenable** or **AWS Inspector** vulnerability scan exports (`.csv` or `.xlsx`), populates the official **[`OPEN FedRAMP-POAM-Template.xlsx`](templates/OPEN%20FedRAMP-POAM-Template.xlsx)** and **[`CLOSED LEGACY FedRAMP-POAM-Template.xlsx`](templates/CLOSED%20LEGACY%20FedRAMP-POAM-Template.xlsx)** workbooks (1 row per `Vulnerability + Asset`), reconciles against a previous OPEN POA&M to automatically move remediated items to the CLOSED POA&M, interactively drafts missing remediation plans with official Tenable/AWS URLs, and reports passed SLAs and finding age in days.
+* **[`transform_scans.py`](scripts/transform_scans.py)** *(Standalone GRC Analyst Engine — `./grc transform`)*: Ingests **Tenable** or **AWS Inspector** vulnerability scan exports (`.csv` or `.xlsx`), reads strictly **Worksheet #1 (`Open POA&M Items`)** of any uploaded multi-worksheet FedRAMP POA&M workbook to reconcile Open $\rightarrow$ Closed findings, interactively drafts missing remediation plans with official Tenable/AWS URLs, reports passed SLAs and finding age in days, and outputs a single combined **`FedRAMP-POAM.xlsx`** workbook (**Tab 1: `Open POA&M Items`**, **Tab 2: `Closed POA&M Items`**) inside `artifacts/pick-up/<YYYY-MM-DD_HHMMSS>/`.
 * **[`grc_bundle.py`](scripts/grc_bundle.py)**: Verifies SHA-256 checksums, validates `git bundle` headers, extracts read-only workspaces, and emits `bundle_provenance.json`.
 * **[`grc_ami.py`](scripts/grc_ami.py)**: Validates AWS AMI encryption, orchestrates EBS snapshot cold-mounting (`ro,noload,noexec,nosuid`), resolves `/etc/os-release` to DISA STIG benchmarks, supports `--mock` offline simulation, and emits `ami_provenance.json`.
 * **[`crypto_lib_scan.py`](scripts/crypto_lib_scan.py)**: Statically inspects manifests (`requirements.txt`, `package.json`, `pom.xml`, `go.mod`) and native libraries (`libcrypto.so*`) against [`rules/crypto_catalog.json`](rules/crypto_catalog.json).
@@ -293,7 +293,7 @@ In high-assurance compliance automation, a scanner that outputs zero findings is
 
 | Active Milestone | Series Codename | Status | Summary of Active Capabilities | Full Roadmap & Release Docs |
 | :--- | :--- | :--- | :--- | :--- |
-| **`v1.4.1 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Yokota Code Review Phase 1 (P0/P1 Security & Data-Integrity Patch)**: Resolved all 6 P0 and 4 P1 Top-10 audit findings across all 7 engines; extracted shared `grc_common.py` and `grc_fixtures.py` modules; upgraded `grc_test.py` and `testing/test_code_review_regressions.py` to 29 content-invariant unit & regression tests. | See **[`hygiene/`](hygiene/)** |
+| **`v1.4.3 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **FedRAMP v3.1 5-Sheet POA&M Ingestion & Unified 2-Tab Output Workbook (`FedRAMP-POAM.xlsx`)**: Strict Worksheet #1 (`sheet_index=0`) reading when ingesting multi-worksheet FedRAMP templates, dynamic `POAM ID` header/data row detection skipping `Guidance`/`Examples`/`Mandatory` rows, unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/`, and 36 unit tests passing. | See **[`hygiene/`](hygiene/)** |
 
 > 🗺️ **Looking Ahead to Future Milestones?**  
 > Planned releases—including the upcoming **`v1.3.5 — Sasebo`** (Universal Workstation Portability & `./grc doctor`) and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:

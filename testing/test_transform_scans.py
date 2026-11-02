@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRC-xMINI (v1.4.2 — Yokota) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRC-xMINI (v1.4.3 — Yokota) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:
@@ -834,6 +834,284 @@ class TestTransformScansEngine(unittest.TestCase):
         multi_scans = ["/path/to/scan1.csv", "/path/to/scan2.csv", "/path/to/scan3.csv"]
         multi_legacy = ts.generate_output_dir_path(multi_scans, base_pickup_dir="/artifacts/pick-up", force_legacy=True)
         self.assertEqual(os.path.basename(multi_legacy), "poam-scan1-and-2-more")
+
+    def test_five_worksheet_fedramp_template_reads_only_first_worksheet_and_skips_guidance_rows(self) -> None:
+        """
+        Verify Bug #1 fix: When an analyst uploads a 5-worksheet FedRAMP v3.1 POA&M workbook
+        (where Worksheet #1 has CSP metadata on Rows 1-4, POAM ID on Row 5, Guidance/Examples/Mandatory
+        on Rows 6-8, and data on Row 9+, while Worksheets #2-#5 contain Closed, Configuration,
+        PL-2, and Record of Changes tabs), xMINI reads strictly Worksheet #1 and ignores
+        both template guidance/example rows (Rows 6-8) and Worksheets #2-#5.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            five_sheet_xlsx = os.path.join(tmpdir, "five_sheet_fedramp_poam.xlsx")
+            ns_main = ts.MAIN_NS
+            ns_r = ts.REL_NS
+
+            # Build a 5-worksheet workbook modeled on the official FedRAMP v3.1 template:
+            # Sheet 1: Open POA&M Items (Row 5 header, Rows 6-8 Guidance/Examples/Mandatory, Row 9 real item)
+            # Sheets 2-5: Closed POA&M Items, Configuration Findings, PL-2 Findings, Record of Changes
+            #             populated with decoy rows that MUST NOT be ingested.
+            with zipfile.ZipFile(self.open_template, "r") as zin, zipfile.ZipFile(five_sheet_xlsx, "w", zipfile.ZIP_DEFLATED) as zout:
+                ss_bytes = zin.read("xl/sharedStrings.xml")
+                ts.register_xml_namespaces(ss_bytes)
+                ss_root = ET.fromstring(ss_bytes)
+                ss_list = ["".join(t.text or "" for t in si.findall(f".//{{{ns_main}}}t")) for si in ss_root.findall(f"{{{ns_main}}}si")]
+
+                def add_ss(val: str) -> int:
+                    if val in ss_list:
+                        return ss_list.index(val)
+                    idx = len(ss_list)
+                    ss_list.append(val)
+                    si = ET.SubElement(ss_root, f"{{{ns_main}}}si")
+                    t = ET.SubElement(si, f"{{{ns_main}}}t")
+                    t.text = val
+                    return idx
+
+                # Construct Sheet 1 with 8 header/instruction rows (POAM ID on Row 5) + 1 real finding on Row 9
+                s1_bytes = zin.read("xl/worksheets/sheet1.xml")
+                ts.register_xml_namespaces(s1_bytes)
+                s1_root = ET.fromstring(s1_bytes)
+                s1_data = s1_root.find(f"{{{ns_main}}}sheetData")
+                orig_rows_1_to_4 = [r for r in list(s1_data) if int(r.attrib.get("r", "0")) <= 4]
+                for r in list(s1_data):
+                    s1_data.remove(r)
+
+                # Rows 1-4: FedRAMP v3.1 CSP/CSO metadata block
+                for r_idx, (a_txt, b_txt) in enumerate([
+                    ("FedRAMP® Plan of Action and Milestones (POA&M)", ""),
+                    ("", "Cloud Service Provider"),
+                    ("Guidance", "Enter the name of the CSP as it appears in the SSP"),
+                    ("", ""),
+                ], start=1):
+                    r_el = ET.SubElement(s1_data, f"{{{ns_main}}}row", {"r": str(r_idx)})
+                    if a_txt:
+                        c_a = ET.SubElement(r_el, f"{{{ns_main}}}c", {"r": f"A{r_idx}", "t": "s"})
+                        ET.SubElement(c_a, f"{{{ns_main}}}v").text = str(add_ss(a_txt))
+                    if b_txt:
+                        c_b = ET.SubElement(r_el, f"{{{ns_main}}}c", {"r": f"B{r_idx}", "t": "s"})
+                        ET.SubElement(c_b, f"{{{ns_main}}}v").text = str(add_ss(b_txt))
+
+                # Shift original Rows 1-4 (Header, Guidance, Examples, Mandatory) down to Rows 5-8
+                for old_r in orig_rows_1_to_4:
+                    new_r_num = int(old_r.attrib["r"]) + 4
+                    old_r.set("r", str(new_r_num))
+                    for c_el in old_r.findall(f"{{{ns_main}}}c"):
+                        col_let, _ = ts.split_cell_ref(c_el.attrib.get("r", "A1"))
+                        c_el.set("r", f"{col_let}{new_r_num}")
+                    s1_data.append(old_r)
+
+                # Row 9: Real Open POA&M item on Worksheet #1
+                r9 = ET.SubElement(s1_data, f"{{{ns_main}}}row", {"r": "9"})
+                for col_let, val in [
+                    ("B", "VULN-00001"),
+                    ("C", "RA-5, SI-2"),
+                    ("D", "Real Worksheet 1 Finding"),
+                    ("E", "Valid finding from Worksheet 1 Row 9"),
+                    ("F", "Tenable Nessus"),
+                    ("G", "176402"),
+                    ("H", "10.0.0.10"),
+                    ("L", "2026-09-01"),
+                    ("M", "2026-10-01"),
+                    ("R", "High"),
+                ]:
+                    c_el = ET.SubElement(r9, f"{{{ns_main}}}c", {"r": f"{col_let}9", "t": "s"})
+                    ET.SubElement(c_el, f"{{{ns_main}}}v").text = str(add_ss(val))
+
+                # Construct decoy Sheet 2..5 containing decoy POAM IDs that must be ignored
+                decoy_root = ET.fromstring(s1_bytes)
+                decoy_data = decoy_root.find(f"{{{ns_main}}}sheetData")
+                for r in list(decoy_data):
+                    if int(r.attrib.get("r", "0")) >= 5:
+                        decoy_data.remove(r)
+                r5_decoy = ET.SubElement(decoy_data, f"{{{ns_main}}}row", {"r": "5"})
+                for col_let, val in [
+                    ("B", "DECOY-99999"),
+                    ("D", "Should Never Be Read From Tabs 2-5"),
+                    ("G", "999999"),
+                    ("H", "10.99.99.99"),
+                ]:
+                    c_el = ET.SubElement(r5_decoy, f"{{{ns_main}}}c", {"r": f"{col_let}5", "t": "s"})
+                    ET.SubElement(c_el, f"{{{ns_main}}}v").text = str(add_ss(val))
+                decoy_xml_bytes = ts.serialize_xml_preserving_root_ns(decoy_root, s1_bytes)
+
+                ss_root.set("count", str(len(ss_list)))
+                ss_root.set("uniqueCount", str(len(ss_list)))
+
+                wb_bytes = zin.read("xl/workbook.xml")
+                wb_root = ET.fromstring(wb_bytes)
+                sheets_el = wb_root.find(f"{{{ns_main}}}sheets")
+                for s in list(sheets_el):
+                    sheets_el.remove(s)
+
+                rels_bytes = zin.read("xl/_rels/workbook.xml.rels")
+                rels_root = ET.fromstring(rels_bytes)
+                rel_ns_uri = rels_root.tag.split("}")[0].lstrip("{")
+                for rel in list(rels_root):
+                    if "worksheets/sheet" in rel.attrib.get("Target", ""):
+                        rels_root.remove(rel)
+
+                tab_names = [
+                    "Open POA&M Items",
+                    "Closed POA&M Items",
+                    "Configuration Findings",
+                    "PL-2 Findings",
+                    "Record of Changes",
+                ]
+                for idx, tname in enumerate(tab_names, start=1):
+                    rid = f"rId{10 + idx}"
+                    ET.SubElement(
+                        sheets_el,
+                        f"{{{ns_main}}}sheet",
+                        {"state": "visible", "name": tname, "sheetId": str(idx), f"{{{ns_r}}}id": rid},
+                    )
+                    ET.SubElement(
+                        rels_root,
+                        f"{{{rel_ns_uri}}}Relationship",
+                        {
+                            "Id": rid,
+                            "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+                            "Target": f"worksheets/sheet{idx}.xml",
+                        },
+                    )
+
+                for item in zin.infolist():
+                    if item.filename == "xl/worksheets/sheet1.xml":
+                        zout.writestr(item, ts.serialize_xml_preserving_root_ns(s1_root, s1_bytes))
+                    elif item.filename == "xl/sharedStrings.xml":
+                        zout.writestr(item, ts.serialize_xml_preserving_root_ns(ss_root, ss_bytes))
+                    elif item.filename == "xl/workbook.xml":
+                        zout.writestr(item, ts.serialize_xml_preserving_root_ns(wb_root, wb_bytes))
+                    elif item.filename == "xl/_rels/workbook.xml.rels":
+                        zout.writestr(item, ts.serialize_xml_preserving_root_ns(rels_root, rels_bytes))
+                    else:
+                        zout.writestr(item, zin.read(item.filename))
+
+                for idx in range(2, 6):
+                    zout.writestr(f"xl/worksheets/sheet{idx}.xml", decoy_xml_bytes)
+
+            # Verify 5 sheets exist in the uploaded workbook
+            self.assertEqual(len(ts.get_workbook_sheet_names(five_sheet_xlsx)), 5)
+
+            # Load via load_existing_poam_workbook: MUST return ONLY the 1 real finding from Tab 1 Row 9
+            loaded = ts.load_existing_poam_workbook(five_sheet_xlsx, is_closed_template=False)
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(loaded[0]["poam_id"], "VULN-00001")
+            self.assertEqual(loaded[0]["weakness_name"], "Real Worksheet 1 Finding")
+
+    def test_combined_fedramp_poam_workbook_contains_open_and_closed_tabs_in_single_file(self) -> None:
+        """
+        Verify Bug #2 fix: Transforming scan data produces a single combined `FedRAMP-POAM.xlsx`
+        workbook in the pick-up folder containing Tab 1 ('Open POA&M Items') and Tab 2
+        ('Closed POA&M Items'), rather than two separate OPEN and CLOSED .xlsx files.
+        """
+        open_entry = {
+            "poam_id": "2026-NOV-00002",
+            "controls": "RA-5, SI-2",
+            "weakness_name": "Active Open Vulnerability",
+            "weakness_description": "Open finding on Tab 1",
+            "detector_source": "Tenable Nessus",
+            "source_identifier": "176402",
+            "asset_identifier": "10.0.0.10",
+            "point_of_contact": "SecOps",
+            "resources_required": "Engineering",
+            "remediation_plan": "Apply vendor patch",
+            "original_detection_date": "2026-10-01",
+            "scheduled_completion_date": "2026-10-31",
+            "status_date": "2026-11-01",
+            "vendor_dependency": "No",
+            "last_vendor_checkin": "",
+            "vendor_product_name": "OpenSSH",
+            "original_risk_rating": "High",
+            "adjusted_risk_rating": "",
+            "risk_adjustment": "No",
+            "false_positive": "No",
+            "operational_requirement": "No",
+            "deviation_rationale": "",
+            "supporting_documents": "scan.csv",
+            "comments": "Active on Tab 1",
+            "bod_22_01_tracking": "No",
+            "bod_22_01_due_date": "",
+            "cve": "CVE-2023-38408",
+        }
+        closed_entry = {
+            "poam_id": "2026-OCT-00001",
+            "controls": "SC-8",
+            "weakness_name": "Remediated Closed Vulnerability",
+            "weakness_description": "Closed finding on Tab 2",
+            "detector_source": "Tenable Nessus",
+            "source_identifier": "153953",
+            "asset_identifier": "10.0.0.25",
+            "point_of_contact": "SecOps",
+            "resources_required": "Engineering",
+            "remediation_plan": "Patched and verified",
+            "original_detection_date": "2026-09-01",
+            "scheduled_completion_date": "2026-10-01",
+            "status_date": "2026-11-01",
+            "vendor_dependency": "No",
+            "last_vendor_checkin": "",
+            "vendor_product_name": "TLS",
+            "original_risk_rating": "High",
+            "adjusted_risk_rating": "",
+            "risk_adjustment": "No",
+            "false_positive": "No",
+            "operational_requirement": "No",
+            "deviation_rationale": "",
+            "supporting_documents": "scan.csv",
+            "comments": "[2026-11-01 Auto-Closed by GRCx]: Verified absent on scanned host.",
+            "bod_22_01_tracking": "No",
+            "bod_22_01_due_date": "",
+            "cve": "CVE-2021-44228",
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            combined_xlsx = os.path.join(tmpdir, "FedRAMP-POAM.xlsx")
+            ts.write_combined_poam_workbook(
+                open_template_path=self.open_template,
+                closed_template_path=self.closed_template,
+                output_path=combined_xlsx,
+                open_entries=[open_entry],
+                closed_entries=[closed_entry],
+            )
+            self.assertTrue(os.path.isfile(combined_xlsx))
+
+            # Verify exactly 2 worksheets exist: Tab 1 = Open POA&M Items, Tab 2 = Closed POA&M Items
+            sheet_names = ts.get_workbook_sheet_names(combined_xlsx)
+            self.assertEqual(sheet_names, ["Open POA&M Items", "Closed POA&M Items"])
+
+            # Verify reading Tab 1 (Open POA&M Items)
+            loaded_open = ts.load_existing_poam_workbook(combined_xlsx, is_closed_template=False)
+            self.assertEqual(len(loaded_open), 1)
+            self.assertEqual(loaded_open[0]["poam_id"], "2026-NOV-00002")
+            self.assertEqual(loaded_open[0]["weakness_name"], "Active Open Vulnerability")
+
+            # Verify reading Tab 2 (Closed POA&M Items)
+            loaded_closed = ts.load_existing_poam_workbook(combined_xlsx, is_closed_template=True)
+            self.assertEqual(len(loaded_closed), 1)
+            self.assertEqual(loaded_closed[0]["poam_id"], "2026-OCT-00001")
+            self.assertEqual(loaded_closed[0]["weakness_name"], "Remediated Closed Vulnerability")
+
+            # Also verify CLI end-to-end execution writes ONLY FedRAMP-POAM.xlsx + poam_transform_summary.md
+            cli_out_dir = os.path.join(tmpdir, "pickup_run")
+            sample_scan = os.path.join(REPO_ROOT, "testing", "sample-scans", "tenable_monthly_scan.csv")
+            sample_prev = os.path.join(REPO_ROOT, "testing", "sample-scans", "previous_open_poam.xlsx")
+            argv = [
+                "grc transform",
+                "--scan", sample_scan,
+                "--previous-open", sample_prev,
+                "--draft-remediations", "n",
+                "--output-dir", cli_out_dir,
+            ]
+            with mock.patch("sys.argv", argv):
+                rc = ts.main()
+                self.assertEqual(rc, 0)
+
+            out_files = sorted(os.listdir(cli_out_dir))
+            self.assertEqual(out_files, ["FedRAMP-POAM.xlsx", "poam_transform_summary.md"])
+            self.assertEqual(
+                ts.get_workbook_sheet_names(os.path.join(cli_out_dir, "FedRAMP-POAM.xlsx")),
+                ["Open POA&M Items", "Closed POA&M Items"],
+            )
 
 
 if __name__ == "__main__":
