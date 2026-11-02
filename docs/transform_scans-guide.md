@@ -20,7 +20,7 @@
 </p>
 
 > **Engine**: [`scripts/transform_scans.py`](../scripts/transform_scans.py) · **CLI Command**: `./grc transform`  
-> **Release Series**: `v1.4.3 — Yokota` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`, and unified 2-tab `FedRAMP-POAM.xlsx` + 5-sheet template ingestion in `v1.4.3 — Yokota`)*  
+> **Release Series**: `v1.4.4 — Yokota` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`, unified 2-tab `FedRAMP-POAM.xlsx` + 5-sheet template ingestion in `v1.4.3 — Yokota`, and Qualys VMDR + Wiz Cloud Security adapters in `v1.4.4 — Yokota`)*  
 > **Execution Mode**: **100% Standalone** *(Requires only Python 3.9+ Standard Library — no Docker container, no `.bundle` file, and no `pip install` needed)*
 
 ---
@@ -56,7 +56,7 @@
 
 Unlike internal pipeline engines such as `crypto_lib_scan.py` or `sbom_analyzer.py`—which run as automated containerized stages inside the 5-phase `.bundle` or `AMI` review lifecycle—**`transform_scans.py` (`./grc transform`) is built to be used directly and independently by GRC analysts** during monthly or weekly Continuous Monitoring (ConMon) cycles.
 
-In day-to-day federal, defense, and enterprise compliance operations, GRC analysts frequently receive raw **Tenable (Nessus / Tenable.sc / Tenable.io)** or **AWS Inspector** vulnerability scan exports in `.csv` or `.xlsx` format and must manually:
+In day-to-day federal, defense, and enterprise compliance operations, GRC analysts frequently receive raw **Tenable (Nessus / Tenable.sc / Tenable.io)**, **AWS Inspector**, **Qualys VMDR**, or **Wiz Cloud Security** vulnerability scan exports in `.csv` or `.xlsx` format and must manually:
 1. Map thousands of scanner rows into the 27 columns of the official **OPEN FedRAMP POA&M template (`.xlsx`)**.
 2. Compare the new scan against last month's filled-out **OPEN FedRAMP POA&M** to determine which items are still open (and must preserve their immutable `Original Detection Date`) versus which items have been remediated and must move to the **CLOSED FedRAMP POA&M template (`.xlsx`)**.
 3. Track down official Tenable or AWS remediation links for any POA&M entries missing a **Remediation Plan (`Column K`)**.
@@ -286,7 +286,7 @@ Running a transformation outputs the itemized SLA Breach & Aging table directly 
 [+] Drafted 5 Remediation Plans with official TENABLE remediation URLs.
 
 ================================================================================================
-  GRC-xMINI (v1.4.3 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
+  GRC-xMINI (v1.4.4 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
 ================================================================================================
   Analysis Reference Date : 2026-10-31
   Source Scan File(s)     : tenable_monthly_scan.csv (1 file)

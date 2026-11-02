@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.4.3 — Yokota) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.4.4 — Yokota) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -1228,7 +1228,7 @@ class WizAdapter:
         if strict_fedramp_risk and risk == "Critical":
             risk = "High"
 
-        vuln_id = get_first_field(row, ["Vulnerability ID", "Vuln ID", "Finding ID", "CVE"], lower_map=row_lc)
+        vuln_id = get_first_field(row, ["Wiz ID", "Wiz Vulnerability ID", "Vulnerability ID", "Vuln ID", "Finding ID", "CVE"], lower_map=row_lc)
         title = get_first_field(row, ["Name", "Vulnerability Name", "Title"], default=vuln_id or "Wiz Vulnerability Finding", lower_map=row_lc)
         desc = get_first_field(row, ["Description", "Summary"], default=title, lower_map=row_lc)
         pkg = get_first_field(row, ["Package Name", "Package", "Vulnerable Package"], lower_map=row_lc)
@@ -2728,7 +2728,7 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRC-xMINI (v1.4.3 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRC-xMINI (v1.4.4 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:

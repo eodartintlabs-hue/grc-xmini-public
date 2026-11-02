@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.4.3 — Yokota` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.4.4 — Yokota` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.4.4`](#v144--yokota) | Yokota | 2026-11-02 | Bug fix | _TBD after tagging_ | Native Qualys VMDR & Wiz Cloud Security adapters, 4-way scanner auto-detection, vendor remediation URL drafting, and pure standard-library synthetic demo data generator (`scripts/generate_demo_data.py`) |
 | [`v1.4.3`](#v143--yokota) | Yokota | 2026-11-01 | Bug fix | `43839b9` | Multi-worksheet FedRAMP v3.1 POA&M template ingestion (strict Worksheet #1 reading + dynamic header/guidance row skipping) and unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/` |
 | [`v1.4.2`](#v142--yokota) | Yokota | 2026-11-01 | Bug fix | `7b05926` | Code Review Phase 2 (Externalized policy catalogs `rules/severity_policy.json` & `rules/stig_catalog.json`, `Ec2Backend` strategy pattern, `PoamIdAllocator`, `TenableAdapter`/`InspectorAdapter`, `@dataclass` models, 34 unit tests, and Bold White `GRCx` logo update) |
 | [`v1.4.1`](#v141--yokota) | Yokota | 2026-11-01 | Bug fix | `c8c629f` | Code Review Phase 1 (P0/P1 security & compliance integrity fixes across all 7 engines, `grc_common.py`, `grc_fixtures.py`, and 29 regression tests) |
@@ -45,6 +46,44 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.4.4 — Yokota
+
+**Native Qualys VMDR & Wiz Scanner Adapters, Multi-Scanner Detection & Synthetic Demo Generator** · November 02, 2026 · Tag `v1.4.4`
+
+### Multi-Scanner Compliance Architecture & Synthetic Demo Tooling
+
+1. **Native Qualys VMDR Scanner Adapter (`scripts/transform_scans.py`)**:
+   - Implemented `QualysAdapter` normalizing Qualys VMDR vulnerability exports (`.csv` and `.xlsx`) into standard FedRAMP POA&M fields.
+   - Maps Qualys numeric severity levels (`5 -> Critical`, `4 -> High`, `3 -> Moderate`, `2/1 -> Low`) and textual severity headers.
+   - Normalizes QID source identifiers, vulnerability titles, threats, impacts, and scanner technical evidence (`[Scanner Evidence]: ...`).
+   - Automatically correlates IP, DNS, NetBIOS, Port, and Protocol into consolidated asset identifiers (`Host (Port/Proto)`).
+2. **Native Wiz Cloud Security Scanner Adapter (`scripts/transform_scans.py`)**:
+   - Implemented `WizAdapter` normalizing cloud infrastructure and container workload findings from Wiz vulnerability reports (`.csv` and `.xlsx`).
+   - Normalizes Wiz IDs (`WIZ-...`), vulnerability names, descriptions, affected package names, and file paths.
+   - Captures cloud asset context across virtual machine workloads and Kubernetes container pods (`Asset Name (Asset Type)`).
+   - Ingests fixed versions, remediation guidance, and sets vendor dependency tracking when fixes are unavailable.
+3. **4-Way Dynamic Scanner Auto-Detection & Asset Alias Expansion (`scripts/transform_scans.py`)**:
+   - Upgraded `detect_scanner_type()` with multi-marker heuristic scoring to accurately auto-detect Tenable, AWS Inspector, Qualys VMDR, and Wiz exports without manual flags.
+   - Extended `extract_row_asset_aliases()` to parse `IP`, `DNS`, `Asset Name`, and `Resource Name` for seamless host reconciliation across mixed-scanner environments.
+   - Added `qualys` and `wiz` to the `--scanner` CLI argument options.
+4. **Vendor Remediation Plan URL Drafter Expansion (`scripts/transform_scans.py`)**:
+   - Extended `build_remediation_plan_with_urls()` with official vendor reference builders:
+     - Qualys: extracts advisory URLs, links to National Vulnerability Database (`https://nvd.nist.gov/vuln/detail/CVE-...`), and official Qualys Threat Research.
+     - Wiz: extracts reference advisories, NVD links, and the official Wiz Vulnerability Database (`https://www.wiz.io/vulnerability-database`).
+5. **Pure Standard-Library Synthetic Demo Dataset Generator (`scripts/generate_demo_data.py`)**:
+   - Created `scripts/generate_demo_data.py` (zero third-party dependencies, standard library `zipfile` and `xml.etree.ElementTree`) generating full-fidelity compliance test datasets:
+     - `previous_open_poam.xlsx`: 160 entries spanning MAR, MAY, JUL, AUG, OCT 2026 (`YYYY-MMM-#####` format) using the official FedRAMP v3.1 5-worksheet template.
+     - `tenable_vulnerability_report.xlsx`: 80 findings (40 matched, 40 new).
+     - `qualys_vulnerability_report.xlsx`: 30 findings (20 matched, 10 new).
+     - `aws_inspector_report.xlsx`: 150 findings (10 matched, 140 new).
+     - `wiz_vulnerability_report.xlsx`: 70 findings (10 matched, 60 new).
+     - Automatic dual-environment distribution to both `artifacts/drop-off/` and `GRC-xTEST/scans/`.
+6. **Regression Test Suite Expansion (`testing/test_transform_scans.py`, `scripts/grc_test.py`)**:
+   - Added unit tests for Qualys and Wiz adapters and scanner auto-detection (`test_qualys_adapter_and_auto_detection`, `test_wiz_adapter_and_auto_detection`).
+   - All 38 unit tests pass with zero errors, and all 7 compliance engines pass under `scripts/grc_test.py`.
 
 ---
 

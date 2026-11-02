@@ -30,7 +30,7 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.3 (Yokota Series)
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.4 (Yokota Series)
  {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
@@ -51,7 +51,7 @@
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.4.3 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.4.4 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Test Corpus**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)  
@@ -293,7 +293,7 @@ In high-assurance compliance automation, a scanner that outputs zero findings is
 
 | Active Milestone | Series Codename | Status | Summary of Active Capabilities | Full Roadmap & Release Docs |
 | :--- | :--- | :--- | :--- | :--- |
-| **`v1.4.3 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **FedRAMP v3.1 5-Sheet POA&M Ingestion & Unified 2-Tab Output Workbook (`FedRAMP-POAM.xlsx`)**: Strict Worksheet #1 (`sheet_index=0`) reading when ingesting multi-worksheet FedRAMP templates, dynamic `POAM ID` header/data row detection skipping `Guidance`/`Examples`/`Mandatory` rows, unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/`, and 36 unit tests passing. | See **[`hygiene/`](hygiene/)** |
+| **`v1.4.4 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Qualys VMDR & Wiz Scanner Adapters, Multi-Scanner Ingestion & Synthetic Demo Generator**: Integrated `QualysAdapter` (QID, severity 1–5, threat/impact) and `WizAdapter` (Wiz ID, cloud assets/pods, fixed versions) into `transform_scans.py`, expanded asset alias extraction, added vendor remediation URLs, created standard-library synthetic test dataset generator `scripts/generate_demo_data.py`, and 38 unit tests passing. | See **[`hygiene/`](hygiene/)** |
 
 > 🗺️ **Looking Ahead to Future Milestones?**  
 > Planned releases—including the upcoming **`v1.3.5 — Sasebo`** (Universal Workstation Portability & `./grc doctor`) and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:

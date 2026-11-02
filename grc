@@ -20,7 +20,7 @@ print_grcfetch() {
 
     echo -e ""
     echo -e "  ${BW}        .--.          .--.          .--.                       ${R}"
-    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.4.3 (Yokota Series)${R}"
+    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.4.4 (Yokota Series)${R}"
     echo -e "  ${BW} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}--------------------------------${R}"
     echo -e "  ${BW} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
     echo -e "  ${BW} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"

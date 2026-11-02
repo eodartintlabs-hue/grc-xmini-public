@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit Test Suite for GRC-xMINI (v1.4.3 — Yokota) Scan-to-POA&M Transformation Engine
+Unit Test Suite for GRC-xMINI (v1.4.4 — Yokota) Scan-to-POA&M Transformation Engine
 (scripts/transform_scans.py).
 
 Validates compliance-critical invariants:
@@ -1112,6 +1112,100 @@ class TestTransformScansEngine(unittest.TestCase):
                 ts.get_workbook_sheet_names(os.path.join(cli_out_dir, "FedRAMP-POAM.xlsx")),
                 ["Open POA&M Items", "Closed POA&M Items"],
             )
+
+    # -----------------------------------------------------------------------
+    # 13. Qualys VMDR and Wiz Cloud Security Adapters & Auto-Detection
+    # -----------------------------------------------------------------------
+
+    def test_qualys_adapter_and_auto_detection(self) -> None:
+        row = {
+            "QID": "38742",
+            "Title": "OpenSSH RegreSSHion Remote Code Execution",
+            "Severity": "5",
+            "IP": "10.100.10.25",
+            "Port": "22",
+            "Protocol": "TCP",
+            "Threat": "Signal handler race condition in OpenSSH sshd allows remote code execution.",
+            "Impact": "Full administrative root takeover.",
+            "Solution": "Upgrade OpenSSH package to 9.8p1 or newer.",
+            "CVE": "CVE-2024-6387",
+            "First Detected": "2026-07-01",
+            "Last Detected": "2026-11-01",
+        }
+        # Auto-detection
+        detected = ts.detect_scanner_type([row])
+        self.assertEqual(detected, "qualys")
+
+        # Parsing
+        row_lc = {k.lower(): v for k, v in row.items()}
+        parsed = ts.QualysAdapter.parse_row(row, row_lc, self.today, {}, strict_fedramp_risk=False)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["risk"], "Critical")
+        self.assertEqual(parsed["source_id"], "38742")
+        self.assertEqual(parsed["name"], "OpenSSH RegreSSHion Remote Code Execution")
+        self.assertEqual(parsed["asset_base"], "10.100.10.25")
+        self.assertEqual(parsed["detector_source"], "Qualys VMDR")
+        self.assertEqual(parsed["cves"], "CVE-2024-6387")
+        self.assertIn("Impact: Full administrative root takeover.", parsed["full_desc"])
+
+        # Remediation plan URL generation
+        dummy_entry = {
+            "detector_source": "Qualys",
+            "_scanner_type": "qualys",
+            "source_identifier": "38742",
+            "cve": "CVE-2024-6387",
+            "weakness_name": parsed["name"],
+            "solution": parsed["solution"],
+            "see_also": "",
+        }
+        plan = ts.build_remediation_plan_with_urls(dummy_entry)
+        self.assertIn("Official Qualys & Vendor Remediation References:", plan)
+        self.assertIn("https://nvd.nist.gov/vuln/detail/CVE-2024-6387", plan)
+
+    def test_wiz_adapter_and_auto_detection(self) -> None:
+        row = {
+            "Wiz ID": "WIZ-2024-0012",
+            "Project Name": "Production FedRAMP Cluster",
+            "Asset Name": "k8s-pod-auth-01",
+            "Asset Type": "Container",
+            "Vulnerability Name": "XZ Utils liblzma Upstream Malicious Backdoor",
+            "Severity": "Critical",
+            "Fixed Version": "5.6.1-r1",
+            "CVE": "CVE-2024-3094",
+            "Remediation": "Rebuild container image using patched base image.",
+            "First Seen": "2026-03-30",
+            "Last Seen": "2026-11-01",
+        }
+        # Auto-detection
+        detected = ts.detect_scanner_type([row])
+        self.assertEqual(detected, "wiz")
+
+        # Parsing
+        row_lc = {k.lower(): v for k, v in row.items()}
+        parsed = ts.WizAdapter.parse_row(row, row_lc, self.today, {}, strict_fedramp_risk=False)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["risk"], "Critical")
+        self.assertEqual(parsed["source_id"], "WIZ-2024-0012")
+        self.assertEqual(parsed["name"], "XZ Utils liblzma Upstream Malicious Backdoor")
+        self.assertEqual(parsed["asset_base"], "k8s-pod-auth-01")
+        self.assertEqual(parsed["detector_source"], "Wiz")
+        self.assertEqual(parsed["cves"], "CVE-2024-3094")
+        self.assertEqual(parsed["asset_display"], "k8s-pod-auth-01 (Container)")
+        self.assertEqual(parsed["solution"], "Rebuild container image using patched base image.")
+
+        # Remediation plan URL generation
+        dummy_entry = {
+            "detector_source": "Wiz",
+            "_scanner_type": "wiz",
+            "source_identifier": "WIZ-2024-0012",
+            "cve": "CVE-2024-3094",
+            "weakness_name": parsed["name"],
+            "solution": parsed["solution"],
+            "see_also": "",
+        }
+        plan = ts.build_remediation_plan_with_urls(dummy_entry)
+        self.assertIn("Official Wiz Cloud & Vendor Remediation References:", plan)
+        self.assertIn("https://nvd.nist.gov/vuln/detail/CVE-2024-3094", plan)
 
 
 if __name__ == "__main__":
