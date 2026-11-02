@@ -84,6 +84,8 @@
 6. **Regression Test Suite Expansion (`testing/test_transform_scans.py`, `scripts/grc_test.py`)**:
    - Added unit tests for Qualys and Wiz adapters and scanner auto-detection (`test_qualys_adapter_and_auto_detection`, `test_wiz_adapter_and_auto_detection`).
    - All 38 unit tests pass with zero errors, and all 7 compliance engines pass under `scripts/grc_test.py`.
+7. **Repository Hygiene**:
+   - Removed obsolete temporary internal modularization review file (`hygiene/REFACTOR_REVIEW_transform_scans.md`).
 
 ---
 
