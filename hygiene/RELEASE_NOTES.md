@@ -28,7 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| [`v1.4.4`](#v144--yokota) | Yokota | 2026-11-02 | Bug fix | _TBD after tagging_ | Native Qualys VMDR & Wiz Cloud Security adapters, 4-way scanner auto-detection, vendor remediation URL drafting, and pure standard-library synthetic demo data generator (`scripts/generate_demo_data.py`) |
+| [`v1.4.4`](#v144--yokota) | Yokota | 2026-11-02 | Bug fix | `5adf787` | Native Qualys VMDR & Wiz Cloud Security adapters, 4-way scanner auto-detection, vendor remediation URL drafting, and pure standard-library synthetic demo data generator (`scripts/generate_demo_data.py`) |
 | [`v1.4.3`](#v143--yokota) | Yokota | 2026-11-01 | Bug fix | `43839b9` | Multi-worksheet FedRAMP v3.1 POA&M template ingestion (strict Worksheet #1 reading + dynamic header/guidance row skipping) and unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/` |
 | [`v1.4.2`](#v142--yokota) | Yokota | 2026-11-01 | Bug fix | `7b05926` | Code Review Phase 2 (Externalized policy catalogs `rules/severity_policy.json` & `rules/stig_catalog.json`, `Ec2Backend` strategy pattern, `PoamIdAllocator`, `TenableAdapter`/`InspectorAdapter`, `@dataclass` models, 34 unit tests, and Bold White `GRCx` logo update) |
 | [`v1.4.1`](#v141--yokota) | Yokota | 2026-11-01 | Bug fix | `c8c629f` | Code Review Phase 1 (P0/P1 security & compliance integrity fixes across all 7 engines, `grc_common.py`, `grc_fixtures.py`, and 29 regression tests) |
