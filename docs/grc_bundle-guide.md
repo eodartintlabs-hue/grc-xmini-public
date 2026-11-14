@@ -184,14 +184,14 @@ In **Phase 3**, the analyst triggers the containerized scanning suite via `./grc
     -> Syft SBOM generated: 84 components indexed in /evidence/sbom.cdx.json
 
 >>> [5/7] Executing Offline Vulnerability Matching via Grype & Trivy...
-    -> Grype scan completed: 2 CVEs recorded in /evidence/grype_cve_report.json
-    -> Trivy scan completed: 2 CVEs recorded in /evidence/trivy_cve_report.json
+    -> Grype scan completed: 2 CVEs recorded in /evidence/grype_findings.json
+    -> Trivy scan completed: 2 CVEs recorded in /evidence/trivy_findings.json
 
 >>> [6/7] Executing Static Cryptographic Provider & EOL Library Scan...
-    -> CryptoScan completed: 1 deprecated cipher detected in /evidence/crypto_lib_findings.json
+    -> CryptoScan completed: 1 deprecated cipher detected in /evidence/crypto_findings.json
 
 >>> [7/7] Generating DISA STIG / DoD Cloud SRG Applicability Matrix...
-    -> STIG mapping completed: 3 STIG profiles identified in /evidence/stig_applicability_report.json
+    -> STIG mapping completed: 3 STIG profiles identified in /evidence/stig_applicability.json
 
 [SUCCESS] Phase 3 Security Analysis complete. Raw telemetry preserved in ./evidence/auth-service-v1.2.0
 ```

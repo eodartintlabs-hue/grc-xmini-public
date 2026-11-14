@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRC-xMINI (The GRC eXperience) — Unified Compliance Test & Verification Engine
-Engine: scripts/grc_test.py (v1.4.4 — Yokota)
+Engine: scripts/grc_test.py (v1.4.5 — Yokota)
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Engine #7 — Test, Mock & Invariant Verification Orchestrator
@@ -171,7 +171,11 @@ class TestEngine:
         try:
             flawed_reqs = temp_dir / "requirements.txt"
             flawed_reqs.write_text(
-                "pycrypto==2.6.1\ncryptography==9.0\ncryptography==100.0.0\n",
+                "pycrypto==2.6.1\npycryptodome==3.20.0\ncryptography==9.0\ncryptography==100.0.0\n",
+                encoding="utf-8",
+            )
+            (temp_dir / "go.mod").write_text(
+                "module example.com/app\n\nrequire golang.org/x/crypto v0.28.0\n",
                 encoding="utf-8",
             )
             (temp_dir / "libssl.so.1.1").touch()
@@ -195,13 +199,15 @@ class TestEngine:
             invariants_ok = (
                 by_key.get(("pycrypto", "2.6.1")) == "FAIL_DEPRECATED"
                 and by_key.get(("cryptography", "9.0")) == "WARN_OUTDATED"
-                and by_key.get(("cryptography", "100.0.0")) == "PASS"
+                and by_key.get(("cryptography", "100.0.0")) == "CANNOT_DETERMINE_STATICALLY"
+                and by_key.get(("pycryptodome", "3.20.0")) == "NOT_VALIDATED"
+                and by_key.get(("golang.org/x/crypto", "0.28.0")) == "NOT_VALIDATED"
                 and by_key.get(("libssl.so.1.1", "1.1")) == "FAIL_EOL"
             )
             return self._record(
                 "crypto_lib_scan",
                 invariants_ok,
-                "DEPRECATED, numeric version compare, vendor path & soname EOL verified"
+                "DEPRECATED, numeric version compare, tri-state FIPS, vendor path & soname EOL verified"
                 if invariants_ok
                 else f"unexpected statuses: {by_key}",
             )
@@ -337,7 +343,7 @@ class TestEngine:
         reporter_script = os.path.join(SCRIPT_DIR, "grc_reporter.py")
         temp_dir = Path(tempfile.mkdtemp(prefix="grc_reporter_test_"))
         try:
-            # Write crypto_findings.json with 1 PASS and 1 FAIL_DEPRECATED
+            # Write crypto_findings.json with 1 CANNOT_DETERMINE_STATICALLY and 1 FAIL_DEPRECATED
             crypto_payload = {
                 "findings": [
                     {
@@ -345,7 +351,8 @@ class TestEngine:
                         "detected_version": "42.0.0",
                         "manifest_file": "requirements.txt",
                         "ecosystem": "python",
-                        "compliance_status": "PASS",
+                        "compliance_status": "CANNOT_DETERMINE_STATICALLY",
+                        "fips_status": "CAPABLE_IF_CONFIGURED",
                         "severity": "INFO",
                         "nist_controls": ["SC-13"],
                     },
@@ -355,6 +362,7 @@ class TestEngine:
                         "manifest_file": "backend/requirements.txt",
                         "ecosystem": "python",
                         "compliance_status": "FAIL_DEPRECATED",
+                        "fips_status": "NOT_VALIDATED",
                         "severity": "CRITICAL",
                         "nist_controls": ["SI-7", "SC-13"],
                     },
@@ -366,32 +374,39 @@ class TestEngine:
             res = subprocess.run(cmd, capture_output=True, text=True)
             pkg_file = temp_dir / "scr_scn_package.json"
             ruleset_file = temp_dir / "ruleset_validation.md"
-            if res.returncode != 0 or not pkg_file.is_file() or not ruleset_file.is_file():
+            poam_file = temp_dir / "poam_data.md"
+            if res.returncode != 0 or not pkg_file.is_file() or not ruleset_file.is_file() or not poam_file.is_file():
                 return self._record("grc_reporter", False, "deliverable generation failed")
 
             pkg = json.loads(pkg_file.read_text(encoding="utf-8"))
             ruleset_md = ruleset_file.read_text(encoding="utf-8")
+            poam_md = poam_file.read_text(encoding="utf-8")
             findings = pkg.get("findings", [])
+            verifications = pkg.get("verification_items", [])
 
             # Invariants:
-            # 1. Only 1 finding (pycrypto FAIL_DEPRECATED), NOT the PASS cryptography entry
+            # 1. Only 1 confirmed POA&M finding (pycrypto FAIL_DEPRECATED); cryptography goes to verification_items
             # 2. Manifest file preserved ('backend/requirements.txt')
-            # 3. Semgrep did not run -> ruleset_validation.md says NOT ASSESSED (NO EVIDENCE)
-            # 4. SI-4 (assessed only by Semgrep) status is NOT_ASSESSED
+            # 3. poam_data.md includes Section 4 ("Needs Human or Runtime Verification")
+            # 4. Semgrep did not run -> ruleset_validation.md says NOT ASSESSED (NO EVIDENCE)
+            # 5. SI-4 (assessed only by Semgrep) status is NOT_ASSESSED
             si4_status = pkg.get("controls_rollup", {}).get("SI-4", {}).get("status")
             invariants_ok = (
                 len(findings) == 1
+                and len(verifications) == 1
+                and verifications[0]["library_name"] == "cryptography"
                 and "pycrypto" in findings[0]["title"]
                 and findings[0]["file_path"] == "backend/requirements.txt"
+                and "## 4. Needs Human or Runtime Verification" in poam_md
                 and "NOT ASSESSED (NO EVIDENCE)" in ruleset_md
                 and si4_status == "NOT_ASSESSED"
             )
             return self._record(
                 "grc_reporter",
                 invariants_ok,
-                "PASS exclusion, NOT_ASSESSED evidence tracking & SCR package verified"
+                "Verification separation, NOT_ASSESSED evidence tracking & SCR package verified"
                 if invariants_ok
-                else f"findings={len(findings)}, SI-4={si4_status}",
+                else f"findings={len(findings)}, verifications={len(verifications)}, SI-4={si4_status}",
             )
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -414,7 +429,7 @@ class TestEngine:
     def run_all(self) -> bool:
         """Executes all engine checks and unit test suites with per-suite crash isolation."""
         print("==================================================================")
-        print("  GRC-xMINI (v1.4.4 — Yokota) · COMPREHENSIVE TEST SUITE")
+        print("  GRC-xMINI (v1.4.5 — Yokota) · COMPREHENSIVE TEST SUITE")
         print("==================================================================")
 
         suite_runners: Dict[str, Callable[[], bool]] = {

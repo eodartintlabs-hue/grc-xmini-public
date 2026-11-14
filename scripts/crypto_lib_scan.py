@@ -5,7 +5,7 @@ crypto_lib_scan.py - Static Cryptographic Provider & Dependency Scanner
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Phase 3 (Analyze) & Phase 4 (Evidence) Deliverable Generator
-Target Frameworks: NIST SP 800-53 (SI-7, SC-12, SC-13, IA-7), DISA STIG ASD V5R1
+Target Frameworks: NIST SP 800-53 (SI-7, SC-12, SC-13), DISA STIG ASD V5R1, NIST FIPS 140-3
 
 Purpose:
   Statically inspects an extracted repository or workspace to identify and enumerate
@@ -17,18 +17,19 @@ Purpose:
     - Native System Libraries (libcrypto.*, libssl.*, openssl binaries)
 
   Evaluates detected libraries against policy rules defined in `crypto_catalog.json`
-  to directly satisfy:
-    - AOC 09: Crypto Dependencies on Unsupported Libraries (e.g. OpenSSL 1.1.1, PyCrypto)
-    - AOC 03: Weak Encryption Check (insecure provider identification)
-    - FIPS 140 Cryptographic Module baseline traceability
+  for:
+    - AOC 09: Crypto Dependencies on Unsupported/EOL Libraries (SI-7)
+    - Static FIPS 140-3 capability & validation-status inventory (SC-13)
+    - Surfacing CAPABLE_IF_CONFIGURED modules as requiring runtime/host verification
 
 Outputs:
-  - Terminal Compliance Audit Summary
+  - Terminal Audit Inventory Summary
   - Structured JSON Evidence Deliverable (`crypto_findings.json`)
   - Markdown Audit Traceability Table (`crypto_matrix.md`)
 """
 
 import argparse
+import copy
 import dataclasses
 import json
 import os
@@ -36,7 +37,7 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     import tomllib  # Python 3.11+ stdlib
@@ -65,103 +66,223 @@ SKIP_DIRS = {".git", "node_modules", "vendor", "__pycache__", ".venv", "venv"}
 
 
 # ==============================================================================
-# DEFAULT EMBEDDED POLICY CATALOG (Fallback if JSON not present)
+# EMBEDDED FALLBACK POLICY CATALOG (Kept in sync with rules/crypto_catalog.json)
 # ==============================================================================
 
-DEFAULT_CRYPTO_CATALOG: Dict[str, Any] = {
+_CATALOG_FILE = Path(__file__).resolve().parent.parent / "rules" / "crypto_catalog.json"
+
+EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
     "openssl": {
         "display_name": "OpenSSL Cryptographic Library",
-        "ecosystems": ["system", "c_cpp", "deb", "rpm", "alpine"],
-        "patterns": [r"^openssl$", r"^libssl.*", r"^libcrypto.*"],
-        "min_supported_version": "3.0.0",
+        "ecosystems": ["c_cpp", "python", "pypi", "system", "deb", "rpm", "alpine"],
+        "patterns": ["^openssl$", "^libssl.*", "^libcrypto.*", "^pyopenssl$"],
+        "min_supported_version": "3.0.14",
         "status": "ACTIVE",
-        "fips_capable": True,
+        "fips_status": "CAPABLE_IF_CONFIGURED",
+        "fips_note": (
+            "OpenSSL 3.x requires an explicitly configured and activated CMVP-validated FIPS "
+            "provider (e.g., openssl.cnf [fips_sect] activate = 1); library version alone does not prove FIPS mode."
+        ),
         "eol_versions": [
             {"version": "1.1.1", "eol_date": "2023-09-11", "severity": "CRITICAL"},
             {"version": "1.1.0", "eol_date": "2019-09-11", "severity": "CRITICAL"},
             {"version": "1.0.2", "eol_date": "2019-12-31", "severity": "CRITICAL"},
+            {"version": "0.9.8", "eol_date": "2015-12-31", "severity": "CRITICAL"},
         ],
-        "remediation": "Upgrade OpenSSL to supported 3.0.x LTS or 3.2.x+ branch.",
+        "remediation": (
+            "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated "
+            "FIPS 140-3 provider for SC-13 workloads."
+        ),
         "nist_controls": ["SI-7", "SC-12", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
     "pycrypto": {
         "display_name": "Python PyCrypto",
         "ecosystems": ["pypi", "python"],
-        "patterns": [r"^pycrypto$"],
+        "patterns": ["^pycrypto$"],
         "status": "DEPRECATED_UNMAINTAINED",
+        "fips_status": "NOT_VALIDATED",
+        "eol_since": "2013-10-18",
         "severity": "CRITICAL",
-        "description": "PyCrypto has been unmaintained since 2013 and contains unpatched vulnerabilities.",
-        "remediation": "Migrate all cryptographic operations to 'cryptography' or 'pycryptodome'.",
+        "description": (
+            "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, "
+            "and is not FIPS 140-3 validated."
+        ),
+        "fips_note": "PyCrypto is unmaintained and holds no NIST CMVP FIPS 140 validation.",
+        "remediation": (
+            "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) "
+            "linked against a CMVP-validated OpenSSL 3 FIPS provider."
+        ),
         "nist_controls": ["SI-7", "SC-13"],
+        "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+    },
+    "pycryptodome": {
+        "display_name": "Python PyCryptodome / PyCryptodomex",
+        "ecosystems": ["pypi", "python"],
+        "patterns": ["^pycryptodome$", "^pycryptodomex$"],
+        "min_supported_version": "3.19.1",
+        "status": "ACTIVE",
+        "fips_status": "NOT_VALIDATED",
+        "fips_note": (
+            "PyCryptodome and PyCryptodomex are actively maintained Python packages, "
+            "but neither holds a NIST CMVP FIPS 140-2/140-3 module validation certificate."
+        ),
+        "remediation": (
+            "For FIPS 140-3 / SC-13 regulated workloads, migrate to 'cryptography' "
+            "(pyca/cryptography) dynamically linked against a CMVP-validated OpenSSL FIPS provider."
+        ),
+        "nist_controls": ["SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
     "cryptography": {
         "display_name": "PyCA Cryptography",
         "ecosystems": ["pypi", "python"],
-        "patterns": [r"^cryptography$"],
+        "patterns": ["^cryptography$"],
         "min_supported_version": "41.0.0",
-        "status": "APPROVED",
-        "fips_capable": True,
-        "remediation": "Ensure version >= 41.0.0 for modern memory-safe OpenSSL bindings.",
+        "status": "ACTIVE",
+        "fips_status": "CAPABLE_IF_CONFIGURED",
+        "fips_note": (
+            "Standard PyPI manylinux/macOS/Windows wheels statically bundle a non-validated "
+            "OpenSSL build. FIPS 140-3 use requires building or dynamically linking against the "
+            "host platform's CMVP-validated OpenSSL FIPS provider with FIPS mode enabled."
+        ),
+        "eol_versions": [
+            {"version": "36.", "eol_date": "2023-03-01", "severity": "HIGH"},
+            {"version": "3.", "eol_date": "2021-11-01", "severity": "CRITICAL"},
+            {"version": "2.", "eol_date": "2020-07-01", "severity": "CRITICAL"},
+        ],
+        "remediation": (
+            "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage "
+            "against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels."
+        ),
         "nist_controls": ["SI-7", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
     "bouncycastle": {
-        "display_name": "Bouncy Castle Crypto Provider",
+        "display_name": "Bouncy Castle Standard Provider (Non-FIPS)",
         "ecosystems": ["maven", "gradle", "java"],
-        "patterns": [r"^bcprov-.*", r"^bcpkix-.*", r"^bcutil-.*", r"^bouncycastle.*"],
-        "min_supported_version": "1.70",
+        "patterns": [
+            "^bcprov-.*",
+            "^bcpkix-(?!fips).*",
+            "^bcutil-.*",
+            "^bctls-(?!fips).*",
+            "^bouncycastle.*",
+        ],
+        "min_supported_version": "1.77",
         "status": "ACTIVE",
-        "fips_capable": True,
+        "fips_status": "NOT_VALIDATED",
+        "fips_note": (
+            "Standard Bouncy Castle (bcprov-jdk18on / bcprov-jdk15on) is not FIPS 140 validated; "
+            "use Bouncy Castle FIPS (bc-fips / bctls-fips) in approved-only mode for SC-13 workloads."
+        ),
         "eol_versions": [
             {"version": "<1.70", "eol_date": "2021-11-01", "severity": "HIGH"}
         ],
-        "remediation": "Upgrade org.bouncycastle dependencies to >= 1.70 (or bc-fips 1.0.2+).",
+        "remediation": (
+            "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with "
+            "CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads."
+        ),
+        "nist_controls": ["SI-7", "SC-12", "SC-13"],
+        "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+    },
+    "bouncycastle-fips": {
+        "display_name": "Bouncy Castle FIPS Provider (bc-fips)",
+        "ecosystems": ["maven", "gradle", "java"],
+        "patterns": ["^bc-fips.*", "^bctls-fips.*", "^bcpkix-fips.*"],
+        "min_supported_version": "1.0.2",
+        "status": "ACTIVE",
+        "fips_status": "CAPABLE_IF_CONFIGURED",
+        "fips_note": (
+            "Bouncy Castle FIPS (bc-fips) holds CMVP validation on specific certified versions "
+            "when JVM provider configuration and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce approved mode."
+        ),
+        "remediation": (
+            "Verify exact bc-fips version against active NIST CMVP certificate and confirm "
+            "JVM/application approved-only mode enforcement."
+        ),
         "nist_controls": ["SI-7", "SC-12", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
     "crypto-js": {
         "display_name": "Node.js crypto-js",
         "ecosystems": ["npm", "yarn", "javascript", "typescript"],
-        "patterns": [r"^crypto-js$"],
+        "patterns": ["^crypto-js$"],
+        "min_supported_version": "4.2.0",
         "status": "UNRECOMMENDED",
+        "fips_status": "NOT_VALIDATED",
         "severity": "MEDIUM",
-        "description": "crypto-js lacks constant-time security and hardware acceleration.",
-        "remediation": "Migrate to native Node.js 'crypto' module or Web Cryptography API.",
+        "description": (
+            "Active development of crypto-js has been discontinued; pure JS crypto lacks constant-time "
+            "side-channel resistance and has no FIPS 140-3 validation."
+        ),
+        "fips_note": "crypto-js is a pure JavaScript implementation with no NIST CMVP FIPS 140 validation.",
+        "remediation": (
+            "Migrate to Node.js built-in 'node:crypto' (compiled against a FIPS-validated OpenSSL "
+            "provider) or Web Crypto API (SubtleCrypto)."
+        ),
         "nist_controls": ["SI-7", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
     "node-forge": {
         "display_name": "Node-Forge Cryptographic Provider",
         "ecosystems": ["npm", "yarn", "javascript", "typescript"],
-        "patterns": [r"^node-forge$"],
+        "patterns": ["^node-forge$"],
         "min_supported_version": "1.3.1",
         "status": "ACTIVE",
-        "remediation": "Ensure version >= 1.3.1 to avoid known signature bypass vulnerabilities.",
+        "fips_status": "NOT_VALIDATED",
+        "fips_note": "Pure-JavaScript node-forge is not a CMVP FIPS 140-3 validated cryptographic module.",
+        "remediation": (
+            "Upgrade node-forge >= 1.3.1 to remediate ASN.1 and signature verification bypass CVEs, "
+            "and migrate SC-13 regulated crypto operations to Node.js 'node:crypto' backed by a FIPS-validated OpenSSL provider."
+        ),
         "nist_controls": ["SI-7", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
     "golang-x-crypto": {
         "display_name": "Go Supplementary Cryptography Libraries",
         "ecosystems": ["golang", "go"],
-        "patterns": [r"^golang\.org/x/crypto.*"],
-        "status": "APPROVED",
-        "remediation": "Review specific subpackage usage. Ensure standard crypto/aes is preferred.",
-        "nist_controls": ["SI-7", "SC-13"],
+        "patterns": ["^golang\\.org/x/crypto($|/.*)"],
+        "min_supported_version": "0.17.0",
+        "status": "ACTIVE",
+        "fips_status": "NOT_VALIDATED",
+        "description": "Go supplementary cryptography packages outside the Go standard library cryptographic module boundary.",
+        "fips_note": (
+            "Packages under golang.org/x/crypto lie outside the Go Cryptographic Module boundary "
+            "(GODEBUG=fips140=on / BoringCrypto) and are not FIPS 140-3 validated."
+        ),
+        "remediation": (
+            "Update golang.org/x/crypto >= v0.17.0 (mitigating Terrapin SSH CVE-2023-48795), and ensure "
+            "FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only "
+            "(Go 1.24+) or BoringCrypto rather than golang.org/x/crypto."
+        ),
+        "nist_controls": ["SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
 }
 
-# Synchronize DEFAULT_CRYPTO_CATALOG with rules/crypto_catalog.json when present
-_CATALOG_FILE = Path(__file__).resolve().parent.parent / "rules" / "crypto_catalog.json"
-if _CATALOG_FILE.is_file():
-    try:
-        _cat_data = json.loads(_CATALOG_FILE.read_text(encoding="utf-8"))
-        if isinstance(_cat_data, dict) and isinstance(_cat_data.get("rules"), dict):
-            DEFAULT_CRYPTO_CATALOG = _cat_data["rules"]
-    except Exception:
-        pass
+
+def load_crypto_catalog(catalog_path: Optional[Path] = None) -> Dict[str, Any]:
+    """
+    Loads rules from `catalog_path` (or `rules/crypto_catalog.json`), falling back to a
+    deep copy of `EMBEDDED_CRYPTO_CATALOG` so the embedded constant is never mutated.
+    """
+    target = Path(catalog_path) if catalog_path else _CATALOG_FILE
+    if target.is_file():
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("rules"), dict):
+                return data["rules"]
+            if isinstance(data, dict) and data:
+                return data
+        except Exception as exc:
+            print(
+                f"[WARN] Failed to load catalog from {target}: {exc}. Using embedded defaults.",
+                file=sys.stderr,
+            )
+    return copy.deepcopy(EMBEDDED_CRYPTO_CATALOG)
+
+
+DEFAULT_CRYPTO_CATALOG: Dict[str, Any] = load_crypto_catalog()
 
 
 # ==============================================================================
@@ -170,19 +291,20 @@ if _CATALOG_FILE.is_file():
 
 @dataclasses.dataclass
 class CryptoFinding:
-    """Represents a discovered cryptographic dependency and its compliance status."""
+    """Represents a discovered cryptographic dependency and its inventory/compliance status."""
 
     name: str
     version: str
     source_file: str
     ecosystem: str
-    status: str       # "PASS", "WARN_OUTDATED", "WARN_UNVERIFIED", "FAIL_EOL", "FAIL_DEPRECATED"
+    status: str       # "NOT_VALIDATED", "CANNOT_DETERMINE_STATICALLY", "CONFORMANT_INDICATOR", "WARN_OUTDATED", "WARN_UNRECOMMENDED", "WARN_UNVERIFIED", "FAIL_EOL", "FAIL_DEPRECATED"
     severity: str     # "INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"
     description: str
     remediation: str
     nist_controls: List[str]
     aoc: str
     rule_key: str
+    fips_status: str = "UNKNOWN"  # "VALIDATED_MODULE", "CAPABLE_IF_CONFIGURED", "NOT_VALIDATED", "UNKNOWN"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -191,6 +313,7 @@ class CryptoFinding:
             "manifest_file": self.source_file,
             "ecosystem": self.ecosystem,
             "compliance_status": self.status,
+            "fips_status": self.fips_status,
             "severity": self.severity,
             "description": self.description,
             "remediation": self.remediation,
@@ -400,6 +523,28 @@ DependencyExtractor.PARSERS = {
 class CryptoScanner:
     """Evaluates extracted dependencies against cryptographic policy catalog."""
 
+    _ECOSYSTEM_ALIASES: Dict[str, Set[str]] = {
+        "python": {"python", "pypi"},
+        "pypi": {"python", "pypi"},
+        "java": {"java", "maven", "gradle"},
+        "maven": {"java", "maven", "gradle"},
+        "gradle": {"java", "maven", "gradle"},
+        "javascript": {"javascript", "typescript", "npm", "yarn"},
+        "typescript": {"javascript", "typescript", "npm", "yarn"},
+        "npm": {"javascript", "typescript", "npm", "yarn"},
+        "yarn": {"javascript", "typescript", "npm", "yarn"},
+        "go": {"go", "golang"},
+        "golang": {"go", "golang"},
+        "system": {"system", "c_cpp", "deb", "rpm", "alpine"},
+        "c_cpp": {"system", "c_cpp", "deb", "rpm", "alpine"},
+        "deb": {"system", "c_cpp", "deb", "rpm", "alpine"},
+        "rpm": {"system", "c_cpp", "deb", "rpm", "alpine"},
+        "alpine": {"system", "c_cpp", "deb", "rpm", "alpine"},
+        "rust": {"rust", "cargo", "crates"},
+        "cargo": {"rust", "cargo", "crates"},
+        "crates": {"rust", "cargo", "crates"},
+    }
+
     def __init__(self, catalog: Dict[str, Any]):
         self.catalog = catalog
         # Pre-compile regex patterns once
@@ -411,15 +556,22 @@ class CryptoScanner:
     def evaluate(self, dependencies: List[Tuple[str, str, str, str]]) -> List[CryptoFinding]:
         findings = []
         for name, version, source_file, ecosystem in dependencies:
-            matched_key, rule = self._match_rule(name)
+            matched_key, rule = self._match_rule(name, ecosystem)
             if not rule or not matched_key:
                 continue
             finding = self._audit_dependency(name, version, source_file, ecosystem, matched_key, rule)
             findings.append(finding)
         return findings
 
-    def _match_rule(self, name: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    def _match_rule(
+        self, name: str, ecosystem: str = ""
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        eco_lc = (ecosystem or "").strip().lower()
+        eco_group = self._ECOSYSTEM_ALIASES.get(eco_lc, {eco_lc}) if eco_lc else set()
         for key, patterns, rule in self._compiled_rules:
+            rule_ecos = {str(e).lower() for e in rule.get("ecosystems", []) if e}
+            if eco_group and rule_ecos and not (eco_group & rule_ecos):
+                continue
             for pat in patterns:
                 if pat.match(name):
                     return key, rule
@@ -435,18 +587,21 @@ class CryptoScanner:
         rule: Dict[str, Any],
     ) -> CryptoFinding:
         status_flag = rule.get("status", "ACTIVE")
+        fips_status = rule.get("fips_status", "UNKNOWN")
+        fips_note = rule.get("fips_note", "")
         base = CryptoFinding(
             name=name,
             version=version,
             source_file=source_file,
             ecosystem=ecosystem,
-            status="PASS",
+            status="CANNOT_DETERMINE_STATICALLY",
             severity="INFO",
             description="",
             remediation=rule.get("remediation", "Migrate to supported crypto provider."),
             nist_controls=rule.get("nist_controls", ["SI-7", "SC-13"]),
             aoc=rule.get("aoc", "AOC-09: Crypto Dependencies on Unsupported Libraries"),
             rule_key=rule_key,
+            fips_status=fips_status,
         )
 
         # 1. Check explicitly deprecated/unmaintained libraries (AOC 09)
@@ -517,14 +672,72 @@ class CryptoScanner:
                 remediation=rule.get("remediation", "Pin and verify cryptographic library version."),
             )
 
-        # 6. Approved / Compliant Provider
+        # 6. Maintained version baseline met (SI-7); evaluate SC-13 FIPS 140-3 status explicitly.
+        # No library reaches PASS for SC-13 from dependency manifest checks alone.
+        if fips_status == "NOT_VALIDATED":
+            desc = (
+                f"Version '{version}' meets maintenance minimums, but '{name}' is not a "
+                "NIST CMVP FIPS 140-3 validated cryptographic module."
+            )
+            if fips_note:
+                desc = f"{desc} {fips_note}"
+            return dataclasses.replace(
+                base,
+                status="NOT_VALIDATED",
+                severity="MEDIUM",
+                description=desc,
+                remediation=rule.get(
+                    "remediation",
+                    "Migrate SC-13 regulated cryptographic operations to a CMVP-validated module.",
+                ),
+                nist_controls=["SC-13"],
+            )
+
+        if fips_status == "CAPABLE_IF_CONFIGURED":
+            desc = (
+                f"Version '{version}' meets maintenance baseline, but FIPS 140-3 module linkage and "
+                "approved-mode activation cannot be determined from dependency manifests alone."
+            )
+            if fips_note:
+                desc = f"{desc} {fips_note}"
+            return dataclasses.replace(
+                base,
+                status="CANNOT_DETERMINE_STATICALLY",
+                severity="INFO",
+                description=desc,
+                remediation=rule.get(
+                    "remediation",
+                    "Verify runtime FIPS provider linkage and approved-mode configuration on the deployed host.",
+                ),
+                nist_controls=["SC-13"],
+            )
+
+        if fips_status == "VALIDATED_MODULE":
+            desc = (
+                f"Version '{version}' matches a validated module entry; confirm operational "
+                "environment and approved-mode execution against the CMVP Security Policy."
+            )
+            if fips_note:
+                desc = f"{desc} {fips_note}"
+            return dataclasses.replace(
+                base,
+                status="CONFORMANT_INDICATOR",
+                severity="INFO",
+                description=desc,
+                remediation=rule.get(
+                    "remediation",
+                    "Confirm operational environment matches CMVP Security Policy.",
+                ),
+                nist_controls=["SC-13"],
+            )
+
         return dataclasses.replace(
             base,
-            status="PASS",
+            status="CANNOT_DETERMINE_STATICALLY",
             severity="INFO",
-            description=f"Supported cryptographic library. FIPS Capable: {rule.get('fips_capable', False)}.",
-            remediation="None required. Maintain automated dependency patch cadence.",
-            nist_controls=rule.get("nist_controls", ["SC-13"]),
+            description=f"Version '{version}' detected; FIPS 140-3 validation status cannot be determined statically.",
+            remediation="Perform manual/runtime FIPS 140-3 module verification for SC-13.",
+            nist_controls=["SC-13"],
         )
 
 
@@ -544,38 +757,41 @@ class CryptoReporter:
         now = utc_now_str()
         fails = sum(1 for f in findings if f.status.startswith("FAIL"))
         warns = sum(1 for f in findings if f.status.startswith("WARN"))
-        passes = sum(1 for f in findings if f.status == "PASS")
+        not_validated = sum(1 for f in findings if f.status == "NOT_VALIDATED")
+        needs_review = sum(1 for f in findings if f.status == "CANNOT_DETERMINE_STATICALLY")
 
         md = [
-            "# Cryptographic Provider & Dependency Audit Matrix",
+            "# Cryptographic Library EOL & FIPS Validation-Status Inventory",
             f"> **Generated**: {now}  ",
             f"> **Workspace**: `{workspace}`  ",
-            "> **Framework Reference**: NIST SP 800-53 (SI-7, SC-12, SC-13) / AOC-09 & AOC-03  ",
+            "> **Framework Reference**: NIST SP 800-53 (SI-7, SC-12, SC-13) / NIST FIPS 140-3 / AOC-09  ",
             "",
             "---",
             "",
-            "## 1. Compliance Summary",
+            "## 1. Inventory & Validation-Status Summary",
             "",
             f"* **Total Cryptographic Libraries Evaluated**: `{len(findings)}`",
-            f"* **Failed / EOL / Unsupported**: `{fails}` (Requires immediate POA&M remediation)",
-            f"* **Warnings / Below Baseline / Unverified**: `{warns}`",
-            f"* **Approved / Supported**: `{passes}`",
+            f"* **Failed / EOL / Unsupported (`FAIL_*`)**: `{fails}` (Requires immediate POA&M remediation)",
+            f"* **Warnings / Below Baseline / Unverified (`WARN_*`)**: `{warns}`",
+            f"* **Unvalidated Modules (`NOT_VALIDATED`)**: `{not_validated}` (No CMVP FIPS 140-3 certificate)",
+            f"* **Needs Human or Runtime Verification (`CANNOT_DETERMINE_STATICALLY`)**: `{needs_review}`",
             "",
             "---",
             "",
             "## 2. Findings Detail Matrix",
             "",
-            "| Library | Detected Version | Manifest Source | Status | Severity | NIST Controls | Remediation Guidance |",
-            "| :--- | :---: | :--- | :---: | :---: | :--- | :--- |",
+            "| Library | Detected Version | Manifest Source | Status | FIPS Status | Severity | NIST Controls | Remediation / Verification Guidance |",
+            "| :--- | :---: | :--- | :---: | :---: | :---: | :--- | :--- |",
         ]
 
         for f in sorted(findings, key=lambda x: (SEVERITY_RANK.get(x.severity.upper(), 99), x.name)):
             status_chip = f"`{_escape_md_cell(f.status)}`"
+            fips_chip = f"`{_escape_md_cell(f.fips_status)}`"
             sev_chip = f"**`{f.severity}`**" if f.severity in ("CRITICAL", "HIGH") else f"`{f.severity}`"
             controls = ", ".join(f.nist_controls)
             md.append(
                 f"| **{_escape_md_cell(f.name)}** | `{_escape_md_cell(f.version)}` | "
-                f"`{_escape_md_cell(f.source_file)}` | {status_chip} | {sev_chip} | "
+                f"`{_escape_md_cell(f.source_file)}` | {status_chip} | {fips_chip} | {sev_chip} | "
                 f"`{_escape_md_cell(controls)}` | {_escape_md_cell(f.remediation)} |"
             )
 
@@ -591,8 +807,8 @@ class CryptoReporter:
                 "scan_time": utc_now_iso(),
                 "workspace": workspace,
                 "tool": "crypto_lib_scan.py",
-                "framework": "NIST SP 800-53 Rev. 5 (SI-7, SC-12, SC-13)",
-                "aoc_coverage": ["AOC-09", "AOC-03"],
+                "framework": "NIST SP 800-53 Rev. 5 (SI-7, SC-12, SC-13) / NIST FIPS 140-3",
+                "aoc_coverage": ["AOC-09"],
             },
             "summary": {
                 "total_crypto_libraries": len(findings),
@@ -602,7 +818,13 @@ class CryptoReporter:
                 "unverified_count": sum(1 for f in findings if f.status == "WARN_UNVERIFIED"),
                 "high_severity_count": sum(1 for f in findings if f.severity == "HIGH"),
                 "warning_count": sum(1 for f in findings if f.status.startswith("WARN")),
-                "compliant_count": sum(1 for f in findings if f.status == "PASS"),
+                "not_validated_count": sum(1 for f in findings if f.status == "NOT_VALIDATED"),
+                "cannot_determine_statically_count": sum(
+                    1 for f in findings if f.status == "CANNOT_DETERMINE_STATICALLY"
+                ),
+                "compliant_count": sum(
+                    1 for f in findings if f.status in ("PASS", "CONFORMANT_INDICATOR")
+                ),
             },
             "findings": [
                 f.to_dict()
@@ -615,7 +837,7 @@ class CryptoReporter:
     def to_terminal(findings: List[CryptoFinding], workspace: str) -> str:
         lines = [
             "=======================================================================",
-            "  Cryptographic Provider & Dependency Audit Report",
+            "  Cryptographic Library EOL & FIPS Validation-Status Inventory",
             "=======================================================================",
             f"Workspace: {workspace}",
             f"Crypto Packages Detected: {len(findings)}",
@@ -623,7 +845,9 @@ class CryptoReporter:
         ]
         for f in sorted(findings, key=lambda x: (SEVERITY_RANK.get(x.severity.upper(), 99), x.name)):
             tag = f"[{f.severity}]"
-            lines.append(f"{tag:<10} {f.name:<20} Ver: {f.version:<10} Status: {f.status}")
+            lines.append(
+                f"{tag:<10} {f.name:<20} Ver: {f.version:<10} Status: {f.status} (FIPS: {f.fips_status})"
+            )
             lines.append(f"           Source: {f.source_file}")
             lines.append(f"           NIST: {', '.join(f.nist_controls)} | AOC: {f.aoc}")
             lines.append(f"           Action: {f.remediation}")
@@ -690,22 +914,7 @@ def main() -> None:
         sys.exit(1)
 
     # Load Catalog
-    catalog = DEFAULT_CRYPTO_CATALOG
-    catalog_path = (
-        Path(args.catalog)
-        if args.catalog
-        else Path(__file__).resolve().parent.parent / "rules" / "crypto_catalog.json"
-    )
-    if catalog_path.exists():
-        try:
-            with open(catalog_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict) and "rules" in data and isinstance(data["rules"], dict):
-                    catalog = data["rules"]
-                elif isinstance(data, dict) and data:
-                    catalog = data
-        except Exception as e:
-            print(f"[WARN] Failed to load catalog from {catalog_path}: {e}. Using embedded defaults.", file=sys.stderr)
+    catalog = load_crypto_catalog(Path(args.catalog) if args.catalog else None)
 
     # 1. Discover dependencies across manifests
     deps = DependencyExtractor.extract_from_workspace(workspace_path)

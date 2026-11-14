@@ -71,7 +71,7 @@ The table below maps the automated workflows conducted across `GRC-x` and `GRC-T
 | **Phase 3: Infrastructure-as-Code (IaC) Auditing** | Checkov Policy Engine (`BC_SKIP_MAPPING=TRUE`) | NIST SP 800-53 Rev. 5: `AC-3`, `CM-6`, `SC-7`<br>NIST SP 800-218: `PW.4.1` | DoD CC SRG Sec. 5.1<br>FedRAMP High `CM-6` | Evaluate Terraform, Kubernetes manifests, and Dockerfiles for federal compliance violations (public buckets, root users). |
 | **Phase 3: CycloneDX SBOM Indexing** | Syft (`SYFT_CHECK_FOR_APP_UPDATE=false`) | NIST SP 800-53 Rev. 5: `SR-3`, `SR-4`, `CM-8`<br>NIST SP 800-161 Rev. 1: `App. F` | EO 14028 Sec. 4(e)(vii)<br>NTIA Minimum Elements for SBOM | Produce deterministic, machine-readable Software Bill of Materials (SBOM) indexing all dependencies and transitives. |
 | **Phase 3: Offline Vulnerability Matching** | Grype + Trivy (`--offline-scan`) | NIST SP 800-53 Rev. 5: `RA-5`, `SI-2`<br>NIST SP 800-218: `RV.1.1` | FedRAMP Continuous Monitoring<br>DoD Cyber Hygiene Mandate | Match SBOM and filesystem components against pre-cached NVD/GHSA CVE databases with EPSS and CISA KEV context. |
-| **Phase 3: EOL & FIPS Crypto Provider Audit** | `scripts/crypto_lib_scan.py`, `rules/crypto_catalog.json` | NIST SP 800-53 Rev. 5: `SC-13`, `SI-7(6)`<br>NIST FIPS 140-3 | DoDI 8500.01 Sec. 3.d<br>DISA ASD STIG V-222608 | Detect deprecated, unmaintained, or non-FIPS 140-3 validated cryptographic modules (PyCrypto, DES, MD5, RC4). |
+| **Phase 3: EOL & Cryptographic Module Inventory** | `scripts/crypto_lib_scan.py`, `rules/crypto_catalog.json` | NIST SP 800-53 Rev. 5: `SC-13`, `SI-7(6)`<br>NIST FIPS 140-3 | DoDI 8500.01 Sec. 3.d<br>DISA ASD STIG V-222608 | Static dependency manifest & shared-library inventory flagging EOL/deprecated providers (`FAIL_*`), unvalidated modules (`NOT_VALIDATED`), and modules requiring runtime FIPS verification (`CANNOT_DETERMINE_STATICALLY`). |
 | **Phase 3: DISA STIG / DoD SRG Applicability Mapping** | `scripts/sbom_analyzer.py` | NIST SP 800-53 Rev. 5: `CA-2`, `CM-6`<br>NIST SP 800-137 | DoDI 8510.01 RMF Step 2<br>DISA STIG Mandate | Programmatically correlate software components to applicable DISA STIGs and DoD Cloud SRG technology profiles. |
 | **Phase 4: FedRAMP High SLA POA&M Generation** | `scripts/grc_reporter.py` (`poam_data.md`) | NIST SP 800-53 Rev. 5: `CA-5`, `RA-5`, `SI-2`<br>NIST SP 800-37 Rev. 2 | FedRAMP High ConMon Policy<br>DoDI 8510.01 RMF Step 6 | Calculate strict remediation deadlines: Critical/High = 30 days, Medium = 90 days, Low = 180 days; generate POA&M table. |
 | **Phase 4: NIST SP 800-53 Control Matrix Synthesis** | `scripts/grc_reporter.py` (`controls.md`) | NIST SP 800-53 Rev. 5: 18 Families (`AC`, `AU`, `CA`, `CM`, `CP`, `IA`, etc.) | DoDI 8510.01 RMF Step 4<br>FedRAMP System Security Plan | Map scanner results directly into formal control pass/fail implementation work papers for assessor review. |
@@ -154,11 +154,11 @@ NIST SP 800-137 emphasizes transition from periodic point-in-time security evalu
 
 ---
 
-### 3.5 NIST FIPS 140-3: Cryptographic Module Validation
+### 3.5 NIST FIPS 140-3: Static Cryptographic Dependency & Module Inventory
 
 * **Enforcement Script**: [`scripts/crypto_lib_scan.py`](../scripts/crypto_lib_scan.py)
 * **Policy Database**: [`rules/crypto_catalog.json`](../rules/crypto_catalog.json)
-* **Function**: Audits application imports and dependency manifests to reject legacy, broken, or non-FIPS 140-3 approved algorithms (e.g., MD5, SHA-1, DES, 3DES, RC4, Blowfish) and unmaintained crypto providers (e.g., PyCrypto).
+* **Function**: Evaluates dependency manifests and shared libraries for End-of-Life (EOL)/deprecated providers (e.g., PyCrypto, OpenSSL 1.1.1), explicitly flags unvalidated modules (`NOT_VALIDATED`), and routes `CAPABLE_IF_CONFIGURED` libraries (`CANNOT_DETERMINE_STATICALLY`) to human/runtime verification under `SC-13`. (Broken algorithms such as MD5, SHA-1, DES, and RC4 are separately audited in source code by Semgrep `AOC-03` rules mapped to `SC-13`.)
 
 ---
 
@@ -241,17 +241,18 @@ The companion repository **[`GRC-xTEST`](https://github.com/eodartintlabs-hue/gr
 
 | Synthetic Test Bundle | Targeted Area of Concern (AOC) | NIST SP 800-53 Control Tested | Expected Failure Behavior Verified |
 | :--- | :--- | :--- | :--- |
-| **`aoc-02-weak-passwords.bundle`** | AOC-02 (Weak Password & Hardcoded Credentials) | `IA-5`, `IA-5(1)`, `IA-5(7)` | Gitleaks detects AWS secret keys; Semgrep flags hardcoded strings. |
-| **`aoc-03-legacy-crypto.bundle`** | AOC-03 (Legacy & Deprecated Cryptography) | `SC-13`, `SI-7(6)` | `crypto_lib_scan.py` flags DES, MD5, and unmaintained PyCrypto. |
-| **`aoc-04-tls-cleartext.bundle`** | AOC-04 (Cleartext Protocols & Broken TLS) | `SC-8`, `SC-8(1)` | Semgrep flags HTTP/Telnet; Checkov flags unencrypted listener ports. |
-| **`aoc-05-node-tls-disabled.bundle`** | AOC-05 (TLS Certificate Validation Bypasses) | `SC-8`, `SI-17` | Semgrep flags `NODE_TLS_REJECT_UNAUTHORIZED='0'`. |
-| **`aoc-06-jwt-none.bundle`** | AOC-06 (Broken JWT & `algorithm: "none"`) | `IA-2`, `SC-13` | Semgrep flags unverified JWT tokens and algorithm substitution. |
-| **`aoc-07-iac-misconfig.bundle`** | AOC-07 (Infrastructure-as-Code Misconfigurations) | `AC-3`, `CM-6`, `SC-7` | Checkov flags public S3 buckets, missing EBS KMS encryption, open ports. |
-| **`aoc-08-cors-wildcard.bundle`** | AOC-08 (Insecure CORS & Access-Control Wildcards) | `AC-4`, `SC-7` | Semgrep flags `Access-Control-Allow-Origin: *`. |
-| **`aoc-09-sql-injection.bundle`** | AOC-09 (SQL & Command Injection) | `SI-10` | Semgrep flags unparameterized string concatenations in database queries. |
-| **`aoc-10-cmd-injection.bundle`** | AOC-10 (OS Command Injection via Shell Invocation) | `SI-10` | Semgrep flags `child_process.exec()` and `os.system()` with user input. |
-| **`aoc-11-docker-root.bundle`** | AOC-11 (Insecure Dockerfile & Root Execution) | `AC-6`, `CM-6` | Checkov flags missing non-root `USER` directive in container images. |
-| **`aoc-12-hardcoded-keys.bundle`** | AOC-12 (Exposed Private RSA / SSH Keys) | `IA-5`, `SC-12` | Gitleaks flags unencrypted RSA private key blocks committed to repo. |
+| **`aoc-02-weak-passwords.bundle`** | AOC-02 (Password Hygiene & Hardcoded Credentials) | `IA-2`, `IA-5`, `IA-5(1)` | Semgrep / Gitleaks detect hardcoded passwords, API tokens, and static credentials. |
+| **`aoc-03-legacy-crypto.bundle`** | AOC-03 (Weak Encryption Check) | `SC-13` | Semgrep flags broken hashes (`MD5`, `SHA-1`), legacy ciphers (`DES`, `RC4`), and `AES/ECB` mode across 4 languages. |
+| **`aoc-04-command-injection.bundle`** | AOC-04 (OS Command Injection) | `SI-4`, `SI-10` | Semgrep flags unsanitized shell invocation (`os.system()`, `subprocess(..., shell=True)`, `exec.Command`, `Runtime.exec`). |
+| **`aoc-05-improper-tls.bundle`** | AOC-05 (Improper TLS / Validation Bypasses) | `SC-8`, `SI-17` | Semgrep flags deprecated `TLS 1.0/1.1` protocols and disabled certificate validation (`verify=False`, `InsecureSkipVerify: true`). |
+| **`aoc-06-secrets-management.bundle`** | AOC-06 (Secrets Management & Private Keys) | `IA-2`, `SC-12` | Semgrep and Gitleaks flag embedded PEM/PKCS `RSA` and `OPENSSH` private key blocks committed to source files. |
+| **`aoc-07-iac-misconfig.bundle`** | AOC-07 (Infrastructure-as-Code Misconfigurations) | `AC-3`, `AC-6`, `CM-6`, `SC-28` | Checkov and Trivy flag public S3 buckets, open `0.0.0.0/0` security groups, unencrypted EBS volumes, and disabled SELinux. |
+| **`aoc-09-eol-libraries.bundle`** | AOC-09 (Unsupported / EOL Crypto Libraries) | `SI-7`, `SC-12`, `SC-13` | `crypto_lib_scan.py` flags EOL/deprecated crypto dependencies (`pycrypto 2.6.1`, `OpenSSL 1.1.1`, `Bouncy Castle 1.60`, `crypto-js`). |
+| **`aoc-10-critical-cves.bundle`** | AOC-10 (Critical Known Vulnerabilities) | `RA-5`, `SI-2` | Syft + Grype / Trivy flag direct dependencies harboring critical CVEs (`Log4j 2.14.1`, `Spring Core 5.3.17`). |
+| **`aoc-11-stig-cat1.bundle`** | AOC-11 (High-Severity DISA STIG Flaws) | `SA-11`, `SI-10` | Semgrep and Checkov flag plaintext HTTP listeners, debug mode, XXE, and missing `Secure; HttpOnly` cookie flags. |
+| **`aoc-12-no-fips-mode.bundle`** | AOC-12 (Non-FIPS Operating Mode — *Planned `v1.5.0`*) | `SC-13`, `IA-7` | Staged fixture (`fips=0`, `DEFAULT` crypto policy, commented `[fips_sect]`, unconfigured Java/Python FIPS); automated `AOC-12` checks ship in `v1.5.0 — Iwakuni`. |
+| **`aoc-140-org-guardrails.bundle`** | AOC-140 (Organization Guardrails) | `AC-3`, `AU-3` | Semgrep flags credential, authorization header, and secret leakage to logs or `stdout`. |
+| **`aoc-combo-4x.bundle`** | Multi-AOC Composite Suite (AOC-02, 04, 07, 09) | `IA-2`, `SI-4`, `CM-6`, `SC-13` | Integrated 4-in-1 bundle verifying 19 total findings (`13 CAT I`, `6 CAT II`) across Semgrep, Checkov, and `crypto_lib_scan.py`. |
 
 > 🧪 **Assessor Verification Walkthrough**: See [`docs/grc-xtest-guide.md`](../docs/grc-xtest-guide.md) for the batch verification test runner and instructions for executing the complete negative testing suite.
 
@@ -282,11 +283,11 @@ evidence/<bundle-name>/
 │                          # -> Satisfies EO 14028 Sec. 4(e)(vii) and NTIA Minimum Elements
 │
 ├── semgrep_findings.json  # Raw AST static code review finding telemetry
-├── gitleaks_report.json   # Raw high-entropy secrets and credential detection output
+├── gitleaks_findings.json # Raw high-entropy secrets and credential detection output
 ├── checkov_findings.json  # Raw Infrastructure-as-Code policy assessment output
-├── grype_cve_report.json  # Raw SBOM CVE vulnerability matching output
-├── trivy_cve_report.json  # Raw filesystem CVE vulnerability scan output
-├── crypto_lib_findings.json # Raw cryptographic library deprecation and FIPS report
+├── grype_findings.json    # Raw SBOM CVE vulnerability matching output
+├── trivy_findings.json    # Raw filesystem CVE vulnerability scan output
+├── crypto_findings.json   # Raw cryptographic library deprecation and FIPS status inventory
 ├── stig_applicability.json# Raw DISA STIG and DoD Cloud SRG applicability report
 │
 └── sha256sum              # Cryptographic Chain of Custody Manifest

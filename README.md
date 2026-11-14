@@ -30,7 +30,7 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.4 (Yokota Series)
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.4.5 (Yokota Series)
  {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
@@ -51,7 +51,7 @@
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.4.4 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.4.5 — Yokota` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Test Corpus**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest)  
@@ -135,7 +135,7 @@ flowchart TD
         Workspace --> Syft["📋 Syft (CycloneDX &amp; SPDX SBOM)"]:::scannerNode
         Syft --> GrypeTrivy["🎯 Grype &amp; Trivy (Offline CVE Matcher)"]:::scannerNode
         Syft --> STIGMap["🏛️ sbom_analyzer.py (DISA STIG Mapper)"]:::scannerNode
-        Workspace --> CryptoScan["🔐 crypto_lib_scan.py (EOL &amp; FIPS 140-3)"]:::scannerNode
+        Workspace --> CryptoScan["🔐 crypto_lib_scan.py (EOL &amp; FIPS Module Inventory)"]:::scannerNode
     end
 
     subgraph Phase4["<b>PHASE 4: SCR/SCN PACKAGE SYNTHESIS</b> (grc_reporter.py)"]
@@ -180,7 +180,7 @@ The pipeline enforces **37 custom Semgrep AST rules** ([`rules/custom-baseline-r
 | AOC ID | Area of Concern | Governing NIST 800-53 Controls | DISA STIG Impact | Target Anti-Patterns & Violations Caught |
 | :--- | :--- | :--- | :--- | :--- |
 | **AOC-02** | **Password Hygiene** | `IA-2` | `CAT I / II` | Hardcoded passwords, database credentials, static API keys, and bearer tokens. |
-| **AOC-03** | **Weak Encryption Check** | `SI-16`, `SC-13` | `CAT I / II` | Broken hash algorithms (`MD5`, `SHA-1`), legacy ciphers (`DES`, `3DES`, `RC4`), and insecure `AES/ECB` modes. |
+| **AOC-03** | **Weak Encryption Check** | `SC-13` | `CAT I / II` | Broken hash algorithms (`MD5`, `SHA-1`), legacy ciphers (`DES`, `3DES`, `RC4`), and insecure `AES/ECB` modes. |
 | **AOC-04** | **Command Injection** | `SI-4`, `SI-10` | `CAT I` | Unsanitized runtime shell execution (`os.system`, `subprocess(shell=True)`, Go `exec.Command`, Java `Runtime.exec`). |
 | **AOC-05** | **Improper TLS** | `SI-17`, `SC-8` | `CAT I / II` | Deprecated `TLS 1.0` / `TLS 1.1` protocols and disabled certificate verification (`verify=False`, `InsecureSkipVerify`). |
 | **AOC-06** | **Secrets Management** | `SC-12`, `IA-2` | `CAT I` | Embedded PEM/PKCS private keys (`RSA`, `EC`, `DSA`, `OPENSSH`) and high-entropy secrets in source history. |
@@ -188,7 +188,7 @@ The pipeline enforces **37 custom Semgrep AST rules** ([`rules/custom-baseline-r
 | **AOC-09** | **Unsupported Crypto Libraries** | `SI-7`, `SC-12`, `SC-13` | `CAT I` | End-of-Life (EOL) and unmaintained cryptographic providers (`pycrypto`, `OpenSSL 1.1.1`, `Bouncy Castle < 1.70`). |
 | **AOC-10** | **CRITICAL Severity Findings** | `RA-5`, `SI-2` | `CAT I` | Known CVSS 9.0–10.0 CVEs (e.g., Log4Shell, Spring4Shell) and unsafe object deserialization (`pickle`, `ObjectInputStream`). |
 | **AOC-11** | **Category I STIG Violations** | `SI-2`, `CM-8` | `CAT I` | Exposed production debug listeners, XML External Entity (XXE) processing, insecure cookies, and OS STIG CAT I gaps. |
-| **AOC-12** | **Lack of FIPS Mode** | `SC-13` | `CAT I` | Kernel bootloaders with `fips=0`, OS crypto-policies set to `DEFAULT`, and OpenSSL configs missing `[fips_sect] activate = 1`. |
+| **AOC-12** | **Lack of FIPS Mode *(Planned — `v1.5.0`)*** | `SC-13` | `CAT I` | **Planned (`v1.5.0 — Iwakuni`)**: Detection of kernel bootloaders with `fips=0`, OS crypto-policies set to `DEFAULT`, and OpenSSL configs missing `[fips_sect] activate = 1` (fixture staged in `GRC-xTEST`). |
 | **AOC-140** | **Org-Specific Guardrails** | `CM-6` | `CAT II` | Credential leakage to `stdout`/logs, hardcoded internal IPs, and root container execution. |
 
 ---
@@ -293,10 +293,10 @@ In high-assurance compliance automation, a scanner that outputs zero findings is
 
 | Active Milestone | Series Codename | Status | Summary of Active Capabilities | Full Roadmap & Release Docs |
 | :--- | :--- | :--- | :--- | :--- |
-| **`v1.4.4 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **Qualys VMDR & Wiz Scanner Adapters, Multi-Scanner Ingestion & Synthetic Demo Generator**: Integrated `QualysAdapter` (QID, severity 1–5, threat/impact) and `WizAdapter` (Wiz ID, cloud assets/pods, fixed versions) into `transform_scans.py`, expanded asset alias extraction, added vendor remediation URLs, created standard-library synthetic test dataset generator `scripts/generate_demo_data.py`, and 38 unit tests passing. | See **[`hygiene/`](hygiene/)** |
+| **`v1.4.5 — Yokota`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **FIPS 140-3 Baseline Honesty & Verification Separation (Phase 0)**: Upgraded `rules/crypto_catalog.json` to v1.1.0 (tri-state `fips_status` replacing the legacy boolean FIPS flag), eliminated false static `PASS` outputs in `crypto_lib_scan.py` (`NOT_VALIDATED` vs. `CANNOT_DETERMINE_STATICALLY`), remapped `AOC-03` from `SI-16` to `SC-13` (restoring `SI-16` as Memory Protection), separated unverified FIPS checks into `poam_data.md` Section 4 ("Needs Human or Runtime Verification") + `SC-13` `NEEDS REVIEW` rollup, regenerated `testing/demo-evidence/*`, and expanded suite to 42 unit tests passing. | See **[`hygiene/`](hygiene/)** |
 
 > 🗺️ **Looking Ahead to Future Milestones?**  
-> Planned releases—including the upcoming **`v1.3.5 — Sasebo`** (Universal Workstation Portability & `./grc doctor`) and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:
+> Planned releases—including the upcoming **`v1.3.5 — Sasebo`** (Universal Workstation Portability & `./grc doctor`), **`v1.5.0 — Iwakuni`** (Standalone FIPS 140-3 Readiness & Cryptographic Posture Analyzer), and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:
 > * 🗺️ **[Product Roadmap (`hygiene/ROADMAP.md`)](hygiene/ROADMAP.md)**: Full breakdown of upcoming beta milestones and the Hawaii GA series (`Pearl Harbor`, `Kaneohe`, `Wahiawa`).
 > * 🚀 **[Release Notes (`hygiene/RELEASE_NOTES.md`)](hygiene/RELEASE_NOTES.md)**: Itemized, narrative release changelogs for all shipped releases.
 > * 🩹 **[Patch Log Index (`hygiene/PATCH_LOG.md`)](hygiene/PATCH_LOG.md)**: Master index linking dedicated sub-ledgers for [Bug Fixes (`PATCH_LOG_BUG.md`)](hygiene/PATCH_LOG_BUG.md), [Minor Releases (`PATCH_LOG_MINOR.md`)](hygiene/PATCH_LOG_MINOR.md), and [Major Baselines (`PATCH_LOG_MAJOR.md`)](hygiene/PATCH_LOG_MAJOR.md).

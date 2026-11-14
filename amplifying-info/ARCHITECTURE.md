@@ -122,16 +122,16 @@
 * **Item Produced**: `ami_provenance.json` (AMI ID, snapshot ID, KMS key ARN, guest OS detection from `/etc/os-release`, and mount telemetry) and the cold-mounted filesystem at `ephemeral_ami_workspace/mnt`.
 * **Individual Cost**: **$0** (In-house custom Python script with built-in `--mock` mode for offline execution).
 
-#### Static Cryptographic Provider & EOL Auditor (`scripts/crypto_lib_scan.py`)
+#### Static Cryptographic Dependency & Module Inventory (`scripts/crypto_lib_scan.py`)
 * **Classification**: `[Custom-Made Tool]`
-* **General Purpose**: Performs AST regex and dependency manifest parsing across Go, Java, Python, and Node.js codebases to identify deprecated, unmaintained, or non-FIPS 140-3 compliant cryptographic libraries (e.g., PyCrypto, BouncyCastle < 1.70, Go crypto/des).
-* **Item Produced**: `crypto_lib_audit_report.json` detailing discovered crypto libraries, import locations, deprecation status, recommended FIPS alternatives, and AOC 03 compliance flags.
+* **General Purpose**: Parses dependency manifests (`requirements.txt`, `pyproject.toml`, `package.json`, `pom.xml`, `go.mod`) and shared libraries (`libssl.so*`, `libcrypto.so*`) against `rules/crypto_catalog.json` (v1.1.0) to flag EOL/deprecated cryptographic packages (`FAIL_*`), identify non-validated modules (`NOT_VALIDATED`), and surface `CAPABLE_IF_CONFIGURED` libraries (`CANNOT_DETERMINE_STATICALLY`) for human or runtime FIPS 140-3 verification.
+* **Item Produced**: `crypto_findings.json` and `crypto_matrix.md` detailing discovered cryptographic dependencies, version baselines, `fips_status`, AOC-09 / SC-13 tags, and verification guidance.
 * **Individual Cost**: **$0** (In-house custom Python script).
 
 #### CycloneDX / SPDX to DISA STIG Applicability Mapper (`scripts/sbom_analyzer.py`)
 * **Classification**: `[Custom-Made Tool]`
 * **General Purpose**: Ingests CycloneDX and SPDX SBOM JSON documents, indexes software components (web servers, database engines, operating systems, runtime packages), and cross-references them against DISA STIG and DoD Cloud Computing SRG benchmarks.
-* **Item Produced**: `stig_applicability_report.json` identifying exact STIG IDs, benchmark version titles, and applicable security profiles required for system accreditation.
+* **Item Produced**: `stig_applicability.json` and `stig_matrix.md` identifying exact STIG IDs, benchmark version titles, and applicable security profiles required for system accreditation.
 * **Individual Cost**: **$0** (In-house custom Python script).
 
 #### Phase 4 SCR/SCN Compliance Reporting Engine (`scripts/grc_reporter.py`)
@@ -158,37 +158,37 @@
 #### Semgrep OSS
 * **Classification**: `[Open-Source Tools]`
 * **General Purpose**: An open-source, AST-based static analysis engine. Runs offline inside the container (`--metrics=off`) to evaluate custom compliance rules across syntax trees without invoking compilers or build systems.
-* **Item Produced**: `semgrep_results.json` containing syntax-accurate code findings mapped directly to AOC 02 through AOC 140.
+* **Item Produced**: `semgrep_findings.json` containing syntax-accurate code findings mapped directly to AOC 02 through AOC 140.
 * **Individual Cost**: **$0** (Open-source LGPL 2.1 version).
 
 #### Gitleaks
 * **Classification**: `[Open-Source Tools]`
 * **General Purpose**: A high-speed Go-based secret scanner that uses regular expressions and Shannon entropy detection to find hardcoded passwords, AWS credentials, RSA private keys, and API tokens.
-* **Item Produced**: `gitleaks_report.json` highlighting leaked secret locations, rule IDs, and entropy scores.
+* **Item Produced**: `gitleaks_findings.json` highlighting leaked secret locations, rule IDs, and entropy scores.
 * **Individual Cost**: **$0** (Open-source MIT License).
 
 #### Checkov
 * **Classification**: `[Open-Source Tools]`
 * **General Purpose**: Static code analysis engine for Infrastructure-as-Code (IaC). Evaluates Terraform templates, Kubernetes manifests, Dockerfiles, and CloudFormation scripts for federal compliance misconfigurations.
-* **Item Produced**: `checkov_results.json` detailing passed and failed security checks across infrastructure configurations.
+* **Item Produced**: `checkov_findings.json` detailing passed and failed security checks across infrastructure configurations.
 * **Individual Cost**: **$0** (Open-source Apache 2.0 License; configured with `BC_SKIP_MAPPING=TRUE` to run offline without Bridgecrew cloud services).
 
 #### Syft
 * **Classification**: `[Open-Source Tools]`
 * **General Purpose**: A specialized CLI utility that catalog-indexes the codebase or cold-mounted filesystem to produce an authoritative Software Bill of Materials (SBOM) across language dependencies and OS packages.
-* **Item Produced**: `sbom.cyclonedx.json` (CycloneDX standard SBOM) detailing package names, versions, licenses, and PURLs.
+* **Item Produced**: `sbom.cdx.json` (CycloneDX standard SBOM) detailing package names, versions, licenses, and PURLs.
 * **Individual Cost**: **$0** (Open-source Apache 2.0 License).
 
 #### Grype
 * **Classification**: `[Open-Source Tools]`
 * **General Purpose**: An open-source vulnerability scanner designed to match CycloneDX SBOM component inventories against pre-cached vulnerability databases (NVD, GHSA, Red Hat, Alpine).
-* **Item Produced**: `grype_cve_report.json` cataloging CVE identifiers, EPSS exploit scores, CVSS ratings, and available remediation versions.
+* **Item Produced**: `grype_findings.json` cataloging CVE identifiers, EPSS exploit scores, CVSS ratings, and available remediation versions.
 * **Individual Cost**: **$0** (Open-source Apache 2.0 License; operates completely offline using pre-cached databases).
 
 #### Trivy
 * **Classification**: `[Open-Source Tools]`
 * **General Purpose**: A multi-purpose security scanner that audits source directory trees, lockfiles, and container layers for known CVEs and insecure configuration defaults.
-* **Item Produced**: `trivy_cve_report.json` providing independent secondary verification of package CVEs and exposed file vulnerabilities.
+* **Item Produced**: `trivy_findings.json` providing independent secondary verification of package CVEs and exposed file vulnerabilities.
 * **Individual Cost**: **$0** (Open-source Apache 2.0 License; operates with `--offline-scan --skip-db-update`).
 
 #### OpenSCAP (`oscap`)
@@ -222,15 +222,15 @@
 | **`./grc`** | `[Custom-Made Tool]` | Unified CLI dispatcher & orchestration | Command routing, pre-flight checks, status outputs | $0 |
 | **`grc_bundle.py`** | `[Custom-Made Tool]` | Phase 1 & 2 Git bundle verification & restore | `bundle_provenance.json` & read-only workspace | $0 |
 | **`grc_ami.py`** | `[Custom-Made Tool]` | Phase 1 & 2 AMI snapshot cold-mount & metadata | `ami_provenance.json` & mounted rootfs | $0 |
-| **`crypto_lib_scan.py`** | `[Custom-Made Tool]` | Cryptographic library deprecation & FIPS auditor | `crypto_lib_audit_report.json` | $0 |
-| **`sbom_analyzer.py`** | `[Custom-Made Tool]` | CycloneDX to DISA STIG applicability mapper | `stig_applicability_report.json` | $0 |
+| **`crypto_lib_scan.py`** | `[Custom-Made Tool]` | Cryptographic library deprecation & FIPS inventory | `crypto_findings.json` | $0 |
+| **`sbom_analyzer.py`** | `[Custom-Made Tool]` | CycloneDX to DISA STIG applicability mapper | `stig_applicability.json` | $0 |
 | **`grc_reporter.py`** | `[Custom-Made Tool]` | Phase 4 SCR/SCN synthesis & compliance reporter | `poam_data.md`, `controls.md`, `ruleset_validation.md`, `scr_scn_package.json`, `sha256sum` | $0 |
 | **Baseline Rules & Catalog** | `[Custom-Made Tool]` | 37 AST security rules & FIPS crypto database | Policy definitions for Semgrep & crypto scan | $0 |
-| **Semgrep OSS** | `[Open-Source Tools]` | AST-based Static Application Security Testing (SAST) | `semgrep_results.json` | $0 |
-| **Gitleaks** | `[Open-Source Tools]` | Hardcoded secrets & credential detection | `gitleaks_report.json` | $0 |
-| **Checkov** | `[Open-Source Tools]` | Infrastructure-as-Code (IaC) compliance scanner | `checkov_results.json` | $0 |
-| **Syft** | `[Open-Source Tools]` | Software Bill of Materials (SBOM) generator | `sbom.cyclonedx.json` | $0 |
-| **Grype** | `[Open-Source Tools]` | Offline CVE vulnerability matcher | `grype_cve_report.json` | $0 |
-| **Trivy** | `[Open-Source Tools]` | Filesystem vulnerability & misconfig scanner | `trivy_cve_report.json` | $0 |
+| **Semgrep OSS** | `[Open-Source Tools]` | AST-based Static Application Security Testing (SAST) | `semgrep_findings.json` | $0 |
+| **Gitleaks** | `[Open-Source Tools]` | Hardcoded secrets & credential detection | `gitleaks_findings.json` | $0 |
+| **Checkov** | `[Open-Source Tools]` | Infrastructure-as-Code (IaC) compliance scanner | `checkov_findings.json` | $0 |
+| **Syft** | `[Open-Source Tools]` | Software Bill of Materials (SBOM) generator | `sbom.cdx.json` | $0 |
+| **Grype** | `[Open-Source Tools]` | Offline CVE vulnerability matcher | `grype_findings.json` | $0 |
+| **Trivy** | `[Open-Source Tools]` | Filesystem vulnerability & misconfig scanner | `trivy_findings.json` | $0 |
 | **OpenSCAP (`oscap`)** | `[Open-Source Tools]` | SCAP / XCCDF DISA STIG benchmark evaluator | `oscap_results.xml` | $0 |
 | **AWS CLI & EBS / KMS** | `[Third-Party Service]` | Cloud snapshot inspection & KMS key validation | AWS snapshot descriptors (optional) | $0 – $0.05 / scan ($0 mock) |

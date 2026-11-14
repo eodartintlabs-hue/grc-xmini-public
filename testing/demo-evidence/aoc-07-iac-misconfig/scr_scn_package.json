@@ -3,14 +3,20 @@
   "package_schema": "grc-scr-scn-package-v1",
   "session_id": "local-session",
   "target_identifier": "aoc-07-iac-misconfig",
-  "generated_at": "2026-10-15T22:50:41.817317+00:00",
+  "generated_at": "2026-11-14T22:18:22.258186+00:00",
+  "assessed_scanners": [
+    "Checkov",
+    "Semgrep"
+  ],
   "provenance": {},
   "summary": {
     "total_findings": 24,
-    "critical_cat1": 13,
-    "high_cat2": 11,
+    "critical_cat1": 12,
+    "high_cat2": 12,
     "medium_cat3": 0,
     "low_cat4": 0,
+    "verification_required_count": 0,
+    "controls_needing_review": 0,
     "overall_status": "NON_COMPLIANT"
   },
   "controls_rollup": {
@@ -19,99 +25,142 @@
       "family": "Identification and Authentication (IA)",
       "status": "FAIL",
       "findings_count": 1,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-001",
+          "finding_id": "POAM-011-17C0CD",
           "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_SECRET_6",
-          "title": "Base64 High Entropy String",
+          "rule_or_cve_id": "CKV_AWS_287",
+          "title": "Ensure IAM policies does not allow credentials exposure",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "ansible/playbook.yml:11 (Resource: c5012a876a4f516b230d4b0f1cdf6216a1b0f54b)",
-          "line_number": 11,
-          "message": "IaC policy violation on resource 'c5012a876a4f516b230d4b0f1cdf6216a1b0f54b': Base64 High Entropy String",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow credentials exposure",
           "aoc": "AOC-02: Password Hygiene",
           "nist_controls": [
-            "IA-2"
+            "IA-2",
+            "SC-12"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "IA-7": {
       "title": "Cryptographic Module Authentication",
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-2": {
       "title": "Flaw Remediation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-4": {
       "title": "Information System Monitoring",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-7": {
       "title": "Software, Firmware, and Information Integrity",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-10": {
       "title": "Information Input Validation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-16": {
-      "title": "Memory Protection / Cryptographic Hash Integrity",
+      "title": "Memory Protection",
       "family": "System and Information Integrity (SI)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-17": {
       "title": "Fail-Secure / Secure Communications Initiation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-8": {
       "title": "Transmission Confidentiality and Integrity",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-12": {
       "title": "Cryptographic Key Establishment and Management",
       "family": "System and Communications Protection (SC)",
-      "status": "PASS",
-      "findings_count": 0,
-      "findings": []
+      "status": "FAIL",
+      "findings_count": 1,
+      "verification_count": 0,
+      "findings": [
+        {
+          "finding_id": "POAM-011-17C0CD",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_287",
+          "title": "Ensure IAM policies does not allow credentials exposure",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow credentials exposure",
+          "aoc": "AOC-02: Password Hygiene",
+          "nist_controls": [
+            "IA-2",
+            "SC-12"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        }
+      ],
+      "verification_items": []
     },
     "SC-13": {
       "title": "Cryptographic Protection (FIPS 140 Validation)",
       "family": "System and Communications Protection (SC)",
       "status": "FAIL",
       "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-004",
+          "finding_id": "POAM-004-008AFB",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_189",
           "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
@@ -126,12 +175,12 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
+          "sla_days": 30,
           "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-005",
+          "finding_id": "POAM-005-6114DD",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_3",
           "title": "Ensure all data stored in the EBS is securely encrypted",
@@ -146,20 +195,211 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
+          "sla_days": 30,
           "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SC-28": {
       "title": "Protection of Information at Rest",
       "family": "System and Communications Protection (SC)",
       "status": "FAIL",
       "findings_count": 11,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-004",
+          "finding_id": "POAM-021-04820A",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_6",
+          "title": "Ensure that S3 bucket has a Public Access block",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has a Public Access block",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-018-17DFED",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_61",
+          "title": "Ensure that an S3 bucket has a lifecycle configuration",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-015-B6D1F0",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_62",
+          "title": "Ensure S3 buckets should have event notifications enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-019-0B3628",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_144",
+          "title": "Ensure that S3 bucket has cross-region replication enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-023-6BBF33",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_145",
+          "title": "Ensure that S3 buckets are encrypted with KMS by default",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 buckets are encrypted with KMS by default",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-020-8B1207",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_18",
+          "title": "Ensure the S3 bucket has access logging enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-017-19DF89",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_20",
+          "title": "S3 Bucket has an ACL defined which allows public READ access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-022-367174",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_21",
+          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-014-91A2B3",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_57",
+          "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public WRITE access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-004-008AFB",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_189",
           "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
@@ -174,12 +414,12 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
+          "sla_days": 30,
           "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-005",
+          "finding_id": "POAM-005-6114DD",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_3",
           "title": "Ensure all data stored in the EBS is securely encrypted",
@@ -194,209 +434,22 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
+          "sla_days": 30,
           "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-014",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_57",
-          "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public WRITE access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-015",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_62",
-          "title": "Ensure S3 buckets should have event notifications enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-017",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_20",
-          "title": "S3 Bucket has an ACL defined which allows public READ access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-018",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_61",
-          "title": "Ensure that an S3 bucket has a lifecycle configuration",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-019",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_144",
-          "title": "Ensure that S3 bucket has cross-region replication enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-020",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_18",
-          "title": "Ensure the S3 bucket has access logging enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-021",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_6",
-          "title": "Ensure that S3 bucket has a Public Access block",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has a Public Access block",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-022",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_21",
-          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-023",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_145",
-          "title": "Ensure that S3 buckets are encrypted with KMS by default",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 buckets are encrypted with KMS by default",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "AC-3": {
       "title": "Access Enforcement",
       "family": "Access Control (AC)",
       "status": "FAIL",
-      "findings_count": 3,
+      "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-002",
+          "finding_id": "POAM-002-753715",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_24",
           "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
@@ -412,11 +465,11 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-003",
+          "finding_id": "POAM-003-99FDCD",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_25",
           "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
@@ -432,165 +485,21 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-016",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_5",
-          "title": "Ensure that Security Groups are attached to another resource",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
-          "line_number": 26,
-          "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure that Security Groups are attached to another resource",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-3",
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "AC-6": {
       "title": "Least Privilege",
       "family": "Access Control (AC)",
       "status": "FAIL",
       "findings_count": 9,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-014",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_57",
-          "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public WRITE access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-015",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_62",
-          "title": "Ensure S3 buckets should have event notifications enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-017",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_20",
-          "title": "S3 Bucket has an ACL defined which allows public READ access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-018",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_61",
-          "title": "Ensure that an S3 bucket has a lifecycle configuration",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-019",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_144",
-          "title": "Ensure that S3 bucket has cross-region replication enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-020",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_18",
-          "title": "Ensure the S3 bucket has access logging enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-021",
+          "finding_id": "POAM-021-04820A",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV2_AWS_6",
           "title": "Ensure that S3 bucket has a Public Access block",
@@ -607,19 +516,19 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-022",
+          "finding_id": "POAM-018-17DFED",
           "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_21",
-          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+          "rule_or_cve_id": "CKV2_AWS_61",
+          "title": "Ensure that an S3 bucket has a lifecycle configuration",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
           "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
           "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
           "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
           "nist_controls": [
             "AC-6",
@@ -628,11 +537,53 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-023",
+          "finding_id": "POAM-015-B6D1F0",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_62",
+          "title": "Ensure S3 buckets should have event notifications enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-019-0B3628",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_144",
+          "title": "Ensure that S3 bucket has cross-region replication enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-023-6BBF33",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_145",
           "title": "Ensure that S3 buckets are encrypted with KMS by default",
@@ -649,19 +600,273 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-020-8B1207",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_18",
+          "title": "Ensure the S3 bucket has access logging enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-017-19DF89",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_20",
+          "title": "S3 Bucket has an ACL defined which allows public READ access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-022-367174",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_21",
+          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-014-91A2B3",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_57",
+          "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public WRITE access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "CM-6": {
       "title": "Configuration Settings",
       "family": "Configuration Management (CM)",
       "status": "FAIL",
       "findings_count": 21,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-002",
+          "finding_id": "POAM-021-04820A",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_6",
+          "title": "Ensure that S3 bucket has a Public Access block",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has a Public Access block",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-018-17DFED",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_61",
+          "title": "Ensure that an S3 bucket has a lifecycle configuration",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-015-B6D1F0",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_62",
+          "title": "Ensure S3 buckets should have event notifications enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-019-0B3628",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_144",
+          "title": "Ensure that S3 bucket has cross-region replication enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-023-6BBF33",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_145",
+          "title": "Ensure that S3 buckets are encrypted with KMS by default",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 buckets are encrypted with KMS by default",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-020-8B1207",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_18",
+          "title": "Ensure the S3 bucket has access logging enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-017-19DF89",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_20",
+          "title": "S3 Bucket has an ACL defined which allows public READ access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-022-367174",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_21",
+          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+          "line_number": 16,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-002-753715",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_24",
           "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
@@ -677,11 +882,11 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-003",
+          "finding_id": "POAM-003-99FDCD",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_25",
           "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
@@ -697,163 +902,11 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-006",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_289",
-          "title": "Ensure IAM policies does not allow permissions management / resource exposure without constraints",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow permissions management / resource exposure without constraints",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
           "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-007",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_290",
-          "title": "Ensure IAM policies does not allow write access without constraints",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow write access without constraints",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-008",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_355",
-          "title": "Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-009",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_63",
-          "title": "Ensure no IAM policies documents allow \"*\" as a statement's actions",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's actions",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-010",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_286",
-          "title": "Ensure IAM policies does not allow privilege escalation",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow privilege escalation",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-011",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_287",
-          "title": "Ensure IAM policies does not allow credentials exposure",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow credentials exposure",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-012",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_62",
-          "title": "Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-013",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_288",
-          "title": "Ensure IAM policies does not allow data exfiltration",
-          "severity": "HIGH",
-          "cat_level": "CAT II",
-          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-          "line_number": 59,
-          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow data exfiltration",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-014",
+          "finding_id": "POAM-014-91A2B3",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_57",
           "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
@@ -870,199 +923,11 @@
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
-          "target_completion_date": "2026-11-14",
+          "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-015",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_62",
-          "title": "Ensure S3 buckets should have event notifications enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-016",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_5",
-          "title": "Ensure that Security Groups are attached to another resource",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
-          "line_number": 26,
-          "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure that Security Groups are attached to another resource",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-3",
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-017",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_20",
-          "title": "S3 Bucket has an ACL defined which allows public READ access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-018",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_61",
-          "title": "Ensure that an S3 bucket has a lifecycle configuration",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-019",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_144",
-          "title": "Ensure that S3 bucket has cross-region replication enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-020",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_18",
-          "title": "Ensure the S3 bucket has access logging enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-021",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_6",
-          "title": "Ensure that S3 bucket has a Public Access block",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has a Public Access block",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-022",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_21",
-          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-023",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_145",
-          "title": "Ensure that S3 buckets are encrypted with KMS by default",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-          "line_number": 16,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 buckets are encrypted with KMS by default",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-14",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-024",
+          "finding_id": "POAM-024-844297",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV2_AWS_40",
           "title": "Ensure AWS IAM policy does not allow full IAM privileges",
@@ -1076,427 +941,206 @@
             "CM-6"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-016-A5F0CD",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_5",
+          "title": "Ensure that Security Groups are attached to another resource",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
+          "line_number": 26,
+          "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure that Security Groups are attached to another resource",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-010-ECDA6E",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_286",
+          "title": "Ensure IAM policies does not allow privilege escalation",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow privilege escalation",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-013-CDEFF7",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_288",
+          "title": "Ensure IAM policies does not allow data exfiltration",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow data exfiltration",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-006-08FF2B",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_289",
+          "title": "Ensure IAM policies does not allow permissions management / resource exposure without constraints",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow permissions management / resource exposure without constraints",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-007-5035DB",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_290",
+          "title": "Ensure IAM policies does not allow write access without constraints",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow write access without constraints",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-008-70B241",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_355",
+          "title": "Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-012-6BB462",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_62",
+          "title": "Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-009-C2A891",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_63",
+          "title": "Ensure no IAM policies documents allow \"*\" as a statement's actions",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+          "line_number": 59,
+          "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's actions",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-12-14",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-001-62FB82",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_SECRET_6",
+          "title": "Base64 High Entropy String",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "ansible/playbook.yml:11 (Resource: c5012a876a4f516b230d4b0f1cdf6216a1b0f54b)",
+          "line_number": 11,
+          "message": "IaC policy violation on resource 'c5012a876a4f516b230d4b0f1cdf6216a1b0f54b': Base64 High Entropy String",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "CM-6"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
           "target_completion_date": "2026-12-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "CM-8": {
       "title": "Information System Component Inventory",
       "family": "Configuration Management (CM)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "RA-5": {
       "title": "Vulnerability Monitoring and Scanning",
       "family": "Risk Assessment (RA)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     }
   },
   "findings": [
     {
-      "finding_id": "POAM-001",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_SECRET_6",
-      "title": "Base64 High Entropy String",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "ansible/playbook.yml:11 (Resource: c5012a876a4f516b230d4b0f1cdf6216a1b0f54b)",
-      "line_number": 11,
-      "message": "IaC policy violation on resource 'c5012a876a4f516b230d4b0f1cdf6216a1b0f54b': Base64 High Entropy String",
-      "aoc": "AOC-02: Password Hygiene",
-      "nist_controls": [
-        "IA-2"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-002",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_24",
-      "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
-      "line_number": 26,
-      "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-3",
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-003",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_25",
-      "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
-      "line_number": 26,
-      "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-3",
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-004",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_189",
-      "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:48 (Resource: aws_ebs_volume.unencrypted_volume)",
-      "line_number": 48,
-      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_volume': Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "SC-13",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-005",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_3",
-      "title": "Ensure all data stored in the EBS is securely encrypted",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:48 (Resource: aws_ebs_volume.unencrypted_volume)",
-      "line_number": 48,
-      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_volume': Ensure all data stored in the EBS is securely encrypted",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "SC-13",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-006",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_289",
-      "title": "Ensure IAM policies does not allow permissions management / resource exposure without constraints",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow permissions management / resource exposure without constraints",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-007",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_290",
-      "title": "Ensure IAM policies does not allow write access without constraints",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow write access without constraints",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-008",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_355",
-      "title": "Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-009",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_63",
-      "title": "Ensure no IAM policies documents allow \"*\" as a statement's actions",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's actions",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-010",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_286",
-      "title": "Ensure IAM policies does not allow privilege escalation",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow privilege escalation",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-011",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_287",
-      "title": "Ensure IAM policies does not allow credentials exposure",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow credentials exposure",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-012",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_62",
-      "title": "Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-013",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_288",
-      "title": "Ensure IAM policies does not allow data exfiltration",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
-      "line_number": 59,
-      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow data exfiltration",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-014",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_57",
-      "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-      "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public WRITE access.",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-015",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV2_AWS_62",
-      "title": "Ensure S3 buckets should have event notifications enabled",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-      "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-016",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV2_AWS_5",
-      "title": "Ensure that Security Groups are attached to another resource",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
-      "line_number": 26,
-      "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure that Security Groups are attached to another resource",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-3",
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-017",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_20",
-      "title": "S3 Bucket has an ACL defined which allows public READ access.",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-      "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-018",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV2_AWS_61",
-      "title": "Ensure that an S3 bucket has a lifecycle configuration",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-      "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-019",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_144",
-      "title": "Ensure that S3 bucket has cross-region replication enabled",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-      "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-020",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_18",
-      "title": "Ensure the S3 bucket has access logging enabled",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
-      "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-14",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-021",
+      "finding_id": "POAM-021-04820A",
       "source_tool": "Checkov",
       "rule_or_cve_id": "CKV2_AWS_6",
       "title": "Ensure that S3 bucket has a Public Access block",
@@ -1513,19 +1157,19 @@
       ],
       "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
       "sla_days": 30,
-      "target_completion_date": "2026-11-14",
+      "target_completion_date": "2026-12-14",
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-022",
+      "finding_id": "POAM-018-17DFED",
       "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_21",
-      "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+      "rule_or_cve_id": "CKV2_AWS_61",
+      "title": "Ensure that an S3 bucket has a lifecycle configuration",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
       "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
       "line_number": 16,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that an S3 bucket has a lifecycle configuration",
       "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
       "nist_controls": [
         "AC-6",
@@ -1534,11 +1178,53 @@
       ],
       "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
       "sla_days": 30,
-      "target_completion_date": "2026-11-14",
+      "target_completion_date": "2026-12-14",
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-023",
+      "finding_id": "POAM-015-B6D1F0",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV2_AWS_62",
+      "title": "Ensure S3 buckets should have event notifications enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+      "line_number": 16,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure S3 buckets should have event notifications enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-019-0B3628",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_144",
+      "title": "Ensure that S3 bucket has cross-region replication enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+      "line_number": 16,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure that S3 bucket has cross-region replication enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-023-6BBF33",
       "source_tool": "Checkov",
       "rule_or_cve_id": "CKV_AWS_145",
       "title": "Ensure that S3 buckets are encrypted with KMS by default",
@@ -1555,11 +1241,155 @@
       ],
       "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
       "sla_days": 30,
-      "target_completion_date": "2026-11-14",
+      "target_completion_date": "2026-12-14",
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-024",
+      "finding_id": "POAM-020-8B1207",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_18",
+      "title": "Ensure the S3 bucket has access logging enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+      "line_number": 16,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure the S3 bucket has access logging enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-017-19DF89",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_20",
+      "title": "S3 Bucket has an ACL defined which allows public READ access.",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+      "line_number": 16,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public READ access.",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-022-367174",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_21",
+      "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+      "line_number": 16,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': Ensure all data stored in the S3 bucket have versioning enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-002-753715",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_24",
+      "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
+      "line_number": 26,
+      "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-3",
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-003-99FDCD",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_25",
+      "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
+      "line_number": 26,
+      "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-3",
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-011-17C0CD",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_287",
+      "title": "Ensure IAM policies does not allow credentials exposure",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow credentials exposure",
+      "aoc": "AOC-02: Password Hygiene",
+      "nist_controls": [
+        "IA-2",
+        "SC-12"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-014-91A2B3",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_57",
+      "title": "S3 Bucket has an ACL defined which allows public WRITE access.",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "terraform/main.tf:16 (Resource: aws_s3_bucket.insecure_public_bucket)",
+      "line_number": 16,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.insecure_public_bucket': S3 Bucket has an ACL defined which allows public WRITE access.",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-024-844297",
       "source_tool": "Checkov",
       "rule_or_cve_id": "CKV2_AWS_40",
       "title": "Ensure AWS IAM policy does not allow full IAM privileges",
@@ -1573,9 +1403,221 @@
         "CM-6"
       ],
       "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-016-A5F0CD",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV2_AWS_5",
+      "title": "Ensure that Security Groups are attached to another resource",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:26 (Resource: aws_security_group.open_management_sg)",
+      "line_number": 26,
+      "message": "IaC policy violation on resource 'aws_security_group.open_management_sg': Ensure that Security Groups are attached to another resource",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-004-008AFB",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_189",
+      "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:48 (Resource: aws_ebs_volume.unencrypted_volume)",
+      "line_number": 48,
+      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_volume': Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "SC-13",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-010-ECDA6E",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_286",
+      "title": "Ensure IAM policies does not allow privilege escalation",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow privilege escalation",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-013-CDEFF7",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_288",
+      "title": "Ensure IAM policies does not allow data exfiltration",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow data exfiltration",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-006-08FF2B",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_289",
+      "title": "Ensure IAM policies does not allow permissions management / resource exposure without constraints",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow permissions management / resource exposure without constraints",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-007-5035DB",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_290",
+      "title": "Ensure IAM policies does not allow write access without constraints",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies does not allow write access without constraints",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-005-6114DD",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_3",
+      "title": "Ensure all data stored in the EBS is securely encrypted",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:48 (Resource: aws_ebs_volume.unencrypted_volume)",
+      "line_number": 48,
+      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_volume': Ensure all data stored in the EBS is securely encrypted",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "SC-13",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-008-70B241",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_355",
+      "title": "Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's resource for restrictable actions",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-012-6BB462",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_62",
+      "title": "Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure IAM policies that allow full \"*-*\" administrative privileges are not created",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-009-C2A891",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_63",
+      "title": "Ensure no IAM policies documents allow \"*\" as a statement's actions",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "terraform/main.tf:59 (Resource: aws_iam_policy.wildcard_admin_policy)",
+      "line_number": 59,
+      "message": "IaC policy violation on resource 'aws_iam_policy.wildcard_admin_policy': Ensure no IAM policies documents allow \"*\" as a statement's actions",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-12-14",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-001-62FB82",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_SECRET_6",
+      "title": "Base64 High Entropy String",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "ansible/playbook.yml:11 (Resource: c5012a876a4f516b230d4b0f1cdf6216a1b0f54b)",
+      "line_number": 11,
+      "message": "IaC policy violation on resource 'c5012a876a4f516b230d4b0f1cdf6216a1b0f54b': Base64 High Entropy String",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
       "target_completion_date": "2026-12-14",
       "status": "Open (Identified Out-of-Band)"
     }
-  ]
+  ],
+  "verification_items": []
 }

@@ -390,6 +390,105 @@ class TestCodeReviewRegressions(unittest.TestCase):
         )
         self.assertEqual(len(norm), 2)
 
+    # -----------------------------------------------------------------------
+    # Phase 0 (v1.4.5 Yokota): FIPS 140-3 baseline honesty & SC-13 verification
+    # -----------------------------------------------------------------------
+    def test_phase0_catalog_sync_and_v1_1_0(self) -> None:
+        catalog_file = Path(REPO_ROOT) / "rules" / "crypto_catalog.json"
+        raw_text = catalog_file.read_text(encoding="utf-8")
+        data = json.loads(raw_text)
+        self.assertEqual(data["catalog_metadata"]["version"], "1.1.0")
+        self.assertNotIn("fips_capable", raw_text)
+        self.assertEqual(data["rules"], crypto_lib_scan.EMBEDDED_CRYPTO_CATALOG)
+        self.assertNotIn("pycryptodome", data["rules"]["pycrypto"]["remediation"].lower())
+
+        # Returned copy from fallback path must not mutate embedded catalog constant
+        fallback = crypto_lib_scan.load_crypto_catalog(Path("/nonexistent/crypto_catalog.json"))
+        fallback["openssl"]["status"] = "MUTATED_TEST"
+        self.assertEqual(crypto_lib_scan.EMBEDDED_CRYPTO_CATALOG["openssl"]["status"], "ACTIVE")
+
+    def test_phase0_no_false_pass_and_tri_state_classifications(self) -> None:
+        scanner = crypto_lib_scan.CryptoScanner(crypto_lib_scan.EMBEDDED_CRYPTO_CATALOG)
+        deps = [
+            ("cryptography", "42.0.0", "requirements.txt", "python"),
+            ("pycryptodome", "3.20.0", "requirements.txt", "python"),
+            ("bcprov-jdk18on", "1.78", "pom.xml", "java"),
+            ("bc-fips", "1.0.2.4", "pom.xml", "java"),
+            ("golang.org/x/crypto", "0.28.0", "go.mod", "go"),
+            ("golang.org/x/crypto/ssh", "0.28.0", "go.mod", "go"),
+            # Cross-ecosystem isolation: npm package named openssl must not match system/python rule
+            ("openssl", "3.0.14", "package.json", "javascript"),
+        ]
+        findings = scanner.evaluate(deps)
+        by_name = {f.name: f for f in findings}
+
+        self.assertNotIn("openssl", by_name)
+        self.assertEqual(by_name["cryptography"].status, "CANNOT_DETERMINE_STATICALLY")
+        self.assertEqual(by_name["cryptography"].fips_status, "CAPABLE_IF_CONFIGURED")
+        self.assertEqual(by_name["cryptography"].severity, "INFO")
+        self.assertEqual(by_name["cryptography"].nist_controls, ["SC-13"])
+
+        self.assertEqual(by_name["pycryptodome"].status, "NOT_VALIDATED")
+        self.assertEqual(by_name["pycryptodome"].fips_status, "NOT_VALIDATED")
+        self.assertEqual(by_name["pycryptodome"].severity, "MEDIUM")
+        self.assertEqual(by_name["pycryptodome"].nist_controls, ["SC-13"])
+
+        self.assertEqual(by_name["bcprov-jdk18on"].status, "NOT_VALIDATED")
+        self.assertEqual(by_name["bc-fips"].status, "CANNOT_DETERMINE_STATICALLY")
+        self.assertEqual(by_name["golang.org/x/crypto"].status, "NOT_VALIDATED")
+        self.assertEqual(by_name["golang.org/x/crypto/ssh"].status, "NOT_VALIDATED")
+        self.assertFalse(any(f.status == "PASS" for f in findings))
+
+    def test_phase0_si16_remapped_to_sc13_and_enhancement_parsing(self) -> None:
+        ruleset_text = (Path(REPO_ROOT) / "rules" / "custom-baseline-ruleset.yaml").read_text(encoding="utf-8")
+        self.assertNotIn("SI-16", ruleset_text)
+        self.assertIn("grc-aoc03-", ruleset_text)
+
+        self.assertEqual(grc_reporter.NIST_CONTROLS_CATALOG["SI-16"]["title"], "Memory Protection")
+        self.assertEqual(grc_reporter.NIST_CONTROLS_CATALOG["SI-16"]["assessed_by"], [])
+        self.assertEqual(
+            grc_reporter._extract_nist_controls("SC-13, IA-5(1), SC-28(1)"),
+            ["SC-13", "IA-5(1)", "SC-28(1)"],
+        )
+
+        # Ensure SI-16 remains intact in STIG catalog
+        stig_text = (Path(REPO_ROOT) / "rules" / "stig_catalog.json").read_text(encoding="utf-8")
+        self.assertIn("SI-16", stig_text)
+
+    def test_phase0_reporter_verification_section_and_sc13_needs_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ev_dir = Path(tmp)
+            crypto_payload = {
+                "findings": [
+                    {
+                        "library_name": "cryptography",
+                        "detected_version": "42.0.0",
+                        "manifest_file": "requirements.txt",
+                        "ecosystem": "python",
+                        "compliance_status": "CANNOT_DETERMINE_STATICALLY",
+                        "fips_status": "CAPABLE_IF_CONFIGURED",
+                        "severity": "INFO",
+                        "nist_controls": ["SC-13"],
+                    }
+                ]
+            }
+            (ev_dir / "crypto_findings.json").write_text(json.dumps(crypto_payload), encoding="utf-8")
+            grc_reporter.GRCComplianceReporter(evidence_dir=ev_dir).run(write_files=True)
+
+            pkg = json.loads((ev_dir / "scr_scn_package.json").read_text(encoding="utf-8"))
+            poam_md = (ev_dir / "poam_data.md").read_text(encoding="utf-8")
+            controls_md = (ev_dir / "controls.md").read_text(encoding="utf-8")
+
+            self.assertEqual(pkg["summary"]["total_findings"], 0)
+            self.assertEqual(pkg["summary"]["verification_required_count"], 1)
+            self.assertEqual(pkg["summary"]["controls_needing_review"], 1)
+            self.assertEqual(pkg["summary"]["overall_status"], "NEEDS_REVIEW")
+            self.assertEqual(pkg["controls_rollup"]["SC-13"]["status"], "NEEDS_REVIEW")
+            self.assertEqual(len(pkg["verification_items"]), 1)
+            self.assertEqual(len(pkg["findings"]), 0)
+            self.assertIn("## 4. Needs Human or Runtime Verification", poam_md)
+            self.assertIn("NEEDS REVIEW", controls_md)
+
 
 if __name__ == "__main__":
     unittest.main()

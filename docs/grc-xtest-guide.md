@@ -40,7 +40,7 @@
    * [4.2 Automated Evidence Isolation & Directory Structure](#42-automated-evidence-isolation--directory-structure)
 5. [Master AOC Verification Cheat Sheet (All 12 Test Bundles)](#5-master-aoc-verification-cheat-sheet-all-12-test-bundles)
    * [AOC-02: Password Hygiene (`IA-2`)](#-aoc-02-password-hygiene-nist-sp-800-53-ia-2)
-   * [AOC-03: Weak Encryption Check (`SI-16`)](#️-aoc-03-weak-encryption-check-nist-sp-800-53-si-16)
+   * [AOC-03: Weak Encryption Check (`SC-13`)](#️-aoc-03-weak-encryption-check-nist-sp-800-53-sc-13)
    * [AOC-04: Command Injection (`SI-4`)](#-aoc-04-command-injection-nist-sp-800-53-si-4)
    * [AOC-05: Improper TLS (`SI-17`)](#-aoc-05-improper-tls-nist-sp-800-53-si-17)
    * [AOC-06: Secrets Management (`SC-12`)](#-aoc-06-secrets-management-nist-sp-800-53-sc-12)
@@ -48,7 +48,7 @@
    * [AOC-09: Unsupported Cryptographic Libraries (`SI-7`)](#-aoc-09-unsupported-cryptographic-libraries-nist-sp-800-53-si-7)
    * [AOC-10: CRITICAL Severity Vulnerabilities (`RA-5, SI-2`)](#-aoc-10-critical-severity-vulnerabilities-nist-sp-800-53-ra-5-si-2)
    * [AOC-11: Category I DISA STIG Violations (`SI-2`)](#️-aoc-11-category-i-disa-stig-violations-nist-sp-800-53-si-2)
-   * [AOC-12: Lack of FIPS Mode (`SC-13`)](#️-aoc-12-lack-of-fips-mode-nist-sp-800-53-sc-13)
+   * [AOC-12: Lack of FIPS Mode *(Planned — `v1.5.0`)* (`SC-13`)](#️-aoc-12-lack-of-fips-mode-nist-sp-800-53-sc-13)
    * [AOC-140: Organization-Specific Guardrails (`CM-6`)](#-aoc-140-organization-specific-guardrails-nist-sp-800-53-cm-6)
    * [AOC-Combo-4x: 4-in-1 Multi-Engine Combined Bundle (`02 + 04 + 07 + 09`)](#-aoc-combo-4x-4-in-1-multi-engine-combined-bundle-aoc-02--04--07--09)
 6. [Automated Batch Verification (Run All 12 Bundle Tests)](#6-automated-batch-verification-run-all-12-bundle-tests)
@@ -231,7 +231,7 @@ Use these copy-pasteable commands from the `GRC-x` root to test any specific Are
 
 ---
 
-### 🛡️ AOC-03: Weak Encryption Check (`NIST SP 800-53 SI-16`)
+### 🛡️ AOC-03: Weak Encryption Check (`NIST SP 800-53 SC-13`)
 * **Target Flaws**: Broken hash algorithms (`MD5`, `SHA-1`), broken symmetric ciphers (`DES`, `RC4`), and insecure `AES/ECB` block modes.
 * **Commands**:
   ```bash
@@ -323,13 +323,14 @@ Use these copy-pasteable commands from the `GRC-x` root to test any specific Are
 ---
 
 ### 🛡️ AOC-12: Lack of FIPS Mode (`NIST SP 800-53 SC-13`)
+> **Status**: **Planned (`v1.5.0 — Iwakuni`)** — The synthetic fixture bundle is staged in `GRC-xTEST`, while automated `AOC-12` approved-mode configuration checks ship in `v1.5.0 — Iwakuni` (`./grc fips`).
 * **Target Flaws**: Linux kernel bootloader with `fips=0` in GRUB parameters, system-wide crypto policies set to `DEFAULT` instead of `FIPS`, OpenSSL 3.0 configuration missing `[fips_sect] activate = 1`.
-* **Commands**:
+* **Commands** *(planned `v1.5.0` workflow)*:
   ```bash
   ./grc bundle restore ../GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle -w ./ephemeral_workspace -r v1.0.0 -f --read-only
   ./grc scan -w ./ephemeral_workspace
   ```
-* **Expected Output**: Non-FIPS configuration flags recorded in `evidence/aoc-12-no-fips-mode/semgrep_findings.json`.
+* **Expected Output**: Automated `AOC-12` configuration checks ship in `v1.5.0 — Iwakuni` (`./grc fips`). Today, only `crypto_lib_scan.py` library inventory applies to dependency manifests in this fixture.
 
 ---
 
@@ -412,7 +413,7 @@ cat ./ephemeral_mock_ami/ami_provenance.json | jq .
 | Deliverable File | Producing Engine | Control Mapping | Auditor Inspection One-Liner (`jq`) |
 | :--- | :--- | :--- | :--- |
 | **`bundle_provenance.json`** | `grc_bundle.py` | NIST CM-8<br>DoD Provenance | `cat bundle_provenance.json \| jq '{id: .bundle_identifier, sha: .bundle_sha256, files: .total_files}'` |
-| **`semgrep_findings.json`** | Semgrep | NIST IA-2, SI-4,<br>SI-16, SI-17 | `cat semgrep_findings.json \| jq -r '.results[] \| "\(.extra.metadata.aoc) \| \(.path):\(.start.line) \| \(.extra.message)"'` |
+| **`semgrep_findings.json`** | Semgrep | NIST IA-2, SC-13,<br>SI-4, SI-17 | `cat semgrep_findings.json \| jq -r '.results[] \| "\(.extra.metadata.aoc) \| \(.path):\(.start.line) \| \(.extra.message)"'` |
 | **`checkov_findings.json`** | Checkov | NIST AC-6, CM-6<br>FedRAMP IaC | `cat checkov_findings.json \| jq '.[].results.failed_checks[] \| {check: .check_name, resource: .resource}'` |
 | **`sbom.cdx.json`** | Syft | NIST CM-8, SI-7<br>CycloneDX | `cat sbom.cdx.json \| jq '.components[] \| {name: .name, version: .version, type: .type}'` |
 | **`grype_findings.json`** | Grype | NIST RA-5, SI-2<br>POA&M Ingestion | `cat grype_findings.json \| jq -r '.matches[] \| "\(.vulnerability.severity) \| \(.vulnerability.id) \| \(.artifact.name):\(.artifact.version)"'` |

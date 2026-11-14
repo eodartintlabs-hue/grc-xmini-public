@@ -61,6 +61,20 @@ except ImportError:
 # NIST SP 800-53 REV. 5 CONTROL DEFINITIONS
 # ==============================================================================
 
+_NIST_CTL_RE = re.compile(r"[A-Z]{2}-\d+(?:\(\d+\))?")
+
+
+def _extract_nist_controls(raw: str, default: str = "CM-6") -> List[str]:
+    """Extracts ordered, deduplicated NIST SP 800-53 control IDs (including enhancements)."""
+    seen: Set[str] = set()
+    controls: List[str] = []
+    for ctl in _NIST_CTL_RE.findall(str(raw or "")):
+        if ctl not in seen:
+            seen.add(ctl)
+            controls.append(ctl)
+    return controls if controls else [default]
+
+
 NIST_CONTROLS_CATALOG: Dict[str, Dict[str, Any]] = {
     "IA-2": {
         "title": "Identification and Authentication (Organizational Users)",
@@ -105,11 +119,12 @@ NIST_CONTROLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "assessed_by": ["Semgrep"],
     },
     "SI-16": {
-        "title": "Memory Protection / Cryptographic Hash Integrity",
+        "title": "Memory Protection",
         "family": "System and Information Integrity (SI)",
-        "description": "Protect memory integrity and enforce strong cryptographic hash algorithms. Prohibits MD5, SHA-1, DES, and RC4.",
-        "stig_cat": "CAT I",
-        "assessed_by": ["Semgrep", "CryptoScan"],
+        "description": "Implement security safeguards to protect system memory from unauthorized code execution (e.g., DEP/NX, ASLR, memory-safe handling).",
+        "stig_cat": "CAT II",
+        "priority": "P1",
+        "assessed_by": [],
     },
     "SI-17": {
         "title": "Fail-Secure / Secure Communications Initiation",
@@ -288,6 +303,7 @@ class GRCComplianceReporter:
         self.ruleset_path = Path(ruleset_path).resolve() if ruleset_path else None
 
         self.findings: List[NormalizedFinding] = []
+        self.verification_items: List[Dict[str, Any]] = []
         self.provenance: Dict[str, Any] = {}
         self.baseline_rules: List[Dict[str, Any]] = []
         self.loaded_scanners: Set[str] = set()
@@ -381,15 +397,14 @@ class GRCComplianceReporter:
                 )
                 for chunk in rule_chunks:
                     r_id, r_sev, r_msg, r_aoc, r_nist = chunk
-                    ctl_match = re.search(r"([A-Z]{2}-\d+)", r_nist)
-                    ctl_id = ctl_match.group(1) if ctl_match else "CM-6"
+                    controls = _extract_nist_controls(r_nist, default="CM-6")
 
                     self.baseline_rules.append({
                         "id": r_id.strip(),
                         "severity": r_sev.strip(),
                         "message": r_msg.strip(),
                         "aoc": r_aoc.strip(),
-                        "nist_control": ctl_id,
+                        "nist_control": ", ".join(controls),
                     })
             except Exception as e:
                 print(f"[!] Warning: Failed to parse baseline ruleset: {e}", file=sys.stderr)
@@ -430,8 +445,15 @@ class GRCComplianceReporter:
                     severity, cat_level = "CRITICAL", "CAT I"
 
                 nist_raw = str(meta.get("nist_control") or "CM-6")
-                ctl_match = re.search(r"([A-Z]{2}-\d+)", nist_raw)
-                ctl_id = ctl_match.group(1) if ctl_match else "CM-6"
+                extracted_ctls = _extract_nist_controls(nist_raw, default="CM-6")
+                norm_ctls: List[str] = []
+                for c in extracted_ctls:
+                    # Guard against historical AOC-03 semgrep artifacts still tagged SI-16
+                    if "AOC-03" in aoc and c == "SI-16":
+                        c = "SC-13"
+                    mapped = c if c in NIST_CONTROLS_CATALOG else c.split("(")[0]
+                    if mapped not in norm_ctls:
+                        norm_ctls.append(mapped)
 
                 title = message.split(":")[0] if ":" in message else check_id
                 remediation = "Remediate source code according to the secure coding baseline; eliminate static credentials, legacy ciphers, or shell execution."
@@ -457,7 +479,7 @@ class GRCComplianceReporter:
                         line_number=line,
                         message=message,
                         aoc=aoc,
-                        nist_controls=[ctl_id],
+                        nist_controls=norm_ctls,
                         remediation=remediation,
                         raw_data=r,
                         anchor_date=anchor,
@@ -554,8 +576,12 @@ class GRCComplianceReporter:
     def parse_crypto_scan(self) -> None:
         """
         Parses crypto_findings.json.
-        CRITICAL FIX (P0 #3): Skips `compliance_status == "PASS"` findings so compliant
-        libraries are never ingested as POA&M items, and preserves `manifest_file`.
+        - Skips `PASS` / `CONFORMANT_INDICATOR` items from POA&M ingestion.
+        - Routes `CANNOT_DETERMINE_STATICALLY` and `NEEDS_REVIEW` items into
+          `self.verification_items` ("Needs Human or Runtime Verification"),
+          keeping them out of confirmed FedRAMP POA&M weakness rows.
+        - Ingests `NOT_VALIDATED` modules against `SC-13` and `FAIL_*`/`WARN_*`
+          lifecycle/EOL findings into POA&Ms while preserving `manifest_file`.
         """
         c_file = self.evidence_dir / "crypto_findings.json"
         if not c_file.exists() or c_file.stat().st_size == 0:
@@ -577,37 +603,76 @@ class GRCComplianceReporter:
                 if not isinstance(item, dict):
                     continue
                 status = str(item.get("compliance_status") or "FAIL").strip().upper()
-                # Never ingest compliant PASS items as POA&M findings
-                if status == "PASS":
+                if status in ("PASS", "CONFORMANT_INDICATOR"):
                     continue
 
                 lib = str(item.get("library_name") or "Unknown Crypto Library")
                 ver = str(item.get("detected_version") or "N/A")
-                raw_sev = str(item.get("severity") or "CRITICAL").upper()
-                sev, cat = normalize_severity_and_cat(raw_sev)
-                aoc = str(item.get("area_of_concern") or "AOC-09: Crypto Dependencies on Unsupported Libraries")
-                remediation = str(
-                    item.get("remediation") or f"Upgrade '{lib}' to a supported, active FIPS-capable version."
-                )
-                ctls = item.get("nist_controls") or ["SI-7", "SC-12", "SC-13"]
                 manifest_path = self.clean_path(
                     item.get("manifest_file") or "Dependency Manifest / System Libraries"
                 )
-                rule_id = f"CRYPTO-{lib.upper()}-{status}"
 
+                if status in ("CANNOT_DETERMINE_STATICALLY", "NEEDS_REVIEW"):
+                    raw_ctls = item.get("nist_controls") or ["SC-13"]
+                    self.verification_items.append({
+                        "verification_id": f"VERIFY-{len(self.verification_items) + 1:03d}",
+                        "source_tool": "CryptoScan",
+                        "library_name": lib,
+                        "detected_version": ver,
+                        "file_path": manifest_path,
+                        "ecosystem": str(item.get("ecosystem") or "unknown"),
+                        "compliance_status": status,
+                        "fips_status": str(item.get("fips_status") or "CAPABLE_IF_CONFIGURED"),
+                        "nist_controls": list(raw_ctls),
+                        "description": str(
+                            item.get("description")
+                            or f"FIPS 140-3 module linkage and approved-mode configuration for '{lib}' ({ver}) require human or runtime verification."
+                        ),
+                        "verification_guidance": str(
+                            item.get("remediation")
+                            or "Verify runtime FIPS provider linkage and approved-mode configuration on the deployed target."
+                        ),
+                    })
+                    continue
+
+                raw_sev = str(
+                    item.get("severity") or ("MEDIUM" if status == "NOT_VALIDATED" else "CRITICAL")
+                ).upper()
+                sev, cat = normalize_severity_and_cat(raw_sev)
+                aoc = str(item.get("area_of_concern") or "AOC-09: Crypto Dependencies on Unsupported Libraries")
+
+                if status == "NOT_VALIDATED":
+                    ctls = list(item.get("nist_controls") or ["SC-13"])
+                    title = f"Unvalidated Cryptographic Module (No FIPS 140-3 Certificate): {lib} ({ver})"
+                    remediation = str(
+                        item.get("remediation")
+                        or f"Migrate SC-13 regulated cryptographic operations from '{lib}' to a NIST CMVP-validated module."
+                    )
+                else:
+                    ctls = list(item.get("nist_controls") or ["SI-7", "SC-12", "SC-13"])
+                    title = f"Unsupported/Deprecated Cryptographic Library: {lib} ({ver})"
+                    remediation = str(
+                        item.get("remediation")
+                        or f"Upgrade '{lib}' to a supported version with a validated cryptographic configuration."
+                    )
+
+                rule_id = f"CRYPTO-{lib.upper()}-{status}"
                 self.findings.append(
                     NormalizedFinding(
                         finding_id=self._make_finding_id("CryptoScan", rule_id, manifest_path),
                         source_tool="CryptoScan",
                         rule_or_cve_id=rule_id,
-                        title=f"Unsupported/Deprecated Cryptographic Library: {lib} ({ver})",
+                        title=title,
                         severity=sev,
                         cat_level=cat,
                         file_path=manifest_path,
                         line_number=None,
-                        message=f"Detected cryptographic library '{lib}' version '{ver}' with status '{status}'.",
+                        message=str(
+                            item.get("description")
+                            or f"Detected cryptographic library '{lib}' version '{ver}' with status '{status}'."
+                        ),
                         aoc=aoc,
-                        nist_controls=list(ctls),
+                        nist_controls=ctls,
                         remediation=remediation,
                         raw_data=item,
                         anchor_date=anchor,
@@ -852,6 +917,19 @@ class GRCComplianceReporter:
             self.loaded_scanners.add("SBOM")
         return bool(assessors & self.loaded_scanners)
 
+    def _group_verifications_by_control(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Indexes verification items by normalized NIST control ID for rollup reporting."""
+        grouped: Dict[str, List[Dict[str, Any]]] = {ctl: [] for ctl in NIST_CONTROLS_CATALOG.keys()}
+        for item in self.verification_items:
+            seen_ctls: Set[str] = set()
+            for raw_ctl in item.get("nist_controls", []):
+                ctl = str(raw_ctl).strip()
+                mapped = ctl if ctl in NIST_CONTROLS_CATALOG else ctl.split("(")[0]
+                if mapped not in seen_ctls:
+                    seen_ctls.add(mapped)
+                    grouped.setdefault(mapped, []).append(item)
+        return grouped
+
     def generate_poam_markdown(self) -> str:
         """Generates poam_data.md in formal FedRAMP High / DoD format."""
         now = utc_now_str()
@@ -873,9 +951,12 @@ class GRCComplianceReporter:
         med_count = sum(1 for f in self.findings if f.severity == "MEDIUM")
         low_count = sum(1 for f in self.findings if f.severity in ("LOW", "INFORMATIONAL", "INFO"))
         total_count = len(self.findings)
+        verify_count = len(self.verification_items)
 
         if total_count > 0:
             overall_posture = "NON-COMPLIANT (Active Findings Identified)"
+        elif verify_count > 0:
+            overall_posture = "NEEDS REVIEW (Human / Runtime Verification Required)"
         elif not self.loaded_scanners:
             overall_posture = "NOT ASSESSED (No Scanner Evidence Present)"
         else:
@@ -904,7 +985,8 @@ class GRCComplianceReporter:
             f"| **HIGH** | **Category II (CAT II)** | **{high_count}** | **30 Calendar Days** | {'❌ Non-Compliant' if high_count > 0 else ('⚪ Not Assessed' if not self.loaded_scanners else '✅ Clear')} |",
             f"| **MEDIUM** | **Category III (CAT III)** | **{med_count}** | **90 Calendar Days** | {'⚠️ Warning' if med_count > 0 else ('⚪ Not Assessed' if not self.loaded_scanners else '✅ Clear')} |",
             f"| **LOW / INFO** | Informational | **{low_count}** | 180 Calendar Days | {'⚪ Not Assessed' if not self.loaded_scanners else '✅ Monitored'} |",
-            f"| **TOTAL** | — | **{total_count}** | — | **{overall_posture}** |",
+            f"| **Needs Verification** | Assessor / Runtime Review | **{verify_count}** | *Excluded from POA&M* | {'🔍 Needs Review (See Sec. 4)' if verify_count > 0 else '—'} |",
+            f"| **TOTAL (POA&M Weaknesses)** | — | **{total_count}** | — | **{overall_posture}** |",
             "",
             "---",
             "",
@@ -917,12 +999,17 @@ class GRCComplianceReporter:
         ]
 
         if not self.findings:
-            empty_status = "**Not Assessed**" if not self.loaded_scanners else "**Compliant**"
-            empty_msg = (
-                "No scanner evidence files were present in the evidence directory."
-                if not self.loaded_scanners
-                else "No unmitigated vulnerabilities detected in release."
-            )
+            if verify_count > 0:
+                empty_status = "**Needs Review**"
+                empty_msg = (
+                    f"0 confirmed POA&M weaknesses; {verify_count} item(s) require human or runtime verification (see Section 4)."
+                )
+            elif not self.loaded_scanners:
+                empty_status = "**Not Assessed**"
+                empty_msg = "No scanner evidence files were present in the evidence directory."
+            else:
+                empty_status = "**Compliant**"
+                empty_msg = "No unmitigated vulnerabilities detected in release."
             md.append(f"| *None* | — | {empty_msg} | — | — | — | — | {empty_status} |")
         else:
             for f in self.findings:
@@ -942,7 +1029,11 @@ class GRCComplianceReporter:
         ])
 
         if not self.findings:
-            if not self.loaded_scanners:
+            if verify_count > 0:
+                md.append(
+                    "No confirmed POA&M weaknesses detected; see Section 4 for cryptographic modules requiring human or runtime verification."
+                )
+            elif not self.loaded_scanners:
                 md.append("No scanner evidence files were found to evaluate remediation requirements.")
             else:
                 md.append("No remediation actions required. The audited release bundle conforms to baseline compliance rules.")
@@ -959,13 +1050,35 @@ class GRCComplianceReporter:
                     "",
                 ])
 
+        if self.verification_items:
+            md.extend([
+                "",
+                "---",
+                "",
+                "## 4. Needs Human or Runtime Verification",
+                "",
+                "> Per federal POA&M guidance, items whose cryptographic validation status (`CANNOT_DETERMINE_STATICALLY` / `NEEDS_REVIEW`) cannot be verified from static dependency manifests alone are excluded from confirmed POA&M weaknesses and tracked here until human or runtime inspection confirms approved-mode execution.",
+                "",
+                "| Verification ID | Control(s) | Library / Component | Version | Manifest File | Static Status | FIPS Status | Required Human / Runtime Check |",
+                "| :--- | :--- | :--- | :---: | :--- | :---: | :---: | :--- |",
+            ])
+            for v in self.verification_items:
+                ctls = ", ".join(v.get("nist_controls", ["SC-13"]))
+                guidance = str(v.get("verification_guidance", "")).replace("|", "/")
+                clean_file = str(v.get("file_path", "N/A")).replace("|", "/")
+                md.append(
+                    f"| **{v['verification_id']}** | `{ctls}` | `{v['library_name']}` | `{v['detected_version']}` | "
+                    f"`{clean_file}` | `{v['compliance_status']}` | `{v['fips_status']}` | {guidance} |"
+                )
+
         return "\n".join(md) + "\n"
 
     def generate_controls_markdown(self) -> str:
         """
         Generates controls.md NIST SP 800-53 Rev. 5 Traceability Matrix.
-        CRITICAL FIX (P0 #4): Reports `⚪ NOT ASSESSED` when the assessing scanner
-        evidence was not present instead of falsely claiming `✅ COMPLIANT`.
+        Reports `⚪ NOT ASSESSED` when assessing scanner evidence is absent, and
+        `🔍 NEEDS REVIEW` when static inspection identified items requiring
+        human or runtime verification without confirmed failures.
         """
         now = utc_now_str()
         bundle_id = self._target_id()
@@ -976,6 +1089,8 @@ class GRCComplianceReporter:
         for f in self.findings:
             for ctl in f.nist_controls:
                 findings_by_control.setdefault(ctl, []).append(f)
+
+        verifications_by_control = self._group_verifications_by_control()
 
         md = [
             "# NIST SP 800-53 Rev. 5 Controls Traceability Matrix",
@@ -994,10 +1109,14 @@ class GRCComplianceReporter:
 
         for ctl_id, meta in sorted(NIST_CONTROLS_CATALOG.items()):
             c_findings = findings_by_control.get(ctl_id, [])
+            c_verifications = verifications_by_control.get(ctl_id, [])
             count = len(c_findings)
+            v_count = len(c_verifications)
             assessed = self._control_was_assessed(ctl_id)
             if count > 0:
                 status = f"❌ **NON-COMPLIANT ({count})**"
+            elif v_count > 0:
+                status = f"🔍 **NEEDS REVIEW ({v_count})**"
             elif not assessed:
                 status = "⚪ **NOT ASSESSED**"
             else:
@@ -1016,15 +1135,24 @@ class GRCComplianceReporter:
 
         for ctl_id, meta in sorted(NIST_CONTROLS_CATALOG.items()):
             c_findings = findings_by_control.get(ctl_id, [])
+            c_verifications = verifications_by_control.get(ctl_id, [])
             count = len(c_findings)
+            v_count = len(c_verifications)
             assessed = self._control_was_assessed(ctl_id)
 
             if count > 0:
                 status_badge = "❌ NON-COMPLIANT"
                 outcome_text = "Deficiencies detected out-of-band requiring remediation."
+            elif v_count > 0:
+                status_badge = f"🔍 NEEDS REVIEW ({v_count} Verification Item(s))"
+                outcome_text = (
+                    "Static manifest inspection could not confirm FIPS 140-3 validated module linkage or "
+                    "approved-mode execution; human or runtime verification is required."
+                )
             elif not assessed:
                 status_badge = "⚪ NOT ASSESSED"
-                outcome_text = f"No evidence file present from assessing scanner(s) ({', '.join(meta.get('assessed_by', []))})."
+                assessors_str = ", ".join(meta.get("assessed_by", [])) or "None configured"
+                outcome_text = f"No evidence file present from assessing scanner(s) ({assessors_str})."
             else:
                 status_badge = "✅ COMPLIANT"
                 outcome_text = "No policy violations or vulnerabilities detected. Conforms to baseline."
@@ -1046,6 +1174,17 @@ class GRCComplianceReporter:
                 for f in c_findings:
                     md.append(
                         f"| **{f.finding_id}** | `{f.source_tool}` | `{f.rule_or_cve_id}` | `{f.file_path}` | **{f.severity}** |"
+                    )
+                md.append("")
+
+            if v_count > 0:
+                md.extend([
+                    "| Verification ID | Source Engine | Library / Component | Affected Location | Static Status |",
+                    "| :--- | :--- | :--- | :--- | :---: |",
+                ])
+                for v in c_verifications:
+                    md.append(
+                        f"| **{v['verification_id']}** | `{v['source_tool']}` | `{v['library_name']} ({v['detected_version']})` | `{v['file_path']}` | `{v['compliance_status']}` |"
                     )
                 md.append("")
 
@@ -1151,12 +1290,19 @@ class GRCComplianceReporter:
         med_count = sum(1 for f in self.findings if f.severity == "MEDIUM")
         low_count = sum(1 for f in self.findings if f.severity in ("LOW", "INFORMATIONAL", "INFO"))
 
+        verifications_by_control = self._group_verifications_by_control()
+
         controls_rollup: Dict[str, Any] = {}
+        controls_needing_review = 0
         for ctl_id, meta in NIST_CONTROLS_CATALOG.items():
             matching = [f.to_dict() for f in self.findings if ctl_id in f.nist_controls]
+            c_verifications = verifications_by_control.get(ctl_id, [])
             assessed = self._control_was_assessed(ctl_id)
             if matching:
                 ctl_status = "FAIL"
+            elif c_verifications:
+                ctl_status = "NEEDS_REVIEW"
+                controls_needing_review += 1
             elif not assessed:
                 ctl_status = "NOT_ASSESSED"
             else:
@@ -1166,11 +1312,15 @@ class GRCComplianceReporter:
                 "family": meta["family"],
                 "status": ctl_status,
                 "findings_count": len(matching),
+                "verification_count": len(c_verifications),
                 "findings": matching,
+                "verification_items": c_verifications,
             }
 
         if self.findings:
             overall_status = "NON_COMPLIANT"
+        elif self.verification_items:
+            overall_status = "NEEDS_REVIEW"
         elif not self.loaded_scanners:
             overall_status = "NOT_ASSESSED"
         else:
@@ -1190,10 +1340,13 @@ class GRCComplianceReporter:
                 "high_cat2": high_count,
                 "medium_cat3": med_count,
                 "low_cat4": low_count,
+                "verification_required_count": len(self.verification_items),
+                "controls_needing_review": controls_needing_review,
                 "overall_status": overall_status,
             },
             "controls_rollup": controls_rollup,
             "findings": [f.to_dict() for f in self.findings],
+            "verification_items": self.verification_items,
         }
         if self.sbom_stig_evidence is not None:
             pkg["sbom_stig_applicability"] = self.sbom_stig_evidence
@@ -1234,8 +1387,11 @@ class GRCComplianceReporter:
         for parser_fn in self.PARSERS.values():
             parser_fn(self)
 
-        # Sort findings deterministically by severity rank then finding_id
+        # Sort findings and verification items deterministically
         self.findings.sort(key=lambda x: (SEVERITY_RANK.get(x.severity, 99), x.rule_or_cve_id, x.file_path))
+        self.verification_items.sort(key=lambda v: (v["library_name"], v["file_path"], v["detected_version"]))
+        for idx, v in enumerate(self.verification_items, start=1):
+            v["verification_id"] = f"VERIFY-{idx:03d}"
 
         poam_md = self.generate_poam_markdown()
         controls_md = self.generate_controls_markdown()
@@ -1257,6 +1413,7 @@ class GRCComplianceReporter:
 
         return {
             "findings_count": len(self.findings),
+            "verification_items_count": len(self.verification_items),
             "assessed_scanners": sorted(list(self.loaded_scanners)),
             "evidence_dir": str(self.evidence_dir),
             "deliverables": [
@@ -1324,6 +1481,7 @@ def main() -> None:
         print(f"[*] Target Evidence:    {result['evidence_dir']}")
         print(f"[*] Assessed Scanners:  {', '.join(result['assessed_scanners']) or 'None'}")
         print(f"[*] Total Discovered:   {result['findings_count']} finding(s)")
+        print(f"[*] Needs Verification: {result['verification_items_count']} item(s)")
         print("[*] Generated Deliverables:")
         for d in result["deliverables"]:
             print(f"    - {d}")

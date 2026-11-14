@@ -246,7 +246,7 @@ semgrep scan \
   * Scans cleanly without syntax errors.
   * Correctly detects intentional violations in `app.py`:
     * `grc-aoc02-python-hardcoded-credentials` (NIST IA-2)
-    * `grc-aoc03-python-weak-hashing` (NIST SI-16)
+    * `grc-aoc03-python-weak-hashing` (NIST SC-13)
     * `grc-aoc04-python-command-injection` (NIST SI-4)
     * `grc-aoc05-python-disabled-tls-verification` (NIST SI-17)
     * `grc-aoc10-python-unsafe-deserialization` (NIST RA-5)
@@ -285,7 +285,7 @@ Run the crypto scanner to identify deprecated and unsupported providers:
       "compliance_status": "FAIL_DEPRECATED",
       "severity": "CRITICAL",
       "area_of_concern": "AOC-09: Crypto Dependencies on Unsupported Libraries",
-      "remediation": "Migrate all cryptographic operations to 'cryptography' or 'pycryptodome'."
+      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider."
     }
   ]
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRCx (The GRC eXperience) — Standalone Scan-to-POA&M Transformation Engine
-Engine: scripts/transform_scans.py (v1.4.4 — Yokota) [LEGACY match mode build]
+Engine: scripts/transform_scans.py (v1.4.5 — Yokota) [LEGACY match mode build]
 
 Purpose:
   Standalone Continuous Monitoring (ConMon) engine for GRC analysts.
@@ -2728,7 +2728,7 @@ def analyze_and_report_sla(
 
     mode_banner = " [DRY-RUN PREVIEW — NO FILES WRITTEN]" if dry_run else ""
     print("\n" + "=" * 96)
-    print(f"  GRC-xMINI (v1.4.4 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
+    print(f"  GRC-xMINI (v1.4.5 — Yokota) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT{mode_banner}")
     print("=" * 96)
     print(f"  Analysis Reference Date : {format_date_iso(today)}")
     if source_scan_paths:

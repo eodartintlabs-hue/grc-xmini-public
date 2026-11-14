@@ -5,7 +5,7 @@
 > **Source Subject**: `/Users/byronturner-pro/Desktop/GRC-Test-Dummies/bundles/aoc-10-critical-cves.bundle`  
 > **Cryptographic Hash (SHA-256)**: `dccc0b56a62dea31b1290d22898a9731089ca67b3e1721760544e1900298e94c`  
 > **Review Session ID**: `f9b83d86-3605-455a-af03-9068f5dde292`  
-> **Evaluation Timestamp**: `2026-10-16 19:05:49 UTC`  
+> **Evaluation Timestamp**: `2026-11-14 22:18:22 UTC`  
 > **Overall Audit Posture**: **COMPLIANT (Clean Out-of-Band Audit)**  
 
 ---
@@ -17,10 +17,11 @@ The following risk rollup aggregates all findings detected across static AST ana
 | Severity Level | DISA STIG Impact Category | Active Findings Count | Mandatory Remediation SLA | Compliance Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **CRITICAL** | **Category I (CAT I)** | **0** | **30 Calendar Days** | ✅ Clear |
-| **HIGH** | **Category II (CAT II)** | **0** | **60 Calendar Days** | ✅ Clear |
+| **HIGH** | **Category II (CAT II)** | **0** | **30 Calendar Days** | ✅ Clear |
 | **MEDIUM** | **Category III (CAT III)** | **0** | **90 Calendar Days** | ✅ Clear |
 | **LOW / INFO** | Informational | **0** | 180 Calendar Days | ✅ Monitored |
-| **TOTAL** | — | **0** | — | **COMPLIANT (Clean Out-of-Band Audit)** |
+| **Needs Verification** | Assessor / Runtime Review | **0** | *Excluded from POA&M* | — |
+| **TOTAL (POA&M Weaknesses)** | — | **0** | — | **COMPLIANT (Clean Out-of-Band Audit)** |
 
 ---
 

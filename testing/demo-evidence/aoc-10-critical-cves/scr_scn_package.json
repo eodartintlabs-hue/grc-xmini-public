@@ -3,7 +3,11 @@
   "package_schema": "grc-scr-scn-package-v1",
   "session_id": "f9b83d86-3605-455a-af03-9068f5dde292",
   "target_identifier": "dccc0b56a62dea31b1290d22898a9731089ca67b3e1721760544e1900298e94c",
-  "generated_at": "2026-10-16T19:05:49.681097+00:00",
+  "generated_at": "2026-11-14T22:18:22.319139+00:00",
+  "assessed_scanners": [
+    "Checkov",
+    "Semgrep"
+  ],
   "provenance": {
     "manifest_schema": "grc-bundle-provenance-v1",
     "session_id": "f9b83d86-3605-455a-af03-9068f5dde292",
@@ -51,6 +55,8 @@
     "high_cat2": 0,
     "medium_cat3": 0,
     "low_cat4": 0,
+    "verification_required_count": 0,
+    "controls_needing_review": 0,
     "overall_status": "COMPLIANT"
   },
   "controls_rollup": {
@@ -59,120 +65,155 @@
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "IA-7": {
       "title": "Cryptographic Module Authentication",
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-2": {
       "title": "Flaw Remediation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-4": {
       "title": "Information System Monitoring",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-7": {
       "title": "Software, Firmware, and Information Integrity",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-10": {
       "title": "Information Input Validation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-16": {
-      "title": "Memory Protection / Cryptographic Hash Integrity",
+      "title": "Memory Protection",
       "family": "System and Information Integrity (SI)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-17": {
       "title": "Fail-Secure / Secure Communications Initiation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-8": {
       "title": "Transmission Confidentiality and Integrity",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-12": {
       "title": "Cryptographic Key Establishment and Management",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-13": {
       "title": "Cryptographic Protection (FIPS 140 Validation)",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-28": {
       "title": "Protection of Information at Rest",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "AC-3": {
       "title": "Access Enforcement",
       "family": "Access Control (AC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "AC-6": {
       "title": "Least Privilege",
       "family": "Access Control (AC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "CM-6": {
       "title": "Configuration Settings",
       "family": "Configuration Management (CM)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "CM-8": {
       "title": "Information System Component Inventory",
       "family": "Configuration Management (CM)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "RA-5": {
       "title": "Vulnerability Monitoring and Scanning",
       "family": "Risk Assessment (RA)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     }
   },
-  "findings": []
+  "findings": [],
+  "verification_items": []
 }

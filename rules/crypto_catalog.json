@@ -2,30 +2,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "catalog_metadata": {
     "title": "Cryptographic Library Policy & EOL Database",
-    "version": "1.0.0",
-    "last_updated": "2026-10-14",
+    "version": "1.1.0",
+    "last_updated": "2026-11-14",
     "target_frameworks": [
       "DISA STIG Application Security and Development V5R1",
-      "NIST SP 800-53 Rev. 5 (SI-7, SC-12, SC-13, IA-7)",
-      "FedRAMP Cryptographic Module Standards"
+      "NIST SP 800-53 Rev. 5 (SI-7, SC-12, SC-13)",
+      "NIST FIPS 140-3"
     ],
-    "description": "Authoritative policy baseline of cryptographic libraries, minimum supported versions, EOL schedules, and FIPS validation baselines for GRC bundle reviews."
+    "description": "Authoritative offline database of cryptographic libraries, EOL lifecycles, minimum supported versions, and FIPS 140-3 module validation capability classifications (AOC-09 & SC-13)."
   },
   "rules": {
     "openssl": {
       "display_name": "OpenSSL Cryptographic Library",
-      "ecosystems": ["system", "c_cpp", "deb", "rpm", "alpine"],
-      "patterns": ["^openssl$", "^libssl.*", "^libcrypto.*"],
-      "min_supported_version": "3.0.0",
+      "ecosystems": ["c_cpp", "python", "pypi", "system", "deb", "rpm", "alpine"],
+      "patterns": ["^openssl$", "^libssl.*", "^libcrypto.*", "^pyopenssl$"],
+      "min_supported_version": "3.0.14",
       "status": "ACTIVE",
-      "fips_capable": true,
+      "fips_status": "CAPABLE_IF_CONFIGURED",
+      "fips_note": "OpenSSL 3.x requires an explicitly configured and activated CMVP-validated FIPS provider (e.g., openssl.cnf [fips_sect] activate = 1); library version alone does not prove FIPS mode.",
       "eol_versions": [
         { "version": "1.1.1", "eol_date": "2023-09-11", "severity": "CRITICAL" },
         { "version": "1.1.0", "eol_date": "2019-09-11", "severity": "CRITICAL" },
         { "version": "1.0.2", "eol_date": "2019-12-31", "severity": "CRITICAL" },
         { "version": "0.9.8", "eol_date": "2015-12-31", "severity": "CRITICAL" }
       ],
-      "remediation": "Upgrade OpenSSL to supported 3.0.x LTS or 3.2.x+ branch. Ensure FIPS 140 provider is configured if required.",
+      "remediation": "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated FIPS 140-3 provider for SC-13 workloads.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -34,10 +35,25 @@
       "ecosystems": ["pypi", "python"],
       "patterns": ["^pycrypto$"],
       "status": "DEPRECATED_UNMAINTAINED",
+      "fips_status": "NOT_VALIDATED",
+      "eol_since": "2013-10-18",
       "severity": "CRITICAL",
-      "description": "PyCrypto has been unmaintained since 2013 and contains unpatched vulnerabilities.",
-      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
+      "description": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
+      "fips_note": "PyCrypto is unmaintained and holds no NIST CMVP FIPS 140 validation.",
+      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
       "nist_controls": ["SI-7", "SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "pycryptodome": {
+      "display_name": "Python PyCryptodome / PyCryptodomex",
+      "ecosystems": ["pypi", "python"],
+      "patterns": ["^pycryptodome$", "^pycryptodomex$"],
+      "min_supported_version": "3.19.1",
+      "status": "ACTIVE",
+      "fips_status": "NOT_VALIDATED",
+      "fips_note": "PyCryptodome and PyCryptodomex are actively maintained Python packages, but neither holds a NIST CMVP FIPS 140-2/140-3 module validation certificate.",
+      "remediation": "For FIPS 140-3 / SC-13 regulated workloads, migrate to 'cryptography' (pyca/cryptography) dynamically linked against a CMVP-validated OpenSSL FIPS provider.",
+      "nist_controls": ["SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
     "cryptography": {
@@ -45,23 +61,42 @@
       "ecosystems": ["pypi", "python"],
       "patterns": ["^cryptography$"],
       "min_supported_version": "41.0.0",
-      "status": "APPROVED",
-      "fips_capable": true,
-      "remediation": "Ensure version >= 41.0.0 to incorporate latest memory-safety improvements (Rust bindings).",
+      "status": "ACTIVE",
+      "fips_status": "CAPABLE_IF_CONFIGURED",
+      "fips_note": "Standard PyPI manylinux/macOS/Windows wheels statically bundle a non-validated OpenSSL build. FIPS 140-3 use requires building or dynamically linking against the host platform's CMVP-validated OpenSSL FIPS provider with FIPS mode enabled.",
+      "eol_versions": [
+        { "version": "36.", "eol_date": "2023-03-01", "severity": "HIGH" },
+        { "version": "3.", "eol_date": "2021-11-01", "severity": "CRITICAL" },
+        { "version": "2.", "eol_date": "2020-07-01", "severity": "CRITICAL" }
+      ],
+      "remediation": "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels.",
       "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
     "bouncycastle": {
-      "display_name": "Bouncy Castle Crypto Provider",
+      "display_name": "Bouncy Castle Standard Provider (Non-FIPS)",
       "ecosystems": ["maven", "gradle", "java"],
-      "patterns": ["^bcprov-.*", "^bcpkix-.*", "^bcutil-.*", "^bouncycastle.*"],
-      "min_supported_version": "1.70",
+      "patterns": ["^bcprov-.*", "^bcpkix-(?!fips).*", "^bcutil-.*", "^bctls-(?!fips).*", "^bouncycastle.*"],
+      "min_supported_version": "1.77",
       "status": "ACTIVE",
-      "fips_capable": true,
+      "fips_status": "NOT_VALIDATED",
+      "fips_note": "Standard Bouncy Castle (bcprov-jdk18on / bcprov-jdk15on) is not FIPS 140 validated; use Bouncy Castle FIPS (bc-fips / bctls-fips) in approved-only mode for SC-13 workloads.",
       "eol_versions": [
         { "version": "<1.70", "eol_date": "2021-11-01", "severity": "HIGH" }
       ],
-      "remediation": "Upgrade org.bouncycastle dependencies to >= 1.70 (or bc-fips 1.0.2+) to mitigate cryptographic side-channels.",
+      "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads.",
+      "nist_controls": ["SI-7", "SC-12", "SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "bouncycastle-fips": {
+      "display_name": "Bouncy Castle FIPS Provider (bc-fips)",
+      "ecosystems": ["maven", "gradle", "java"],
+      "patterns": ["^bc-fips.*", "^bctls-fips.*", "^bcpkix-fips.*"],
+      "min_supported_version": "1.0.2",
+      "status": "ACTIVE",
+      "fips_status": "CAPABLE_IF_CONFIGURED",
+      "fips_note": "Bouncy Castle FIPS (bc-fips) holds CMVP validation on specific certified versions when JVM provider configuration and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce approved mode.",
+      "remediation": "Verify exact bc-fips version against active NIST CMVP certificate and confirm JVM/application approved-only mode enforcement.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -69,10 +104,13 @@
       "display_name": "Node.js crypto-js",
       "ecosystems": ["npm", "yarn", "javascript", "typescript"],
       "patterns": ["^crypto-js$"],
+      "min_supported_version": "4.2.0",
       "status": "UNRECOMMENDED",
+      "fips_status": "NOT_VALIDATED",
       "severity": "MEDIUM",
-      "description": "crypto-js is a pure JavaScript library that lacks constant-time security and hardware acceleration.",
-      "remediation": "Migrate to native Node.js 'crypto' module or Web Cryptography API (SubtleCrypto).",
+      "description": "Active development of crypto-js has been discontinued; pure JS crypto lacks constant-time side-channel resistance and has no FIPS 140-3 validation.",
+      "fips_note": "crypto-js is a pure JavaScript implementation with no NIST CMVP FIPS 140 validation.",
+      "remediation": "Migrate to Node.js built-in 'node:crypto' (compiled against a FIPS-validated OpenSSL provider) or Web Crypto API (SubtleCrypto).",
       "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -82,18 +120,23 @@
       "patterns": ["^node-forge$"],
       "min_supported_version": "1.3.1",
       "status": "ACTIVE",
-      "remediation": "Ensure version >= 1.3.1 to avoid known ASN.1 parser and signature verification bypass vulnerabilities.",
+      "fips_status": "NOT_VALIDATED",
+      "fips_note": "Pure-JavaScript node-forge is not a CMVP FIPS 140-3 validated cryptographic module.",
+      "remediation": "Upgrade node-forge >= 1.3.1 to remediate ASN.1 and signature verification bypass CVEs, and migrate SC-13 regulated crypto operations to Node.js 'node:crypto' backed by a FIPS-validated OpenSSL provider.",
       "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
     "golang-x-crypto": {
       "display_name": "Go Supplementary Cryptography Libraries",
       "ecosystems": ["golang", "go"],
-      "patterns": ["^golang\\.org/x/crypto.*"],
-      "status": "APPROVED",
-      "description": "Go supplementary crypto packages. Deprecated subpackages (e.g. ripemd160, salsa20) are flagged individually.",
-      "remediation": "Review specific subpackage usage. Ensure standard crypto/aes and crypto/cipher are preferred.",
-      "nist_controls": ["SI-7", "SC-13"],
+      "patterns": ["^golang\\.org/x/crypto($|/.*)"],
+      "min_supported_version": "0.17.0",
+      "status": "ACTIVE",
+      "fips_status": "NOT_VALIDATED",
+      "description": "Go supplementary cryptography packages outside the Go standard library cryptographic module boundary.",
+      "fips_note": "Packages under golang.org/x/crypto lie outside the Go Cryptographic Module boundary (GODEBUG=fips140=on / BoringCrypto) and are not FIPS 140-3 validated.",
+      "remediation": "Update golang.org/x/crypto >= v0.17.0 (mitigating Terrapin SSH CVE-2023-48795), and ensure FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only (Go 1.24+) or BoringCrypto rather than golang.org/x/crypto.",
+      "nist_controls": ["SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     }
   }

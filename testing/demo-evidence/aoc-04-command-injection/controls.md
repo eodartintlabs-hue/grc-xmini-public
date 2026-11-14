@@ -2,7 +2,7 @@
 
 > **Classification / Use**: Internal Compliance & Security Audit Deliverable (FedRAMP High / DoD RMF / SCR-SCN)  
 > **Audit Target Identifier**: `6dec88c8940840c0ee7bcea50a24226c50ddffd2be92ad8b107831996f9f67a2`  
-> **Evaluation Timestamp**: `2026-10-16 19:15:35 UTC`  
+> **Evaluation Timestamp**: `2026-11-14 22:18:22 UTC`  
 
 ---
 
@@ -13,16 +13,16 @@
 | **AC-3** | Access Enforcement | Access Control (AC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **AC-6** | Least Privilege | Access Control (AC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **CM-6** | Configuration Settings | Configuration Management (CM) | `CAT II` | 0 | ✅ **COMPLIANT** |
-| **CM-8** | Information System Component Inventory | Configuration Management (CM) | `CAT II` | 0 | ✅ **COMPLIANT** |
+| **CM-8** | Information System Component Inventory | Configuration Management (CM) | `CAT II` | 0 | ⚪ **NOT ASSESSED** |
 | **IA-2** | Identification and Authentication (Organizational Users) | Identification and Authentication (IA) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **IA-7** | Cryptographic Module Authentication | Identification and Authentication (IA) | `CAT II` | 0 | ✅ **COMPLIANT** |
-| **RA-5** | Vulnerability Monitoring and Scanning | Risk Assessment (RA) | `CAT I` | 0 | ✅ **COMPLIANT** |
+| **RA-5** | Vulnerability Monitoring and Scanning | Risk Assessment (RA) | `CAT I` | 0 | ⚪ **NOT ASSESSED** |
 | **SC-12** | Cryptographic Key Establishment and Management | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SC-13** | Cryptographic Protection (FIPS 140 Validation) | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SC-28** | Protection of Information at Rest | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SC-8** | Transmission Confidentiality and Integrity | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SI-10** | Information Input Validation | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
-| **SI-16** | Memory Protection / Cryptographic Hash Integrity | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
+| **SI-16** | Memory Protection | System and Information Integrity (SI) | `CAT II` | 0 | ⚪ **NOT ASSESSED** |
 | **SI-17** | Fail-Secure / Secure Communications Initiation | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SI-2** | Flaw Remediation | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SI-4** | Information System Monitoring | System and Information Integrity (SI) | `CAT I` | 9 | ❌ **NON-COMPLIANT (9)** |
@@ -50,11 +50,11 @@
 * **Control Objective**: Establish and document mandatory configuration settings for IT products using hardened baselines (DISA STIG / CIS).
 * **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
 
-### CM-8: Information System Component Inventory — ✅ COMPLIANT
+### CM-8: Information System Component Inventory — ⚪ NOT ASSESSED
 * **Control Family**: Configuration Management (CM)
 * **DISA STIG Baseline**: `CAT II`
 * **Control Objective**: Develop and document an inventory of information system components (SBOM) detailing name, version, and license.
-* **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
+* **Evaluation Outcome**: No evidence file present from assessing scanner(s) (Grype, Trivy, SBOM).
 
 ### IA-2: Identification and Authentication (Organizational Users) — ✅ COMPLIANT
 * **Control Family**: Identification and Authentication (IA)
@@ -68,11 +68,11 @@
 * **Control Objective**: Authenticate to cryptographic modules using mechanisms meeting applicable federal laws, regulations, and standards.
 * **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
 
-### RA-5: Vulnerability Monitoring and Scanning — ✅ COMPLIANT
+### RA-5: Vulnerability Monitoring and Scanning — ⚪ NOT ASSESSED
 * **Control Family**: Risk Assessment (RA)
 * **DISA STIG Baseline**: `CAT I`
 * **Control Objective**: Monitor and scan for vulnerabilities in the system and hosted applications, prioritizing remediation of critical CVEs.
-* **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
+* **Evaluation Outcome**: No evidence file present from assessing scanner(s) (Grype, Trivy).
 
 ### SC-12: Cryptographic Key Establishment and Management — ✅ COMPLIANT
 * **Control Family**: System and Communications Protection (SC)
@@ -104,11 +104,11 @@
 * **Control Objective**: Validate information inputs to syntax rules, character sets, and payload limits before runtime interpretation.
 * **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
 
-### SI-16: Memory Protection / Cryptographic Hash Integrity — ✅ COMPLIANT
+### SI-16: Memory Protection — ⚪ NOT ASSESSED
 * **Control Family**: System and Information Integrity (SI)
-* **DISA STIG Baseline**: `CAT I`
-* **Control Objective**: Protect memory integrity and enforce strong cryptographic hash algorithms. Prohibits MD5, SHA-1, DES, and RC4.
-* **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
+* **DISA STIG Baseline**: `CAT II`
+* **Control Objective**: Implement security safeguards to protect system memory from unauthorized code execution (e.g., DEP/NX, ASLR, memory-safe handling).
+* **Evaluation Outcome**: No evidence file present from assessing scanner(s) (None configured).
 
 ### SI-17: Fail-Secure / Secure Communications Initiation — ✅ COMPLIANT
 * **Control Family**: System and Information Integrity (SI)
@@ -130,15 +130,15 @@
 
 | Finding ID | Source Engine | Rule / CVE ID | Affected Location | Severity |
 | :--- | :--- | :--- | :--- | :--- |
-| **POAM-001** | `Semgrep` | `rules.grc-aoc04-java-command-injection` | `src/CommandExecutor.java:11` | **CRITICAL** |
-| **POAM-002** | `Semgrep` | `rules.grc-aoc04-java-command-injection` | `src/CommandExecutor.java:15` | **CRITICAL** |
-| **POAM-003** | `Semgrep` | `rules.grc-aoc04-go-command-injection` | `src/executor.go:10` | **CRITICAL** |
-| **POAM-004** | `Semgrep` | `rules.grc-aoc04-go-command-injection` | `src/executor.go:15` | **CRITICAL** |
-| **POAM-005** | `Semgrep` | `rules.grc-aoc04-python-command-injection` | `src/runner.py:14` | **CRITICAL** |
-| **POAM-006** | `Semgrep` | `rules.grc-aoc04-python-command-injection` | `src/runner.py:20` | **CRITICAL** |
-| **POAM-007** | `Semgrep` | `rules.grc-aoc04-python-command-injection` | `src/runner.py:28` | **CRITICAL** |
-| **POAM-008** | `Semgrep` | `rules.grc-aoc04-javascript-command-injection` | `src/system.js:5` | **CRITICAL** |
-| **POAM-009** | `Semgrep` | `rules.grc-aoc04-javascript-command-injection` | `src/system.js:15` | **CRITICAL** |
+| **POAM-003-0FFAB3** | `Semgrep` | `rules.grc-aoc04-go-command-injection` | `src/executor.go:10` | **CRITICAL** |
+| **POAM-004-61C446** | `Semgrep` | `rules.grc-aoc04-go-command-injection` | `src/executor.go:15` | **CRITICAL** |
+| **POAM-001-8B5629** | `Semgrep` | `rules.grc-aoc04-java-command-injection` | `src/CommandExecutor.java:11` | **CRITICAL** |
+| **POAM-002-1BFAA0** | `Semgrep` | `rules.grc-aoc04-java-command-injection` | `src/CommandExecutor.java:15` | **CRITICAL** |
+| **POAM-009-CF9073** | `Semgrep` | `rules.grc-aoc04-javascript-command-injection` | `src/system.js:15` | **CRITICAL** |
+| **POAM-008-34E2CF** | `Semgrep` | `rules.grc-aoc04-javascript-command-injection` | `src/system.js:5` | **CRITICAL** |
+| **POAM-005-1421B9** | `Semgrep` | `rules.grc-aoc04-python-command-injection` | `src/runner.py:14` | **CRITICAL** |
+| **POAM-006-EBE815** | `Semgrep` | `rules.grc-aoc04-python-command-injection` | `src/runner.py:20` | **CRITICAL** |
+| **POAM-007-D2A53C** | `Semgrep` | `rules.grc-aoc04-python-command-injection` | `src/runner.py:28` | **CRITICAL** |
 
 ### SI-7: Software, Firmware, and Information Integrity — ✅ COMPLIANT
 * **Control Family**: System and Information Integrity (SI)

@@ -3,7 +3,11 @@
   "package_schema": "grc-scr-scn-package-v1",
   "session_id": "872c1eef-7d6a-46ce-aec9-72fc4b2a6d30",
   "target_identifier": "6dec88c8940840c0ee7bcea50a24226c50ddffd2be92ad8b107831996f9f67a2",
-  "generated_at": "2026-10-16T19:15:35.827382+00:00",
+  "generated_at": "2026-11-14T22:18:22.226724+00:00",
+  "assessed_scanners": [
+    "Checkov",
+    "Semgrep"
+  ],
   "provenance": {
     "manifest_schema": "grc-bundle-provenance-v1",
     "session_id": "872c1eef-7d6a-46ce-aec9-72fc4b2a6d30",
@@ -51,6 +55,8 @@
     "high_cat2": 0,
     "medium_cat3": 0,
     "low_cat4": 0,
+    "verification_required_count": 0,
+    "controls_needing_review": 0,
     "overall_status": "NON_COMPLIANT"
   },
   "controls_rollup": {
@@ -59,68 +65,37 @@
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "IA-7": {
       "title": "Cryptographic Module Authentication",
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-2": {
       "title": "Flaw Remediation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-4": {
       "title": "Information System Monitoring",
       "family": "System and Information Integrity (SI)",
       "status": "FAIL",
       "findings_count": 9,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-001",
-          "source_tool": "Semgrep",
-          "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
-          "title": "AOC-04 [NIST SP 800-53 SI-4]",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "src/CommandExecutor.java:11",
-          "line_number": 11,
-          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
-          "aoc": "AOC-04: Command Injection",
-          "nist_controls": [
-            "SI-4"
-          ],
-          "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-15",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-002",
-          "source_tool": "Semgrep",
-          "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
-          "title": "AOC-04 [NIST SP 800-53 SI-4]",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "src/CommandExecutor.java:15",
-          "line_number": 15,
-          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
-          "aoc": "AOC-04: Command Injection",
-          "nist_controls": [
-            "SI-4"
-          ],
-          "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-15",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-003",
+          "finding_id": "POAM-003-0FFAB3",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc04-go-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -139,7 +114,7 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-004",
+          "finding_id": "POAM-004-61C446",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc04-go-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -158,15 +133,15 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-005",
+          "finding_id": "POAM-001-8B5629",
           "source_tool": "Semgrep",
-          "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+          "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "src/runner.py:14",
-          "line_number": 14,
-          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+          "file_path": "src/CommandExecutor.java:11",
+          "line_number": 11,
+          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
           "aoc": "AOC-04: Command Injection",
           "nist_controls": [
             "SI-4"
@@ -177,15 +152,15 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-006",
+          "finding_id": "POAM-002-1BFAA0",
           "source_tool": "Semgrep",
-          "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+          "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "src/runner.py:20",
-          "line_number": 20,
-          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+          "file_path": "src/CommandExecutor.java:15",
+          "line_number": 15,
+          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
           "aoc": "AOC-04: Command Injection",
           "nist_controls": [
             "SI-4"
@@ -196,15 +171,15 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-007",
+          "finding_id": "POAM-009-CF9073",
           "source_tool": "Semgrep",
-          "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+          "rule_or_cve_id": "rules.grc-aoc04-javascript-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "src/runner.py:28",
-          "line_number": 28,
-          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+          "file_path": "src/system.js:15",
+          "line_number": 15,
+          "message": "AOC-04 [NIST SP 800-53 SI-4]: Potential command injection in Node.js child_process.exec. Prefer child_process.execFile with parameter arrays.",
           "aoc": "AOC-04: Command Injection",
           "nist_controls": [
             "SI-4"
@@ -215,7 +190,7 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-008",
+          "finding_id": "POAM-008-34E2CF",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc04-javascript-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -234,15 +209,53 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-009",
+          "finding_id": "POAM-005-1421B9",
           "source_tool": "Semgrep",
-          "rule_or_cve_id": "rules.grc-aoc04-javascript-command-injection",
+          "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "src/system.js:15",
-          "line_number": 15,
-          "message": "AOC-04 [NIST SP 800-53 SI-4]: Potential command injection in Node.js child_process.exec. Prefer child_process.execFile with parameter arrays.",
+          "file_path": "src/runner.py:14",
+          "line_number": 14,
+          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+          "aoc": "AOC-04: Command Injection",
+          "nist_controls": [
+            "SI-4"
+          ],
+          "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-006-EBE815",
+          "source_tool": "Semgrep",
+          "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+          "title": "AOC-04 [NIST SP 800-53 SI-4]",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "src/runner.py:20",
+          "line_number": 20,
+          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+          "aoc": "AOC-04: Command Injection",
+          "nist_controls": [
+            "SI-4"
+          ],
+          "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-007-D2A53C",
+          "source_tool": "Semgrep",
+          "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+          "title": "AOC-04 [NIST SP 800-53 SI-4]",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "src/runner.py:28",
+          "line_number": 28,
+          "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
           "aoc": "AOC-04: Command Injection",
           "nist_controls": [
             "SI-4"
@@ -252,141 +265,130 @@
           "target_completion_date": "2026-11-15",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SI-7": {
       "title": "Software, Firmware, and Information Integrity",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-10": {
       "title": "Information Input Validation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-16": {
-      "title": "Memory Protection / Cryptographic Hash Integrity",
+      "title": "Memory Protection",
       "family": "System and Information Integrity (SI)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-17": {
       "title": "Fail-Secure / Secure Communications Initiation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-8": {
       "title": "Transmission Confidentiality and Integrity",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-12": {
       "title": "Cryptographic Key Establishment and Management",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-13": {
       "title": "Cryptographic Protection (FIPS 140 Validation)",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-28": {
       "title": "Protection of Information at Rest",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "AC-3": {
       "title": "Access Enforcement",
       "family": "Access Control (AC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "AC-6": {
       "title": "Least Privilege",
       "family": "Access Control (AC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "CM-6": {
       "title": "Configuration Settings",
       "family": "Configuration Management (CM)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "CM-8": {
       "title": "Information System Component Inventory",
       "family": "Configuration Management (CM)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "RA-5": {
       "title": "Vulnerability Monitoring and Scanning",
       "family": "Risk Assessment (RA)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     }
   },
   "findings": [
     {
-      "finding_id": "POAM-001",
-      "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
-      "title": "AOC-04 [NIST SP 800-53 SI-4]",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "src/CommandExecutor.java:11",
-      "line_number": 11,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
-      "aoc": "AOC-04: Command Injection",
-      "nist_controls": [
-        "SI-4"
-      ],
-      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-15",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-002",
-      "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
-      "title": "AOC-04 [NIST SP 800-53 SI-4]",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "src/CommandExecutor.java:15",
-      "line_number": 15,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
-      "aoc": "AOC-04: Command Injection",
-      "nist_controls": [
-        "SI-4"
-      ],
-      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-15",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-003",
+      "finding_id": "POAM-003-0FFAB3",
       "source_tool": "Semgrep",
       "rule_or_cve_id": "rules.grc-aoc04-go-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -405,7 +407,7 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-004",
+      "finding_id": "POAM-004-61C446",
       "source_tool": "Semgrep",
       "rule_or_cve_id": "rules.grc-aoc04-go-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -424,15 +426,15 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-005",
+      "finding_id": "POAM-001-8B5629",
       "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
-      "file_path": "src/runner.py:14",
-      "line_number": 14,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "file_path": "src/CommandExecutor.java:11",
+      "line_number": 11,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
       "aoc": "AOC-04: Command Injection",
       "nist_controls": [
         "SI-4"
@@ -443,15 +445,15 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-006",
+      "finding_id": "POAM-002-1BFAA0",
       "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "rule_or_cve_id": "rules.grc-aoc04-java-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
-      "file_path": "src/runner.py:20",
-      "line_number": 20,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "file_path": "src/CommandExecutor.java:15",
+      "line_number": 15,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution in Java via Runtime or ProcessBuilder. Sanitize input and pass arguments as discrete array elements.",
       "aoc": "AOC-04: Command Injection",
       "nist_controls": [
         "SI-4"
@@ -462,15 +464,15 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-007",
+      "finding_id": "POAM-009-CF9073",
       "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "rule_or_cve_id": "rules.grc-aoc04-javascript-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
-      "file_path": "src/runner.py:28",
-      "line_number": 28,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "file_path": "src/system.js:15",
+      "line_number": 15,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Potential command injection in Node.js child_process.exec. Prefer child_process.execFile with parameter arrays.",
       "aoc": "AOC-04: Command Injection",
       "nist_controls": [
         "SI-4"
@@ -481,7 +483,7 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-008",
+      "finding_id": "POAM-008-34E2CF",
       "source_tool": "Semgrep",
       "rule_or_cve_id": "rules.grc-aoc04-javascript-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -500,15 +502,53 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-009",
+      "finding_id": "POAM-005-1421B9",
       "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-javascript-command-injection",
+      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
       "title": "AOC-04 [NIST SP 800-53 SI-4]",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
-      "file_path": "src/system.js:15",
-      "line_number": 15,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Potential command injection in Node.js child_process.exec. Prefer child_process.execFile with parameter arrays.",
+      "file_path": "src/runner.py:14",
+      "line_number": 14,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "aoc": "AOC-04: Command Injection",
+      "nist_controls": [
+        "SI-4"
+      ],
+      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-15",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-006-EBE815",
+      "source_tool": "Semgrep",
+      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "title": "AOC-04 [NIST SP 800-53 SI-4]",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "src/runner.py:20",
+      "line_number": 20,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "aoc": "AOC-04: Command Injection",
+      "nist_controls": [
+        "SI-4"
+      ],
+      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-15",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-007-D2A53C",
+      "source_tool": "Semgrep",
+      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "title": "AOC-04 [NIST SP 800-53 SI-4]",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "src/runner.py:28",
+      "line_number": 28,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
       "aoc": "AOC-04: Command Injection",
       "nist_controls": [
         "SI-4"
@@ -518,5 +558,6 @@
       "target_completion_date": "2026-11-15",
       "status": "Open (Identified Out-of-Band)"
     }
-  ]
+  ],
+  "verification_items": []
 }

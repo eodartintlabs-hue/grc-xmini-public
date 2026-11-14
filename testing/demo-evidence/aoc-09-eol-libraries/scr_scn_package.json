@@ -3,7 +3,12 @@
   "package_schema": "grc-scr-scn-package-v1",
   "session_id": "a8cc795a-d4f8-4eb3-8826-3f7ff504ddc1",
   "target_identifier": "25a6b1f79c4e5a8876cb44416d2af6002f4e97a9316814309a39bc9e8781ad31",
-  "generated_at": "2026-10-16T17:20:18.259616+00:00",
+  "generated_at": "2026-11-14T22:18:22.288765+00:00",
+  "assessed_scanners": [
+    "Checkov",
+    "CryptoScan",
+    "Semgrep"
+  ],
   "provenance": {
     "manifest_schema": "grc-bundle-provenance-v1",
     "session_id": "a8cc795a-d4f8-4eb3-8826-3f7ff504ddc1",
@@ -47,10 +52,12 @@
   },
   "summary": {
     "total_findings": 4,
-    "critical_cat1": 1,
+    "critical_cat1": 2,
     "high_cat2": 1,
-    "medium_cat3": 0,
+    "medium_cat3": 1,
     "low_cat4": 0,
+    "verification_required_count": 0,
+    "controls_needing_review": 0,
     "overall_status": "NON_COMPLIANT"
   },
   "controls_rollup": {
@@ -59,412 +66,447 @@
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "IA-7": {
       "title": "Cryptographic Module Authentication",
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-2": {
       "title": "Flaw Remediation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-4": {
       "title": "Information System Monitoring",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-7": {
       "title": "Software, Firmware, and Information Integrity",
       "family": "System and Information Integrity (SI)",
       "status": "FAIL",
       "findings_count": 4,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-001",
+          "finding_id": "POAM-001-1906D0",
           "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
-          "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+          "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-FAIL_EOL",
+          "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (1.1.1)",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "usr/lib64/libcrypto.so.1.1.1",
           "line_number": null,
-          "message": "Detected cryptographic library 'pycrypto' version '2.6.1' with status 'FAIL_DEPRECATED'.",
+          "message": "Version branch '1.1.1' is End-of-Life (EOL since 2023-09-11).",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
+            "SC-12",
             "SC-13"
           ],
-          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
+          "remediation": "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated FIPS 140-3 provider for SC-13 workloads.",
           "sla_days": 30,
           "target_completion_date": "2026-11-15",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-002",
+          "finding_id": "POAM-002-C3D33E",
+          "source_tool": "CryptoScan",
+          "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
+          "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "requirements.txt",
+          "line_number": null,
+          "message": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
+          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+          "nist_controls": [
+            "SI-7",
+            "SC-13"
+          ],
+          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-003-8A00AE",
           "source_tool": "CryptoScan",
           "rule_or_cve_id": "CRYPTO-BCPROV-JDK15ON-FAIL_EOL",
           "title": "Unsupported/Deprecated Cryptographic Library: bcprov-jdk15on (1.60)",
           "severity": "HIGH",
           "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "pom.xml",
           "line_number": null,
-          "message": "Detected cryptographic library 'bcprov-jdk15on' version '1.60' with status 'FAIL_EOL'.",
+          "message": "Version '1.60' is End-of-Life (EOL since 2021-11-01).",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-12",
             "SC-13"
           ],
-          "remediation": "Upgrade org.bouncycastle dependencies to >= 1.70 (or bc-fips 1.0.2+) to mitigate cryptographic side-channels.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
+          "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-003",
+          "finding_id": "POAM-004-17874D",
           "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-CRYPTO-JS-PASS",
+          "rule_or_cve_id": "CRYPTO-CRYPTO-JS-WARN_UNRECOMMENDED",
           "title": "Unsupported/Deprecated Cryptographic Library: crypto-js (3.1.91)",
-          "severity": "INFO",
-          "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "severity": "MEDIUM",
+          "cat_level": "CAT III",
+          "file_path": "package.json",
           "line_number": null,
-          "message": "Detected cryptographic library 'crypto-js' version '3.1.91' with status 'PASS'.",
+          "message": "Active development of crypto-js has been discontinued; pure JS crypto lacks constant-time side-channel resistance and has no FIPS 140-3 validation.",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-13"
           ],
-          "remediation": "None required. Maintain automated dependency patch cadence.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-004",
-          "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-PASS",
-          "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (Unknown)",
-          "severity": "INFO",
-          "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
-          "line_number": null,
-          "message": "Detected cryptographic library 'libcrypto.so.1.1.1' version 'Unknown' with status 'PASS'.",
-          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
-          "nist_controls": [
-            "SI-7",
-            "SC-12",
-            "SC-13"
-          ],
-          "remediation": "None required. Maintain automated dependency patch cadence.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
+          "remediation": "Migrate to Node.js built-in 'node:crypto' (compiled against a FIPS-validated OpenSSL provider) or Web Crypto API (SubtleCrypto).",
+          "sla_days": 90,
+          "target_completion_date": "2027-01-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SI-10": {
       "title": "Information Input Validation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-16": {
-      "title": "Memory Protection / Cryptographic Hash Integrity",
+      "title": "Memory Protection",
       "family": "System and Information Integrity (SI)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-17": {
       "title": "Fail-Secure / Secure Communications Initiation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-8": {
       "title": "Transmission Confidentiality and Integrity",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-12": {
       "title": "Cryptographic Key Establishment and Management",
       "family": "System and Communications Protection (SC)",
       "status": "FAIL",
       "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-002",
+          "finding_id": "POAM-001-1906D0",
+          "source_tool": "CryptoScan",
+          "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-FAIL_EOL",
+          "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (1.1.1)",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "usr/lib64/libcrypto.so.1.1.1",
+          "line_number": null,
+          "message": "Version branch '1.1.1' is End-of-Life (EOL since 2023-09-11).",
+          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+          "nist_controls": [
+            "SI-7",
+            "SC-12",
+            "SC-13"
+          ],
+          "remediation": "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated FIPS 140-3 provider for SC-13 workloads.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-003-8A00AE",
           "source_tool": "CryptoScan",
           "rule_or_cve_id": "CRYPTO-BCPROV-JDK15ON-FAIL_EOL",
           "title": "Unsupported/Deprecated Cryptographic Library: bcprov-jdk15on (1.60)",
           "severity": "HIGH",
           "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "pom.xml",
           "line_number": null,
-          "message": "Detected cryptographic library 'bcprov-jdk15on' version '1.60' with status 'FAIL_EOL'.",
+          "message": "Version '1.60' is End-of-Life (EOL since 2021-11-01).",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-12",
             "SC-13"
           ],
-          "remediation": "Upgrade org.bouncycastle dependencies to >= 1.70 (or bc-fips 1.0.2+) to mitigate cryptographic side-channels.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-004",
-          "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-PASS",
-          "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (Unknown)",
-          "severity": "INFO",
-          "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
-          "line_number": null,
-          "message": "Detected cryptographic library 'libcrypto.so.1.1.1' version 'Unknown' with status 'PASS'.",
-          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
-          "nist_controls": [
-            "SI-7",
-            "SC-12",
-            "SC-13"
-          ],
-          "remediation": "None required. Maintain automated dependency patch cadence.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
+          "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SC-13": {
       "title": "Cryptographic Protection (FIPS 140 Validation)",
       "family": "System and Communications Protection (SC)",
       "status": "FAIL",
       "findings_count": 4,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-001",
+          "finding_id": "POAM-001-1906D0",
           "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
-          "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+          "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-FAIL_EOL",
+          "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (1.1.1)",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "usr/lib64/libcrypto.so.1.1.1",
           "line_number": null,
-          "message": "Detected cryptographic library 'pycrypto' version '2.6.1' with status 'FAIL_DEPRECATED'.",
+          "message": "Version branch '1.1.1' is End-of-Life (EOL since 2023-09-11).",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
+            "SC-12",
             "SC-13"
           ],
-          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
+          "remediation": "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated FIPS 140-3 provider for SC-13 workloads.",
           "sla_days": 30,
           "target_completion_date": "2026-11-15",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-002",
+          "finding_id": "POAM-002-C3D33E",
+          "source_tool": "CryptoScan",
+          "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
+          "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "requirements.txt",
+          "line_number": null,
+          "message": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
+          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+          "nist_controls": [
+            "SI-7",
+            "SC-13"
+          ],
+          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-003-8A00AE",
           "source_tool": "CryptoScan",
           "rule_or_cve_id": "CRYPTO-BCPROV-JDK15ON-FAIL_EOL",
           "title": "Unsupported/Deprecated Cryptographic Library: bcprov-jdk15on (1.60)",
           "severity": "HIGH",
           "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "pom.xml",
           "line_number": null,
-          "message": "Detected cryptographic library 'bcprov-jdk15on' version '1.60' with status 'FAIL_EOL'.",
+          "message": "Version '1.60' is End-of-Life (EOL since 2021-11-01).",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-12",
             "SC-13"
           ],
-          "remediation": "Upgrade org.bouncycastle dependencies to >= 1.70 (or bc-fips 1.0.2+) to mitigate cryptographic side-channels.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
+          "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-15",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-003",
+          "finding_id": "POAM-004-17874D",
           "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-CRYPTO-JS-PASS",
+          "rule_or_cve_id": "CRYPTO-CRYPTO-JS-WARN_UNRECOMMENDED",
           "title": "Unsupported/Deprecated Cryptographic Library: crypto-js (3.1.91)",
-          "severity": "INFO",
-          "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "severity": "MEDIUM",
+          "cat_level": "CAT III",
+          "file_path": "package.json",
           "line_number": null,
-          "message": "Detected cryptographic library 'crypto-js' version '3.1.91' with status 'PASS'.",
+          "message": "Active development of crypto-js has been discontinued; pure JS crypto lacks constant-time side-channel resistance and has no FIPS 140-3 validation.",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-13"
           ],
-          "remediation": "None required. Maintain automated dependency patch cadence.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-004",
-          "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-PASS",
-          "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (Unknown)",
-          "severity": "INFO",
-          "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
-          "line_number": null,
-          "message": "Detected cryptographic library 'libcrypto.so.1.1.1' version 'Unknown' with status 'PASS'.",
-          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
-          "nist_controls": [
-            "SI-7",
-            "SC-12",
-            "SC-13"
-          ],
-          "remediation": "None required. Maintain automated dependency patch cadence.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-15",
+          "remediation": "Migrate to Node.js built-in 'node:crypto' (compiled against a FIPS-validated OpenSSL provider) or Web Crypto API (SubtleCrypto).",
+          "sla_days": 90,
+          "target_completion_date": "2027-01-14",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SC-28": {
       "title": "Protection of Information at Rest",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "AC-3": {
       "title": "Access Enforcement",
       "family": "Access Control (AC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "AC-6": {
       "title": "Least Privilege",
       "family": "Access Control (AC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "CM-6": {
       "title": "Configuration Settings",
       "family": "Configuration Management (CM)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "CM-8": {
       "title": "Information System Component Inventory",
       "family": "Configuration Management (CM)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "RA-5": {
       "title": "Vulnerability Monitoring and Scanning",
       "family": "Risk Assessment (RA)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     }
   },
   "findings": [
     {
-      "finding_id": "POAM-001",
+      "finding_id": "POAM-001-1906D0",
       "source_tool": "CryptoScan",
-      "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
-      "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+      "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-FAIL_EOL",
+      "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (1.1.1)",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
-      "file_path": "Dependency Manifest / System Libraries",
+      "file_path": "usr/lib64/libcrypto.so.1.1.1",
       "line_number": null,
-      "message": "Detected cryptographic library 'pycrypto' version '2.6.1' with status 'FAIL_DEPRECATED'.",
+      "message": "Version branch '1.1.1' is End-of-Life (EOL since 2023-09-11).",
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
       "nist_controls": [
         "SI-7",
+        "SC-12",
         "SC-13"
       ],
-      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
+      "remediation": "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated FIPS 140-3 provider for SC-13 workloads.",
       "sla_days": 30,
       "target_completion_date": "2026-11-15",
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-002",
+      "finding_id": "POAM-002-C3D33E",
+      "source_tool": "CryptoScan",
+      "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
+      "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "requirements.txt",
+      "line_number": null,
+      "message": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+      "nist_controls": [
+        "SI-7",
+        "SC-13"
+      ],
+      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-15",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-003-8A00AE",
       "source_tool": "CryptoScan",
       "rule_or_cve_id": "CRYPTO-BCPROV-JDK15ON-FAIL_EOL",
       "title": "Unsupported/Deprecated Cryptographic Library: bcprov-jdk15on (1.60)",
       "severity": "HIGH",
       "cat_level": "CAT II",
-      "file_path": "Dependency Manifest / System Libraries",
+      "file_path": "pom.xml",
       "line_number": null,
-      "message": "Detected cryptographic library 'bcprov-jdk15on' version '1.60' with status 'FAIL_EOL'.",
+      "message": "Version '1.60' is End-of-Life (EOL since 2021-11-01).",
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
       "nist_controls": [
         "SI-7",
         "SC-12",
         "SC-13"
       ],
-      "remediation": "Upgrade org.bouncycastle dependencies to >= 1.70 (or bc-fips 1.0.2+) to mitigate cryptographic side-channels.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-15",
+      "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-15",
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-003",
+      "finding_id": "POAM-004-17874D",
       "source_tool": "CryptoScan",
-      "rule_or_cve_id": "CRYPTO-CRYPTO-JS-PASS",
+      "rule_or_cve_id": "CRYPTO-CRYPTO-JS-WARN_UNRECOMMENDED",
       "title": "Unsupported/Deprecated Cryptographic Library: crypto-js (3.1.91)",
-      "severity": "INFO",
-      "cat_level": "CAT II",
-      "file_path": "Dependency Manifest / System Libraries",
+      "severity": "MEDIUM",
+      "cat_level": "CAT III",
+      "file_path": "package.json",
       "line_number": null,
-      "message": "Detected cryptographic library 'crypto-js' version '3.1.91' with status 'PASS'.",
+      "message": "Active development of crypto-js has been discontinued; pure JS crypto lacks constant-time side-channel resistance and has no FIPS 140-3 validation.",
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
       "nist_controls": [
         "SI-7",
         "SC-13"
       ],
-      "remediation": "None required. Maintain automated dependency patch cadence.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-15",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-004",
-      "source_tool": "CryptoScan",
-      "rule_or_cve_id": "CRYPTO-LIBCRYPTO.SO.1.1.1-PASS",
-      "title": "Unsupported/Deprecated Cryptographic Library: libcrypto.so.1.1.1 (Unknown)",
-      "severity": "INFO",
-      "cat_level": "CAT II",
-      "file_path": "Dependency Manifest / System Libraries",
-      "line_number": null,
-      "message": "Detected cryptographic library 'libcrypto.so.1.1.1' version 'Unknown' with status 'PASS'.",
-      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
-      "nist_controls": [
-        "SI-7",
-        "SC-12",
-        "SC-13"
-      ],
-      "remediation": "None required. Maintain automated dependency patch cadence.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-15",
+      "remediation": "Migrate to Node.js built-in 'node:crypto' (compiled against a FIPS-validated OpenSSL provider) or Web Crypto API (SubtleCrypto).",
+      "sla_days": 90,
+      "target_completion_date": "2027-01-14",
       "status": "Open (Identified Out-of-Band)"
     }
-  ]
+  ],
+  "verification_items": []
 }

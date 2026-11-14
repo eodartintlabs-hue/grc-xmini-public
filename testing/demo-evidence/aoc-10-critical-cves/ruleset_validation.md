@@ -3,7 +3,8 @@
 > **Classification / Use**: Internal Compliance & Security Audit Deliverable (Ruleset Verification Log)  
 > **Audit Target Identifier**: `dccc0b56a62dea31b1290d22898a9731089ca67b3e1721760544e1900298e94c`  
 > **Ruleset File**: `rules/custom-baseline-ruleset.yaml`  
-> **Evaluation Timestamp**: `2026-10-16 19:05:49 UTC`  
+> **Evaluation Timestamp**: `2026-11-14 22:18:22 UTC`  
+> **Semgrep Evidence Status**: `ASSESSED (semgrep_findings.json loaded)`  
 
 ---
 
@@ -13,7 +14,7 @@ The custom Semgrep baseline defines **37 high-assurance security rules** spannin
 
 | Metric | Value | Audit Significance |
 | :--- | :--- | :--- |
-| **Total Evaluated Rules** | **37** | Complete baseline coverage |
+| **Total Evaluated Rules** | **37 / 37** | Complete baseline coverage |
 | **Triggered Rules (Violations Detected)** | **0** | Active findings requiring engineering triage |
 | **Clean Rules (Passed Checks)** | **37** | Controls verified without violation |
 | **Total Discovered Code Defects** | **0** | Raw AST match instances |
@@ -28,14 +29,14 @@ The custom Semgrep baseline defines **37 high-assurance security rules** spannin
 | `grc-aoc02-go-hardcoded-credentials` | AOC-02: Password Hygiene | `IA-2` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
 | `grc-aoc02-java-hardcoded-credentials` | AOC-02: Password Hygiene | `IA-2` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
 | `grc-aoc02-javascript-hardcoded-credentials` | AOC-02: Password Hygiene | `IA-2` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-python-weak-hashing` | AOC-03: Weak Encryption Check | `SI-16` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-python-weak-ciphers` | AOC-03: Weak Encryption Check | `SI-16` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-go-weak-hashing` | AOC-03: Weak Encryption Check | `SI-16` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-go-weak-ciphers` | AOC-03: Weak Encryption Check | `SI-16` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-java-weak-hashing` | AOC-03: Weak Encryption Check | `SI-16` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-java-weak-ciphers` | AOC-03: Weak Encryption Check | `SI-16` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-javascript-weak-hashing` | AOC-03: Weak Encryption Check | `SI-16` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
-| `grc-aoc03-javascript-weak-ciphers` | AOC-03: Weak Encryption Check | `SI-16` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-python-weak-hashing` | AOC-03: Weak Encryption Check | `SC-13` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-python-weak-ciphers` | AOC-03: Weak Encryption Check | `SC-13` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-go-weak-hashing` | AOC-03: Weak Encryption Check | `SC-13` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-go-weak-ciphers` | AOC-03: Weak Encryption Check | `SC-13` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-java-weak-hashing` | AOC-03: Weak Encryption Check | `SC-13` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-java-weak-ciphers` | AOC-03: Weak Encryption Check | `SC-13` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-javascript-weak-hashing` | AOC-03: Weak Encryption Check | `SC-13` | `WARNING` | ✅ **PASSED (CLEAN)** | **0** |
+| `grc-aoc03-javascript-weak-ciphers` | AOC-03: Weak Encryption Check | `SC-13` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
 | `grc-aoc04-python-command-injection` | AOC-04: Command Injection | `SI-4` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
 | `grc-aoc04-go-command-injection` | AOC-04: Command Injection | `SI-4` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |
 | `grc-aoc04-java-command-injection` | AOC-04: Command Injection | `SI-4` | `ERROR` | ✅ **PASSED (CLEAN)** | **0** |

@@ -98,15 +98,15 @@ rules:
       - pattern-not: const secretKey = "";
 
   # ==============================================================================
-  # AOC-03: WEAK ENCRYPTION CHECK (NIST SP 800-53 SI-16)
+  # AOC-03: WEAK ENCRYPTION CHECK (NIST SP 800-53 SC-13)
   # ==============================================================================
   - id: grc-aoc03-python-weak-hashing
     languages: [python]
     severity: WARNING
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Insecure cryptographic hash function (MD5/SHA-1) detected in Python. Use SHA-256 or SHA-3 for integrity."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Insecure cryptographic hash function (MD5/SHA-1) detected in Python. Use SHA-256 or SHA-3 for cryptographic hashing."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-328: Use of Weak Hash"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -119,10 +119,10 @@ rules:
   - id: grc-aoc03-python-weak-ciphers
     languages: [python]
     severity: ERROR
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Insecure cipher (DES, 3DES, RC4, or Blowfish) detected in Python. Upgrade to AES-GCM with >= 256-bit keys."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Insecure cipher (DES, 3DES, RC4, or Blowfish) detected in Python. Upgrade to AES-GCM with >= 256-bit keys."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -136,10 +136,10 @@ rules:
   - id: grc-aoc03-go-weak-hashing
     languages: [go]
     severity: WARNING
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Insecure MD5/SHA-1 hash algorithm detected in Go. Use crypto/sha256 or crypto/sha512."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Insecure MD5/SHA-1 hash algorithm detected in Go. Use crypto/sha256 or crypto/sha512."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-328: Use of Weak Hash"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -152,10 +152,10 @@ rules:
   - id: grc-aoc03-go-weak-ciphers
     languages: [go]
     severity: ERROR
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Deprecated cipher (DES or RC4) instantiated in Go. Migrate to AES-GCM (crypto/aes and crypto/cipher)."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Deprecated cipher (DES or RC4) instantiated in Go. Migrate to AES-GCM (crypto/aes and crypto/cipher)."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -167,10 +167,10 @@ rules:
   - id: grc-aoc03-java-weak-hashing
     languages: [java]
     severity: WARNING
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Weak digest algorithm (MD5 or SHA-1) in Java. Upgrade to SHA-256 or SHA-512."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Weak digest algorithm (MD5 or SHA-1) in Java. Upgrade to SHA-256 or SHA-512."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-328: Use of Weak Hash"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -184,10 +184,10 @@ rules:
   - id: grc-aoc03-java-weak-ciphers
     languages: [java]
     severity: ERROR
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Insecure cipher transformation (DES, RC4, or ECB mode) detected in Java. Use AES/GCM/NoPadding."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Insecure cipher transformation (DES, RC4, or ECB mode) detected in Java. Use AES/GCM/NoPadding."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -202,10 +202,10 @@ rules:
   - id: grc-aoc03-javascript-weak-hashing
     languages: [javascript, typescript]
     severity: WARNING
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Weak digest algorithm (MD5/SHA-1) in Node.js crypto. Use sha256 or sha512."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Weak digest algorithm (MD5/SHA-1) in Node.js crypto. Use sha256 or sha512."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-328: Use of Weak Hash"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -218,10 +218,10 @@ rules:
   - id: grc-aoc03-javascript-weak-ciphers
     languages: [javascript, typescript]
     severity: ERROR
-    message: "AOC-03 [NIST SP 800-53 SI-16]: Legacy cipher or deprecated createCipher API detected in JavaScript. Use crypto.createCipheriv with aes-256-gcm."
+    message: "AOC-03 [NIST SP 800-53 SC-13]: Legacy cipher or deprecated createCipher API detected in JavaScript. Use crypto.createCipheriv with aes-256-gcm."
     metadata:
       aoc: "AOC-03: Weak Encryption Check"
-      nist_control: "SI-16: Cryptographic Protection"
+      nist_control: "SC-13: Cryptographic Protection"
       cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
       owasp: "A02:2021 - Cryptographic Failures"
       confidence: HIGH
@@ -408,7 +408,7 @@ rules:
   - id: grc-aoc09-python-deprecated-crypto-module
     languages: [python]
     severity: ERROR
-    message: "AOC-09 [NIST SP 800-53 SI-7]: Import of deprecated or vulnerable crypto library (md5, sha, pycrypto). Migrate to standard hashlib or pyca/cryptography."
+    message: "AOC-09 [NIST SP 800-53 SI-7]: Import of deprecated or vulnerable crypto library (md5, sha, pycrypto). Migrate to standard hashlib or pyca/cryptography backed by a CMVP-validated OpenSSL FIPS provider."
     metadata:
       aoc: "AOC-09: Crypto Dependencies on Unsupported Libraries"
       nist_control: "SI-7: Software, Firmware, and Information Integrity"
@@ -424,7 +424,7 @@ rules:
   - id: grc-aoc09-go-deprecated-crypto-module
     languages: [go]
     severity: WARNING
-    message: "AOC-09 [NIST SP 800-53 SI-7]: Deprecated crypto algorithm package imported in Go. Migrate to standard crypto/sha256 or crypto/aes."
+    message: "AOC-09 [NIST SP 800-53 SI-7]: Deprecated crypto algorithm package imported in Go. Note that golang.org/x/crypto lies outside the Go FIPS module boundary; migrate regulated cryptography to Go standard library crypto/* (sha256, aes) with FIPS mode enabled."
     metadata:
       aoc: "AOC-09: Crypto Dependencies on Unsupported Libraries"
       nist_control: "SI-7: Software, Firmware, and Information Integrity"
@@ -438,7 +438,7 @@ rules:
   - id: grc-aoc09-java-deprecated-crypto-provider
     languages: [java]
     severity: WARNING
-    message: "AOC-09 [NIST SP 800-53 SI-7]: Reference to proprietary or deprecated Sun/Oracle internal security provider. Use standard JCA/JCE providers."
+    message: "AOC-09 [NIST SP 800-53 SI-7]: Reference to proprietary or deprecated Sun/Oracle internal security provider. Use standard JCA/JCE APIs with a CMVP-validated provider (e.g., bc-fips in approved mode or SunPKCS11-NSS-FIPS)."
     metadata:
       aoc: "AOC-09: Crypto Dependencies on Unsupported Libraries"
       nist_control: "SI-7: Software, Firmware, and Information Integrity"
@@ -451,7 +451,7 @@ rules:
   - id: grc-aoc09-javascript-deprecated-crypto-package
     languages: [javascript, typescript]
     severity: WARNING
-    message: "AOC-09 [NIST SP 800-53 SI-7]: Import of legacy, unmaintained crypto-js legacy algorithm packages. Migrate to Web Crypto API or Node.js native crypto."
+    message: "AOC-09 [NIST SP 800-53 SI-7]: Import of legacy, unmaintained crypto-js package. Migrate to Web Crypto API or Node.js built-in 'node:crypto' compiled against a CMVP-validated OpenSSL FIPS provider."
     metadata:
       aoc: "AOC-09: Crypto Dependencies on Unsupported Libraries"
       nist_control: "SI-7: Software, Firmware, and Information Integrity"

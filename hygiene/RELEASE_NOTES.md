@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.4.4 — Yokota` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.4.5 — Yokota` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.4.5`](#v145--yokota) | Yokota | 2026-11-14 | Bug fix | `_TBD after tagging_` | FIPS 140-3 Phase 0 baseline honesty & verification separation: `rules/crypto_catalog.json` v1.1.0 (`fips_status` replacing `fips_capable`), tri-state `crypto_lib_scan.py` statuses (`NOT_VALIDATED` vs. `CANNOT_DETERMINE_STATICALLY`) & ecosystem scoping, `AOC-03` `SI-16` -> `SC-13` remapping, `poam_data.md` Sec. 4 ("Needs Human or Runtime Verification") + `SC-13` `NEEDS REVIEW`, regenerated `demo-evidence/*`, and 42 unit tests passing |
 | [`v1.4.4`](#v144--yokota) | Yokota | 2026-11-02 | Bug fix | `5adf787` | Native Qualys VMDR & Wiz Cloud Security adapters, 4-way scanner auto-detection, vendor remediation URL drafting, and pure standard-library synthetic demo data generator (`scripts/generate_demo_data.py`) |
 | [`v1.4.3`](#v143--yokota) | Yokota | 2026-11-01 | Bug fix | `43839b9` | Multi-worksheet FedRAMP v3.1 POA&M template ingestion (strict Worksheet #1 reading + dynamic header/guidance row skipping) and unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/` |
 | [`v1.4.2`](#v142--yokota) | Yokota | 2026-11-01 | Bug fix | `7b05926` | Code Review Phase 2 (Externalized policy catalogs `rules/severity_policy.json` & `rules/stig_catalog.json`, `Ec2Backend` strategy pattern, `PoamIdAllocator`, `TenableAdapter`/`InspectorAdapter`, `@dataclass` models, 34 unit tests, and Bold White `GRCx` logo update) |
@@ -46,6 +47,26 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.4.5 — Yokota
+
+**FIPS 140-3 Phase 0: Cryptographic Catalog Honesty, `SC-13` Remapping & Verification Separation** · November 14, 2026 · Tag `v1.4.5`
+
+### Security & Compliance Integrity Fixes
+
+1. **Cryptographic Catalog Truthfulness (`rules/crypto_catalog.json` `v1.1.0` & `scripts/crypto_lib_scan.py`)**:
+   - Replaced misleading boolean `fips_capable` fields with explicit tri-state `fips_status` (`VALIDATED_MODULE`, `CAPABLE_IF_CONFIGURED`, `NOT_VALIDATED`, `UNKNOWN`) and `fips_note` operator guidance.
+   - Added standalone `pycryptodome` (`NOT_VALIDATED`), split standard `bouncycastle` (`NOT_VALIDATED`) from `bouncycastle-fips` (`CAPABLE_IF_CONFIGURED`), set `golang-x-crypto` & `crypto-js` & `node-forge` to `NOT_VALIDATED`, and removed `'pycryptodome'` from `pycrypto` remediation.
+   - Replaced import-time mutation in `scripts/crypto_lib_scan.py` with `EMBEDDED_CRYPTO_CATALOG` + `load_crypto_catalog()`, enforced `_ECOSYSTEM_ALIASES` matching in `_match_rule()`, and eliminated false static `"PASS"` results (`NOT_VALIDATED` -> `MEDIUM`, `SC-13`; `CAPABLE_IF_CONFIGURED`/`UNKNOWN` -> `CANNOT_DETERMINE_STATICALLY`, `INFO`, `SC-13`).
+2. **`AOC-03` Control Remapping & Enhancement Parsing (`rules/custom-baseline-ruleset.yaml` & `scripts/grc_reporter.py`)**:
+   - Remapped all 8 `grc-aoc03-*` Semgrep rules from `SI-16` to `SC-13`, restored `NIST_CONTROLS_CATALOG["SI-16"]` to `Memory Protection` (`assessed_by: []`), and qualified `grc-aoc09-*` messages for FIPS-validated provider requirements.
+   - Added `_extract_nist_controls()` to parse multi-control strings and control enhancements (`IA-5(1)`, `SC-28(1)`).
+3. **Human & Runtime Verification Separation (`scripts/grc_reporter.py`)**:
+   - Routed `CANNOT_DETERMINE_STATICALLY` and `NEEDS_REVIEW` crypto items out of confirmed POA&M weaknesses into `poam_data.md` Section 4 (`## 4. Needs Human or Runtime Verification`), `controls.md` (`🔍 NEEDS REVIEW`), and `scr_scn_package.json` (`verification_items`, `NEEDS_REVIEW`).
+4. **Demo Evidence Regeneration, Cross-Repo Sync & Regression Tests**:
+   - Programmatically regenerated `testing/demo-evidence/*` packages with valid `sha256sum` seals, synchronized `GRC-xMINI`, `GRC-xTEST`, and `GRC-xBOT` (`v1.2.2 — Motegi`) documentation/roadmaps for `v1.5.0 — Iwakuni`, and expanded unit tests to 42 passing.
 
 ---
 

@@ -3,7 +3,13 @@
   "package_schema": "grc-scr-scn-package-v1",
   "session_id": "6eb152ba-a455-4b5e-886f-7f8fb5b69794",
   "target_identifier": "001b61db92be9f9b7ddd0d5d0d8f32a20edab91d1e0f033a30448a8f77ee3dbb",
-  "generated_at": "2026-10-19T14:29:47.162010+00:00",
+  "generated_at": "2026-11-14T22:18:22.349931+00:00",
+  "assessed_scanners": [
+    "Checkov",
+    "CryptoScan",
+    "SBOM",
+    "Semgrep"
+  ],
   "provenance": {
     "manifest_schema": "grc-bundle-provenance-v1",
     "session_id": "6eb152ba-a455-4b5e-886f-7f8fb5b69794",
@@ -51,10 +57,12 @@
   },
   "summary": {
     "total_findings": 19,
-    "critical_cat1": 14,
-    "high_cat2": 5,
+    "critical_cat1": 13,
+    "high_cat2": 6,
     "medium_cat3": 0,
     "low_cat4": 0,
+    "verification_required_count": 0,
+    "controls_needing_review": 0,
     "overall_status": "NON_COMPLIANT"
   },
   "controls_rollup": {
@@ -63,9 +71,10 @@
       "family": "Identification and Authentication (IA)",
       "status": "FAIL",
       "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-001",
+          "finding_id": "POAM-001-C75B26",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc02-python-hardcoded-credentials",
           "title": "AOC-02 [NIST SP 800-53 IA-2]",
@@ -79,12 +88,12 @@
             "IA-2"
           ],
           "remediation": "Externalize credentials into a secret management vault or protected environment variable.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-002",
+          "finding_id": "POAM-002-92E437",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc02-python-hardcoded-credentials",
           "title": "AOC-02 [NIST SP 800-53 IA-2]",
@@ -98,34 +107,40 @@
             "IA-2"
           ],
           "remediation": "Externalize credentials into a secret management vault or protected environment variable.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "IA-7": {
       "title": "Cryptographic Module Authentication",
       "family": "Identification and Authentication (IA)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-2": {
       "title": "Flaw Remediation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-4": {
       "title": "Information System Monitoring",
       "family": "System and Information Integrity (SI)",
       "status": "FAIL",
       "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-003",
+          "finding_id": "POAM-003-31B66C",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -144,7 +159,7 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-004",
+          "finding_id": "POAM-004-F2E9D3",
           "source_tool": "Semgrep",
           "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
           "title": "AOC-04 [NIST SP 800-53 SI-4]",
@@ -162,99 +177,133 @@
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SI-7": {
       "title": "Software, Firmware, and Information Integrity",
       "family": "System and Information Integrity (SI)",
       "status": "FAIL",
       "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-018",
+          "finding_id": "POAM-018-C3D33E",
           "source_tool": "CryptoScan",
           "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
           "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "requirements.txt",
           "line_number": null,
-          "message": "Detected cryptographic library 'pycrypto' version '2.6.1' with status 'FAIL_DEPRECATED'.",
+          "message": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-13"
           ],
-          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
+          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
           "sla_days": 30,
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-019",
+          "finding_id": "POAM-019-0BF368",
           "source_tool": "CryptoScan",
           "rule_or_cve_id": "CRYPTO-CRYPTOGRAPHY-WARN_OUTDATED",
           "title": "Unsupported/Deprecated Cryptographic Library: cryptography (38.0.1)",
           "severity": "HIGH",
           "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "requirements.txt",
           "line_number": null,
-          "message": "Detected cryptographic library 'cryptography' version '38.0.1' with status 'WARN_OUTDATED'.",
+          "message": "Detected version '38.0.1' is below baseline minimum '41.0.0'.",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-13"
           ],
-          "remediation": "Ensure version >= 41.0.0 to incorporate latest memory-safety improvements (Rust bindings).",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
+          "remediation": "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SI-10": {
       "title": "Information Input Validation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-16": {
-      "title": "Memory Protection / Cryptographic Hash Integrity",
+      "title": "Memory Protection",
       "family": "System and Information Integrity (SI)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SI-17": {
       "title": "Fail-Secure / Secure Communications Initiation",
       "family": "System and Information Integrity (SI)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-8": {
       "title": "Transmission Confidentiality and Integrity",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-12": {
       "title": "Cryptographic Key Establishment and Management",
       "family": "System and Communications Protection (SC)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "SC-13": {
       "title": "Cryptographic Protection (FIPS 140 Validation)",
       "family": "System and Communications Protection (SC)",
       "status": "FAIL",
       "findings_count": 4,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-007",
+          "finding_id": "POAM-018-C3D33E",
+          "source_tool": "CryptoScan",
+          "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
+          "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "requirements.txt",
+          "line_number": null,
+          "message": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
+          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+          "nist_controls": [
+            "SI-7",
+            "SC-13"
+          ],
+          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-007-E2D21D",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_189",
           "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
@@ -269,12 +318,12 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-008",
+          "finding_id": "POAM-008-D7E64D",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_3",
           "title": "Ensure all data stored in the EBS is securely encrypted",
@@ -289,60 +338,210 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-018",
-          "source_tool": "CryptoScan",
-          "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
-          "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "Dependency Manifest / System Libraries",
-          "line_number": null,
-          "message": "Detected cryptographic library 'pycrypto' version '2.6.1' with status 'FAIL_DEPRECATED'.",
-          "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
-          "nist_controls": [
-            "SI-7",
-            "SC-13"
-          ],
-          "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
           "sla_days": 30,
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-019",
+          "finding_id": "POAM-019-0BF368",
           "source_tool": "CryptoScan",
           "rule_or_cve_id": "CRYPTO-CRYPTOGRAPHY-WARN_OUTDATED",
           "title": "Unsupported/Deprecated Cryptographic Library: cryptography (38.0.1)",
           "severity": "HIGH",
           "cat_level": "CAT II",
-          "file_path": "Dependency Manifest / System Libraries",
+          "file_path": "requirements.txt",
           "line_number": null,
-          "message": "Detected cryptographic library 'cryptography' version '38.0.1' with status 'WARN_OUTDATED'.",
+          "message": "Detected version '38.0.1' is below baseline minimum '41.0.0'.",
           "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
           "nist_controls": [
             "SI-7",
             "SC-13"
           ],
-          "remediation": "Ensure version >= 41.0.0 to incorporate latest memory-safety improvements (Rust bindings).",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
+          "remediation": "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "SC-28": {
       "title": "Protection of Information at Rest",
       "family": "System and Communications Protection (SC)",
       "status": "FAIL",
       "findings_count": 10,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-007",
+          "finding_id": "POAM-015-430E0B",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_6",
+          "title": "Ensure that S3 bucket has a Public Access block",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has a Public Access block",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-011-4A1106",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_61",
+          "title": "Ensure that an S3 bucket has a lifecycle configuration",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-009-7CE4E9",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_62",
+          "title": "Ensure S3 buckets should have event notifications enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-013-780AF2",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_144",
+          "title": "Ensure that S3 bucket has cross-region replication enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-014-ADDCE7",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_145",
+          "title": "Ensure that S3 buckets are encrypted with KMS by default",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-012-BF4022",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_18",
+          "title": "Ensure the S3 bucket has access logging enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-016-0B8F2E",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_20",
+          "title": "S3 Bucket has an ACL defined which allows public READ access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': S3 Bucket has an ACL defined which allows public READ access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-017-2B1184",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_21",
+          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure all data stored in the S3 bucket have versioning enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-007-E2D21D",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_189",
           "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
@@ -357,12 +556,12 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-008",
+          "finding_id": "POAM-008-D7E64D",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_3",
           "title": "Ensure all data stored in the EBS is securely encrypted",
@@ -377,208 +576,22 @@
             "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 60,
-          "target_completion_date": "2026-12-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-009",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_62",
-          "title": "Ensure S3 buckets should have event notifications enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-011",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_61",
-          "title": "Ensure that an S3 bucket has a lifecycle configuration",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-012",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_18",
-          "title": "Ensure the S3 bucket has access logging enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-013",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_144",
-          "title": "Ensure that S3 bucket has cross-region replication enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-014",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_145",
-          "title": "Ensure that S3 buckets are encrypted with KMS by default",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-015",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_6",
-          "title": "Ensure that S3 bucket has a Public Access block",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has a Public Access block",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-016",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_20",
-          "title": "S3 Bucket has an ACL defined which allows public READ access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': S3 Bucket has an ACL defined which allows public READ access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-017",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_21",
-          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure all data stored in the S3 bucket have versioning enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "AC-3": {
       "title": "Access Enforcement",
       "family": "Access Control (AC)",
       "status": "FAIL",
-      "findings_count": 3,
+      "findings_count": 2,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-005",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_24",
-          "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
-          "line_number": 6,
-          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-3",
-            "CM-6"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-006",
+          "finding_id": "POAM-006-DFAA29",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_23",
           "title": "Ensure every security group and rule has a description",
@@ -598,15 +611,15 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-010",
+          "finding_id": "POAM-005-D59099",
           "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_5",
-          "title": "Ensure that Security Groups are attached to another resource",
+          "rule_or_cve_id": "CKV_AWS_24",
+          "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
           "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
           "line_number": 6,
-          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure that Security Groups are attached to another resource",
+          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
           "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
           "nist_controls": [
             "AC-3",
@@ -617,121 +630,18 @@
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "AC-6": {
       "title": "Least Privilege",
       "family": "Access Control (AC)",
       "status": "FAIL",
       "findings_count": 8,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-009",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_62",
-          "title": "Ensure S3 buckets should have event notifications enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-011",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_61",
-          "title": "Ensure that an S3 bucket has a lifecycle configuration",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-012",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_18",
-          "title": "Ensure the S3 bucket has access logging enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-013",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_144",
-          "title": "Ensure that S3 bucket has cross-region replication enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-014",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_145",
-          "title": "Ensure that S3 buckets are encrypted with KMS by default",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-015",
+          "finding_id": "POAM-015-430E0B",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV2_AWS_6",
           "title": "Ensure that S3 bucket has a Public Access block",
@@ -752,7 +662,112 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-016",
+          "finding_id": "POAM-011-4A1106",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_61",
+          "title": "Ensure that an S3 bucket has a lifecycle configuration",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-009-7CE4E9",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_62",
+          "title": "Ensure S3 buckets should have event notifications enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-013-780AF2",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_144",
+          "title": "Ensure that S3 bucket has cross-region replication enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-014-ADDCE7",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_145",
+          "title": "Ensure that S3 buckets are encrypted with KMS by default",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-012-BF4022",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_18",
+          "title": "Ensure the S3 bucket has access logging enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-016-0B8F2E",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_20",
           "title": "S3 Bucket has an ACL defined which allows public READ access.",
@@ -773,7 +788,7 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-017",
+          "finding_id": "POAM-017-2B1184",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_21",
           "title": "Ensure all data stored in the S3 bucket have versioning enabled",
@@ -793,28 +808,31 @@
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "CM-6": {
       "title": "Configuration Settings",
       "family": "Configuration Management (CM)",
       "status": "FAIL",
       "findings_count": 11,
+      "verification_count": 0,
       "findings": [
         {
-          "finding_id": "POAM-005",
+          "finding_id": "POAM-015-430E0B",
           "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_24",
-          "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+          "rule_or_cve_id": "CKV2_AWS_6",
+          "title": "Ensure that S3 bucket has a Public Access block",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
-          "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
-          "line_number": 6,
-          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has a Public Access block",
           "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
           "nist_controls": [
-            "AC-3",
-            "CM-6"
+            "AC-6",
+            "CM-6",
+            "SC-28"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
@@ -822,7 +840,154 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-006",
+          "finding_id": "POAM-011-4A1106",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_61",
+          "title": "Ensure that an S3 bucket has a lifecycle configuration",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-009-7CE4E9",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV2_AWS_62",
+          "title": "Ensure S3 buckets should have event notifications enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-013-780AF2",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_144",
+          "title": "Ensure that S3 bucket has cross-region replication enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-014-ADDCE7",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_145",
+          "title": "Ensure that S3 buckets are encrypted with KMS by default",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-012-BF4022",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_18",
+          "title": "Ensure the S3 bucket has access logging enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-016-0B8F2E",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_20",
+          "title": "S3 Bucket has an ACL defined which allows public READ access.",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': S3 Bucket has an ACL defined which allows public READ access.",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-017-2B1184",
+          "source_tool": "Checkov",
+          "rule_or_cve_id": "CKV_AWS_21",
+          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
+          "severity": "CRITICAL",
+          "cat_level": "CAT I",
+          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+          "line_number": 1,
+          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure all data stored in the S3 bucket have versioning enabled",
+          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+          "nist_controls": [
+            "AC-6",
+            "CM-6",
+            "SC-28"
+          ],
+          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+          "sla_days": 30,
+          "target_completion_date": "2026-11-18",
+          "status": "Open (Identified Out-of-Band)"
+        },
+        {
+          "finding_id": "POAM-006-DFAA29",
           "source_tool": "Checkov",
           "rule_or_cve_id": "CKV_AWS_23",
           "title": "Ensure every security group and rule has a description",
@@ -842,36 +1007,15 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-009",
+          "finding_id": "POAM-005-D59099",
           "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_62",
-          "title": "Ensure S3 buckets should have event notifications enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-010",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_5",
-          "title": "Ensure that Security Groups are attached to another resource",
+          "rule_or_cve_id": "CKV_AWS_24",
+          "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
           "severity": "CRITICAL",
           "cat_level": "CAT I",
           "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
           "line_number": 6,
-          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure that Security Groups are attached to another resource",
+          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
           "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
           "nist_controls": [
             "AC-3",
@@ -883,453 +1027,49 @@
           "status": "Open (Identified Out-of-Band)"
         },
         {
-          "finding_id": "POAM-011",
+          "finding_id": "POAM-010-504AB9",
           "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_61",
-          "title": "Ensure that an S3 bucket has a lifecycle configuration",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
+          "rule_or_cve_id": "CKV2_AWS_5",
+          "title": "Ensure that Security Groups are attached to another resource",
+          "severity": "HIGH",
+          "cat_level": "CAT II",
+          "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
+          "line_number": 6,
+          "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure that Security Groups are attached to another resource",
           "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
           "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-012",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_18",
-          "title": "Ensure the S3 bucket has access logging enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-013",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_144",
-          "title": "Ensure that S3 bucket has cross-region replication enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-014",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_145",
-          "title": "Ensure that S3 buckets are encrypted with KMS by default",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-015",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV2_AWS_6",
-          "title": "Ensure that S3 bucket has a Public Access block",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has a Public Access block",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-016",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_20",
-          "title": "S3 Bucket has an ACL defined which allows public READ access.",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': S3 Bucket has an ACL defined which allows public READ access.",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
-          ],
-          "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-          "sla_days": 30,
-          "target_completion_date": "2026-11-18",
-          "status": "Open (Identified Out-of-Band)"
-        },
-        {
-          "finding_id": "POAM-017",
-          "source_tool": "Checkov",
-          "rule_or_cve_id": "CKV_AWS_21",
-          "title": "Ensure all data stored in the S3 bucket have versioning enabled",
-          "severity": "CRITICAL",
-          "cat_level": "CAT I",
-          "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-          "line_number": 1,
-          "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure all data stored in the S3 bucket have versioning enabled",
-          "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-          "nist_controls": [
-            "AC-6",
-            "CM-6",
-            "SC-28"
+            "CM-6"
           ],
           "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
           "sla_days": 30,
           "target_completion_date": "2026-11-18",
           "status": "Open (Identified Out-of-Band)"
         }
-      ]
+      ],
+      "verification_items": []
     },
     "CM-8": {
       "title": "Information System Component Inventory",
       "family": "Configuration Management (CM)",
       "status": "PASS",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     },
     "RA-5": {
       "title": "Vulnerability Monitoring and Scanning",
       "family": "Risk Assessment (RA)",
-      "status": "PASS",
+      "status": "NOT_ASSESSED",
       "findings_count": 0,
-      "findings": []
+      "verification_count": 0,
+      "findings": [],
+      "verification_items": []
     }
   },
   "findings": [
     {
-      "finding_id": "POAM-001",
-      "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc02-python-hardcoded-credentials",
-      "title": "AOC-02 [NIST SP 800-53 IA-2]",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "app.py:5",
-      "line_number": 5,
-      "message": "AOC-02 [NIST SP 800-53 IA-2]: Detected hardcoded credential assignment in Python source code. Use environment variables or a secrets manager.",
-      "aoc": "AOC-02: Password Hygiene",
-      "nist_controls": [
-        "IA-2"
-      ],
-      "remediation": "Externalize credentials into a secret management vault or protected environment variable.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-002",
-      "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc02-python-hardcoded-credentials",
-      "title": "AOC-02 [NIST SP 800-53 IA-2]",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "app.py:6",
-      "line_number": 6,
-      "message": "AOC-02 [NIST SP 800-53 IA-2]: Detected hardcoded credential assignment in Python source code. Use environment variables or a secrets manager.",
-      "aoc": "AOC-02: Password Hygiene",
-      "nist_controls": [
-        "IA-2"
-      ],
-      "remediation": "Externalize credentials into a secret management vault or protected environment variable.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-003",
-      "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
-      "title": "AOC-04 [NIST SP 800-53 SI-4]",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "app.py:10",
-      "line_number": 10,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
-      "aoc": "AOC-04: Command Injection",
-      "nist_controls": [
-        "SI-4"
-      ],
-      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-004",
-      "source_tool": "Semgrep",
-      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
-      "title": "AOC-04 [NIST SP 800-53 SI-4]",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "app.py:11",
-      "line_number": 11,
-      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
-      "aoc": "AOC-04: Command Injection",
-      "nist_controls": [
-        "SI-4"
-      ],
-      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-005",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_24",
-      "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
-      "line_number": 6,
-      "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-3",
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-006",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_23",
-      "title": "Ensure every security group and rule has a description",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
-      "line_number": 6,
-      "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure every security group and rule has a description",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-3",
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-007",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_189",
-      "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "main.tf:18 (Resource: aws_ebs_volume.unencrypted_data)",
-      "line_number": 18,
-      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_data': Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "SC-13",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-008",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_3",
-      "title": "Ensure all data stored in the EBS is securely encrypted",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "main.tf:18 (Resource: aws_ebs_volume.unencrypted_data)",
-      "line_number": 18,
-      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_data': Ensure all data stored in the EBS is securely encrypted",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "SC-13",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-009",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV2_AWS_62",
-      "title": "Ensure S3 buckets should have event notifications enabled",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-      "line_number": 1,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-010",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV2_AWS_5",
-      "title": "Ensure that Security Groups are attached to another resource",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
-      "line_number": 6,
-      "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure that Security Groups are attached to another resource",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-3",
-        "CM-6"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-011",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV2_AWS_61",
-      "title": "Ensure that an S3 bucket has a lifecycle configuration",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-      "line_number": 1,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-012",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_18",
-      "title": "Ensure the S3 bucket has access logging enabled",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-      "line_number": 1,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-013",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_144",
-      "title": "Ensure that S3 bucket has cross-region replication enabled",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-      "line_number": 1,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-014",
-      "source_tool": "Checkov",
-      "rule_or_cve_id": "CKV_AWS_145",
-      "title": "Ensure that S3 buckets are encrypted with KMS by default",
-      "severity": "CRITICAL",
-      "cat_level": "CAT I",
-      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
-      "line_number": 1,
-      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
-      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
-      "nist_controls": [
-        "AC-6",
-        "CM-6",
-        "SC-28"
-      ],
-      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
-      "sla_days": 30,
-      "target_completion_date": "2026-11-18",
-      "status": "Open (Identified Out-of-Band)"
-    },
-    {
-      "finding_id": "POAM-015",
+      "finding_id": "POAM-015-430E0B",
       "source_tool": "Checkov",
       "rule_or_cve_id": "CKV2_AWS_6",
       "title": "Ensure that S3 bucket has a Public Access block",
@@ -1350,7 +1090,112 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-016",
+      "finding_id": "POAM-011-4A1106",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV2_AWS_61",
+      "title": "Ensure that an S3 bucket has a lifecycle configuration",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+      "line_number": 1,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that an S3 bucket has a lifecycle configuration",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-009-7CE4E9",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV2_AWS_62",
+      "title": "Ensure S3 buckets should have event notifications enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+      "line_number": 1,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure S3 buckets should have event notifications enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-013-780AF2",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_144",
+      "title": "Ensure that S3 bucket has cross-region replication enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+      "line_number": 1,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 bucket has cross-region replication enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-014-ADDCE7",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_145",
+      "title": "Ensure that S3 buckets are encrypted with KMS by default",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+      "line_number": 1,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure that S3 buckets are encrypted with KMS by default",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-012-BF4022",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_18",
+      "title": "Ensure the S3 bucket has access logging enabled",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "main.tf:1 (Resource: aws_s3_bucket.public_audit_logs)",
+      "line_number": 1,
+      "message": "IaC policy violation on resource 'aws_s3_bucket.public_audit_logs': Ensure the S3 bucket has access logging enabled",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-6",
+        "CM-6",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-016-0B8F2E",
       "source_tool": "Checkov",
       "rule_or_cve_id": "CKV_AWS_20",
       "title": "S3 Bucket has an ACL defined which allows public READ access.",
@@ -1371,7 +1216,7 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-017",
+      "finding_id": "POAM-017-2B1184",
       "source_tool": "Checkov",
       "rule_or_cve_id": "CKV_AWS_21",
       "title": "Ensure all data stored in the S3 bucket have versioning enabled",
@@ -1392,44 +1237,376 @@
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-018",
-      "source_tool": "CryptoScan",
-      "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
-      "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+      "finding_id": "POAM-006-DFAA29",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_23",
+      "title": "Ensure every security group and rule has a description",
       "severity": "CRITICAL",
       "cat_level": "CAT I",
-      "file_path": "Dependency Manifest / System Libraries",
-      "line_number": null,
-      "message": "Detected cryptographic library 'pycrypto' version '2.6.1' with status 'FAIL_DEPRECATED'.",
-      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+      "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
+      "line_number": 6,
+      "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure every security group and rule has a description",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
       "nist_controls": [
-        "SI-7",
-        "SC-13"
+        "AC-3",
+        "CM-6"
       ],
-      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography) or 'pycryptodome'.",
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
       "sla_days": 30,
       "target_completion_date": "2026-11-18",
       "status": "Open (Identified Out-of-Band)"
     },
     {
-      "finding_id": "POAM-019",
+      "finding_id": "POAM-005-D59099",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_24",
+      "title": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
+      "line_number": 6,
+      "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "AC-3",
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-018-C3D33E",
       "source_tool": "CryptoScan",
-      "rule_or_cve_id": "CRYPTO-CRYPTOGRAPHY-WARN_OUTDATED",
-      "title": "Unsupported/Deprecated Cryptographic Library: cryptography (38.0.1)",
-      "severity": "HIGH",
-      "cat_level": "CAT II",
-      "file_path": "Dependency Manifest / System Libraries",
+      "rule_or_cve_id": "CRYPTO-PYCRYPTO-FAIL_DEPRECATED",
+      "title": "Unsupported/Deprecated Cryptographic Library: pycrypto (2.6.1)",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "requirements.txt",
       "line_number": null,
-      "message": "Detected cryptographic library 'cryptography' version '38.0.1' with status 'WARN_OUTDATED'.",
+      "message": "PyCrypto has been unmaintained since 2013, contains unpatched vulnerabilities, and is not FIPS 140-3 validated.",
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
       "nist_controls": [
         "SI-7",
         "SC-13"
       ],
-      "remediation": "Ensure version >= 41.0.0 to incorporate latest memory-safety improvements (Rust bindings).",
-      "sla_days": 60,
-      "target_completion_date": "2026-12-18",
+      "remediation": "Migrate all cryptographic operations to 'cryptography' (pyca/cryptography >= 41.0.0) linked against a CMVP-validated OpenSSL 3 FIPS provider.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-003-31B66C",
+      "source_tool": "Semgrep",
+      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "title": "AOC-04 [NIST SP 800-53 SI-4]",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "app.py:10",
+      "line_number": 10,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "aoc": "AOC-04: Command Injection",
+      "nist_controls": [
+        "SI-4"
+      ],
+      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-004-F2E9D3",
+      "source_tool": "Semgrep",
+      "rule_or_cve_id": "rules.grc-aoc04-python-command-injection",
+      "title": "AOC-04 [NIST SP 800-53 SI-4]",
+      "severity": "CRITICAL",
+      "cat_level": "CAT I",
+      "file_path": "app.py:11",
+      "line_number": 11,
+      "message": "AOC-04 [NIST SP 800-53 SI-4]: Dynamic command execution via shell invocation in Python. Use subprocess.run with arguments list and shell=False.",
+      "aoc": "AOC-04: Command Injection",
+      "nist_controls": [
+        "SI-4"
+      ],
+      "remediation": "Replace shell execution with parameterized runtime APIs; avoid shell=True.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-010-504AB9",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV2_AWS_5",
+      "title": "Ensure that Security Groups are attached to another resource",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "main.tf:6 (Resource: aws_security_group.wide_open_ssh)",
+      "line_number": 6,
+      "message": "IaC policy violation on resource 'aws_security_group.wide_open_ssh': Ensure that Security Groups are attached to another resource",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "CM-6"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-007-E2D21D",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_189",
+      "title": "Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "main.tf:18 (Resource: aws_ebs_volume.unencrypted_data)",
+      "line_number": 18,
+      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_data': Ensure EBS Volume is encrypted by KMS using a customer managed Key (CMK)",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "SC-13",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-008-D7E64D",
+      "source_tool": "Checkov",
+      "rule_or_cve_id": "CKV_AWS_3",
+      "title": "Ensure all data stored in the EBS is securely encrypted",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "main.tf:18 (Resource: aws_ebs_volume.unencrypted_data)",
+      "line_number": 18,
+      "message": "IaC policy violation on resource 'aws_ebs_volume.unencrypted_data': Ensure all data stored in the EBS is securely encrypted",
+      "aoc": "AOC-07: Infrastructure-as-Code Misconfiguration",
+      "nist_controls": [
+        "SC-13",
+        "SC-28"
+      ],
+      "remediation": "Harden Infrastructure-as-Code template according to CIS / DISA STIG benchmarks.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-019-0BF368",
+      "source_tool": "CryptoScan",
+      "rule_or_cve_id": "CRYPTO-CRYPTOGRAPHY-WARN_OUTDATED",
+      "title": "Unsupported/Deprecated Cryptographic Library: cryptography (38.0.1)",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "requirements.txt",
+      "line_number": null,
+      "message": "Detected version '38.0.1' is below baseline minimum '41.0.0'.",
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
+      "nist_controls": [
+        "SI-7",
+        "SC-13"
+      ],
+      "remediation": "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-001-C75B26",
+      "source_tool": "Semgrep",
+      "rule_or_cve_id": "rules.grc-aoc02-python-hardcoded-credentials",
+      "title": "AOC-02 [NIST SP 800-53 IA-2]",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "app.py:5",
+      "line_number": 5,
+      "message": "AOC-02 [NIST SP 800-53 IA-2]: Detected hardcoded credential assignment in Python source code. Use environment variables or a secrets manager.",
+      "aoc": "AOC-02: Password Hygiene",
+      "nist_controls": [
+        "IA-2"
+      ],
+      "remediation": "Externalize credentials into a secret management vault or protected environment variable.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
+      "status": "Open (Identified Out-of-Band)"
+    },
+    {
+      "finding_id": "POAM-002-92E437",
+      "source_tool": "Semgrep",
+      "rule_or_cve_id": "rules.grc-aoc02-python-hardcoded-credentials",
+      "title": "AOC-02 [NIST SP 800-53 IA-2]",
+      "severity": "HIGH",
+      "cat_level": "CAT II",
+      "file_path": "app.py:6",
+      "line_number": 6,
+      "message": "AOC-02 [NIST SP 800-53 IA-2]: Detected hardcoded credential assignment in Python source code. Use environment variables or a secrets manager.",
+      "aoc": "AOC-02: Password Hygiene",
+      "nist_controls": [
+        "IA-2"
+      ],
+      "remediation": "Externalize credentials into a secret management vault or protected environment variable.",
+      "sla_days": 30,
+      "target_completion_date": "2026-11-18",
       "status": "Open (Identified Out-of-Band)"
     }
-  ]
+  ],
+  "verification_items": [],
+  "sbom_stig_applicability": {
+    "metadata": {
+      "generated_at": "2026-10-19T14:29:47.134430+00:00",
+      "source_sbom": "sbom.cdx.json",
+      "analyzer": "sbom_analyzer.py (GRC Bundle Review Pipeline)"
+    },
+    "summary": {
+      "total_components": 5,
+      "unique_stigs_mapped": 1,
+      "stig_distribution": {
+        "U_ASD_V5R1_STIG": 5
+      },
+      "severity_distribution": {
+        "CAT I": 5
+      },
+      "mapped_nist_controls": [
+        "AC-3",
+        "IA-2",
+        "SC-12",
+        "SC-13",
+        "SC-8",
+        "SI-10",
+        "SI-16",
+        "SI-2",
+        "SI-4",
+        "SI-7"
+      ]
+    },
+    "mappings": [
+      {
+        "component_name": "/workspace",
+        "component_version": "Unknown",
+        "component_type": "file",
+        "purl": "",
+        "stig_id": "U_ASD_V5R1_STIG",
+        "stig_title": "Application Security and Development (ASD) STIG",
+        "benchmark_id": "Application_Security_and_Development_STIG",
+        "version": "Version 5, Release 1",
+        "max_severity": "CAT I",
+        "nist_controls": [
+          "SI-2",
+          "SI-4",
+          "SI-7",
+          "SI-10",
+          "SI-16",
+          "SC-8",
+          "SC-12",
+          "SC-13",
+          "IA-2",
+          "AC-3"
+        ],
+        "match_reason": "Application dependency governed by General Application Security and Development (ASD) STIG",
+        "match_type": "FALLBACK"
+      },
+      {
+        "component_name": "cryptography",
+        "component_version": "38.0.1",
+        "component_type": "library",
+        "purl": "pkg:pypi/cryptography@38.0.1",
+        "stig_id": "U_ASD_V5R1_STIG",
+        "stig_title": "Application Security and Development (ASD) STIG",
+        "benchmark_id": "Application_Security_and_Development_STIG",
+        "version": "Version 5, Release 1",
+        "max_severity": "CAT I",
+        "nist_controls": [
+          "SI-2",
+          "SI-4",
+          "SI-7",
+          "SI-10",
+          "SI-16",
+          "SC-8",
+          "SC-12",
+          "SC-13",
+          "IA-2",
+          "AC-3"
+        ],
+        "match_reason": "Resolved via PURL ecosystem (pypi): Python application dependency (PyPI)",
+        "match_type": "PURL_ECOSYSTEM"
+      },
+      {
+        "component_name": "pycrypto",
+        "component_version": "2.6.1",
+        "component_type": "library",
+        "purl": "pkg:pypi/pycrypto@2.6.1",
+        "stig_id": "U_ASD_V5R1_STIG",
+        "stig_title": "Application Security and Development (ASD) STIG",
+        "benchmark_id": "Application_Security_and_Development_STIG",
+        "version": "Version 5, Release 1",
+        "max_severity": "CAT I",
+        "nist_controls": [
+          "SI-2",
+          "SI-4",
+          "SI-7",
+          "SI-10",
+          "SI-16",
+          "SC-8",
+          "SC-12",
+          "SC-13",
+          "IA-2",
+          "AC-3"
+        ],
+        "match_reason": "Resolved via PURL ecosystem (pypi): Python application dependency (PyPI)",
+        "match_type": "PURL_ECOSYSTEM"
+      },
+      {
+        "component_name": "requests",
+        "component_version": "2.31.0",
+        "component_type": "library",
+        "purl": "pkg:pypi/requests@2.31.0",
+        "stig_id": "U_ASD_V5R1_STIG",
+        "stig_title": "Application Security and Development (ASD) STIG",
+        "benchmark_id": "Application_Security_and_Development_STIG",
+        "version": "Version 5, Release 1",
+        "max_severity": "CAT I",
+        "nist_controls": [
+          "SI-2",
+          "SI-4",
+          "SI-7",
+          "SI-10",
+          "SI-16",
+          "SC-8",
+          "SC-12",
+          "SC-13",
+          "IA-2",
+          "AC-3"
+        ],
+        "match_reason": "Resolved via PURL ecosystem (pypi): Python application dependency (PyPI)",
+        "match_type": "PURL_ECOSYSTEM"
+      },
+      {
+        "component_name": "/workspace/requirements.txt",
+        "component_version": "Unknown",
+        "component_type": "file",
+        "purl": "",
+        "stig_id": "U_ASD_V5R1_STIG",
+        "stig_title": "Application Security and Development (ASD) STIG",
+        "benchmark_id": "Application_Security_and_Development_STIG",
+        "version": "Version 5, Release 1",
+        "max_severity": "CAT I",
+        "nist_controls": [
+          "SI-2",
+          "SI-4",
+          "SI-7",
+          "SI-10",
+          "SI-16",
+          "SC-8",
+          "SC-12",
+          "SC-13",
+          "IA-2",
+          "AC-3"
+        ],
+        "match_reason": "Application dependency governed by General Application Security and Development (ASD) STIG",
+        "match_type": "FALLBACK"
+      }
+    ]
+  }
 }

@@ -2,7 +2,7 @@
 
 > **Classification / Use**: Internal Compliance & Security Audit Deliverable (FedRAMP High / DoD RMF / SCR-SCN)  
 > **Audit Target Identifier**: `dccc0b56a62dea31b1290d22898a9731089ca67b3e1721760544e1900298e94c`  
-> **Evaluation Timestamp**: `2026-10-16 19:05:49 UTC`  
+> **Evaluation Timestamp**: `2026-11-14 22:18:22 UTC`  
 
 ---
 
@@ -13,16 +13,16 @@
 | **AC-3** | Access Enforcement | Access Control (AC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **AC-6** | Least Privilege | Access Control (AC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **CM-6** | Configuration Settings | Configuration Management (CM) | `CAT II` | 0 | ✅ **COMPLIANT** |
-| **CM-8** | Information System Component Inventory | Configuration Management (CM) | `CAT II` | 0 | ✅ **COMPLIANT** |
+| **CM-8** | Information System Component Inventory | Configuration Management (CM) | `CAT II` | 0 | ⚪ **NOT ASSESSED** |
 | **IA-2** | Identification and Authentication (Organizational Users) | Identification and Authentication (IA) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **IA-7** | Cryptographic Module Authentication | Identification and Authentication (IA) | `CAT II` | 0 | ✅ **COMPLIANT** |
-| **RA-5** | Vulnerability Monitoring and Scanning | Risk Assessment (RA) | `CAT I` | 0 | ✅ **COMPLIANT** |
+| **RA-5** | Vulnerability Monitoring and Scanning | Risk Assessment (RA) | `CAT I` | 0 | ⚪ **NOT ASSESSED** |
 | **SC-12** | Cryptographic Key Establishment and Management | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SC-13** | Cryptographic Protection (FIPS 140 Validation) | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SC-28** | Protection of Information at Rest | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SC-8** | Transmission Confidentiality and Integrity | System and Communications Protection (SC) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SI-10** | Information Input Validation | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
-| **SI-16** | Memory Protection / Cryptographic Hash Integrity | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
+| **SI-16** | Memory Protection | System and Information Integrity (SI) | `CAT II` | 0 | ⚪ **NOT ASSESSED** |
 | **SI-17** | Fail-Secure / Secure Communications Initiation | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SI-2** | Flaw Remediation | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
 | **SI-4** | Information System Monitoring | System and Information Integrity (SI) | `CAT I` | 0 | ✅ **COMPLIANT** |
@@ -50,11 +50,11 @@
 * **Control Objective**: Establish and document mandatory configuration settings for IT products using hardened baselines (DISA STIG / CIS).
 * **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
 
-### CM-8: Information System Component Inventory — ✅ COMPLIANT
+### CM-8: Information System Component Inventory — ⚪ NOT ASSESSED
 * **Control Family**: Configuration Management (CM)
 * **DISA STIG Baseline**: `CAT II`
 * **Control Objective**: Develop and document an inventory of information system components (SBOM) detailing name, version, and license.
-* **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
+* **Evaluation Outcome**: No evidence file present from assessing scanner(s) (Grype, Trivy, SBOM).
 
 ### IA-2: Identification and Authentication (Organizational Users) — ✅ COMPLIANT
 * **Control Family**: Identification and Authentication (IA)
@@ -68,11 +68,11 @@
 * **Control Objective**: Authenticate to cryptographic modules using mechanisms meeting applicable federal laws, regulations, and standards.
 * **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
 
-### RA-5: Vulnerability Monitoring and Scanning — ✅ COMPLIANT
+### RA-5: Vulnerability Monitoring and Scanning — ⚪ NOT ASSESSED
 * **Control Family**: Risk Assessment (RA)
 * **DISA STIG Baseline**: `CAT I`
 * **Control Objective**: Monitor and scan for vulnerabilities in the system and hosted applications, prioritizing remediation of critical CVEs.
-* **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
+* **Evaluation Outcome**: No evidence file present from assessing scanner(s) (Grype, Trivy).
 
 ### SC-12: Cryptographic Key Establishment and Management — ✅ COMPLIANT
 * **Control Family**: System and Communications Protection (SC)
@@ -104,11 +104,11 @@
 * **Control Objective**: Validate information inputs to syntax rules, character sets, and payload limits before runtime interpretation.
 * **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
 
-### SI-16: Memory Protection / Cryptographic Hash Integrity — ✅ COMPLIANT
+### SI-16: Memory Protection — ⚪ NOT ASSESSED
 * **Control Family**: System and Information Integrity (SI)
-* **DISA STIG Baseline**: `CAT I`
-* **Control Objective**: Protect memory integrity and enforce strong cryptographic hash algorithms. Prohibits MD5, SHA-1, DES, and RC4.
-* **Evaluation Outcome**: No policy violations or vulnerabilities detected. Conforms to baseline.
+* **DISA STIG Baseline**: `CAT II`
+* **Control Objective**: Implement security safeguards to protect system memory from unauthorized code execution (e.g., DEP/NX, ASLR, memory-safe handling).
+* **Evaluation Outcome**: No evidence file present from assessing scanner(s) (None configured).
 
 ### SI-17: Fail-Secure / Secure Communications Initiation — ✅ COMPLIANT
 * **Control Family**: System and Information Integrity (SI)

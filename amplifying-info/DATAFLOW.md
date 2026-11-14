@@ -103,14 +103,14 @@ When `./grc scan` executes, the host dispatcher mounts Zone 1 (`./ephemeral_work
 
 1. **Provenance Copy**: Copies `/workspace/bundle_provenance.json` (or `ami_provenance.json`) directly into `/evidence/` to anchor the audit trail.
 2. **Stream 1 — Semgrep AST SAST**: Parses source files into Abstract Syntax Trees and evaluates all 37 rules in `/rules/custom-baseline-ruleset.yaml` (`--metrics=off`). Writes **`/evidence/semgrep_findings.json`**.
-3. **Stream 2 — Gitleaks Secrets**: Scans all files (`--no-git`) for high-entropy credentials, private keys, and cloud tokens. Writes **`/evidence/gitleaks_report.json`**.
+3. **Stream 2 — Gitleaks Secrets**: Scans all files (`--no-git`) for high-entropy credentials, private keys, and cloud tokens. Writes **`/evidence/gitleaks_findings.json`**.
 4. **Stream 3 — Checkov IaC Policy**: Evaluates Terraform, Kubernetes, Dockerfile, and CloudFormation manifests offline (`BC_SKIP_MAPPING=TRUE`, `--skip-download`). Writes **`/evidence/checkov_findings.json`**.
 5. **Stream 4 — Syft SBOM Indexing**: Catalogs all OS packages and language dependencies (`go.mod`, `pom.xml`, `requirements.txt`, `package.json`) into CycloneDX format. Writes **`/evidence/sbom.cdx.json`**.
 6. **Stream 5 — Grype & Trivy Offline CVE Matching**:
-   * **Grype** ingests `sbom.cdx.json` (`sbom:/evidence/sbom.cdx.json`) and matches components against its pre-cached SQLite vulnerability database (`GRYPE_DB_AUTO_UPDATE=false`). Writes **`/evidence/grype_cve_report.json`**.
-   * **Trivy** scans `/workspace` using its pre-cached BoltDB vulnerability database (`--offline-scan --skip-db-update`). Writes **`/evidence/trivy_cve_report.json`**.
-7. **Stream 6 — Cryptographic Library & EOL Audit**: [`scripts/crypto_lib_scan.py`](../scripts/crypto_lib_scan.py) inspects dependency manifests and source imports against [`rules/crypto_catalog.json`](../rules/crypto_catalog.json). Writes **`/evidence/crypto_lib_findings.json`**.
-8. **Stream 7 — DISA STIG & DoD SRG Mapping**: [`scripts/sbom_analyzer.py`](../scripts/sbom_analyzer.py) ingests `/evidence/sbom.cdx.json` and maps discovered components to applicable DISA STIG benchmarks. Writes **`/evidence/stig_applicability_report.json`** and **`/evidence/stig_applicability_matrix.md`**.
+   * **Grype** ingests `sbom.cdx.json` (`sbom:/evidence/sbom.cdx.json`) and matches components against its pre-cached SQLite vulnerability database (`GRYPE_DB_AUTO_UPDATE=false`). Writes **`/evidence/grype_findings.json`**.
+   * **Trivy** scans `/workspace` using its pre-cached BoltDB vulnerability database (`--offline-scan --skip-db-update`). Writes **`/evidence/trivy_findings.json`**.
+7. **Stream 6 — Cryptographic Library & EOL Audit**: [`scripts/crypto_lib_scan.py`](../scripts/crypto_lib_scan.py) inspects dependency manifests and shared objects against [`rules/crypto_catalog.json`](../rules/crypto_catalog.json). Writes **`/evidence/crypto_findings.json`**.
+8. **Stream 7 — DISA STIG & DoD SRG Mapping**: [`scripts/sbom_analyzer.py`](../scripts/sbom_analyzer.py) ingests `/evidence/sbom.cdx.json` and maps discovered components to applicable DISA STIG benchmarks. Writes **`/evidence/stig_applicability.json`** and **`/evidence/stig_matrix.md`**.
 
 ---
 
@@ -138,10 +138,10 @@ flowchart LR
     classDef seal fill:#1a0f37,stroke:#a855f7,stroke-width:2px,color:#f3e8ff;
 
     S1["semgrep_findings.json"]:::raw --> R["grc_reporter.py<br/><b>Phase 4 Normalizer</b>"]:::engine
-    S2["gitleaks_report.json"]:::raw --> R
+    S2["gitleaks_findings.json"]:::raw --> R
     S3["checkov_findings.json"]:::raw --> R
     S4["grype &amp; trivy CVE JSON"]:::raw --> R
-    S5["crypto_lib_findings.json"]:::raw --> R
+    S5["crypto_findings.json"]:::raw --> R
     S6["bundle_provenance.json"]:::raw --> R
 
     R --> D1["poam_data.md<br/><i>FedRAMP SLA Table</i>"]:::out
@@ -178,12 +178,12 @@ Rather than redundantly indexing the filesystem multiple times, the pipeline use
    │
    └──► [Syft Engine] ──► generates /evidence/sbom.cdx.json (CycloneDX 1.5 JSON)
                               │
-                              ├──► [Grype Engine]     ──► /evidence/grype_cve_report.json
-                              └──► [sbom_analyzer.py] ──► /evidence/stig_applicability_report.json
-                                                      ──► /evidence/stig_applicability_matrix.md
+                              ├──► [Grype Engine]     ──► /evidence/grype_findings.json
+                              └──► [sbom_analyzer.py] ──► /evidence/stig_applicability.json
+                                                      ──► /evidence/stig_matrix.md
 ```
 
-This single-index fan-out guarantees that the vulnerability report (`grype_cve_report.json`) and the DISA STIG applicability matrix (`stig_applicability_report.json`) are derived from the exact same component inventory (`sbom.cdx.json`).
+This single-index fan-out guarantees that the vulnerability report (`grype_findings.json`) and the DISA STIG applicability matrix (`stig_applicability.json`) are derived from the exact same component inventory (`sbom.cdx.json`).
 
 ---
 
@@ -196,13 +196,13 @@ This single-index fan-out guarantees that the vulnerability report (`grype_cve_r
 | **`bundle_provenance.json`** | 2 | `grc_bundle.py` (`restore`) | `scan_orchestrator.sh`, `grc_reporter.py` | JSON (`grc-bundle-provenance-v1`) | Zone 1 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
 | **`ami_provenance.json`** | 2 | `grc_ami.py` (`restore`) | `scan_orchestrator.sh`, `grc_reporter.py` | JSON (`grc-ami-provenance-v1`) | Zone 1 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<ami>/` |
 | **`semgrep_findings.json`** | 3 | Semgrep OSS + 37 AOC Rules | `grc_reporter.py` | JSON (Semgrep Schema) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
-| **`gitleaks_report.json`** | 3 | Gitleaks v8.18.4 | `grc_reporter.py` | JSON Array | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
+| **`gitleaks_findings.json`** | 3 | Gitleaks v8.18.4 | `grc_reporter.py` | JSON Array | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
 | **`checkov_findings.json`** | 3 | Checkov IaC Engine | `grc_reporter.py` | JSON (Checkov Schema) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
 | **`sbom.cdx.json`** | 3 | Syft v1.18.1 | Grype, `sbom_analyzer.py`, Auditors | CycloneDX JSON | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
-| **`grype_cve_report.json`** | 3 | Grype v0.86.1 (Offline DB) | `grc_reporter.py` | JSON (Grype Matches) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
-| **`trivy_cve_report.json`** | 3 | Trivy v0.58.1 (Offline DB) | `grc_reporter.py` | JSON (Trivy Results) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
-| **`crypto_lib_findings.json`** | 3 | `scripts/crypto_lib_scan.py` | `grc_reporter.py` | JSON (`crypto-audit-v1`) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
-| **`stig_applicability_report.json`** | 3 | `scripts/sbom_analyzer.py` | `grc_reporter.py`, Auditors | JSON (`stig-map-v1`) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
+| **`grype_findings.json`** | 3 | Grype v0.86.1 (Offline DB) | `grc_reporter.py` | JSON (Grype Matches) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
+| **`trivy_findings.json`** | 3 | Trivy v0.58.1 (Offline DB) | `grc_reporter.py` | JSON (Trivy Results) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
+| **`crypto_findings.json`** | 3 | `scripts/crypto_lib_scan.py` | `grc_reporter.py` | JSON (`crypto-audit-v1`) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
+| **`stig_applicability.json`** | 3 | `scripts/sbom_analyzer.py` | `grc_reporter.py`, Auditors | JSON (`stig-map-v1`) | Zone 2 $\rightarrow$ Zone 3 | Preserved & sealed in `evidence/<bundle>/` |
 | **`poam_data.md`** | 4 | `scripts/grc_reporter.py` | Authorizing Officials (AOs), 3PAOs | GitHub-Flavored Markdown | Zone 3 (Sealed) | Permanent Compliance Work Paper |
 | **`controls.md`** | 4 | `scripts/grc_reporter.py` | Security Control Assessors (SCAs) | GitHub-Flavored Markdown | Zone 3 (Sealed) | Permanent Compliance Work Paper |
 | **`ruleset_validation.md`** | 4 | `scripts/grc_reporter.py` | DevSecOps & Audit Reviewers | GitHub-Flavored Markdown | Zone 3 (Sealed) | Permanent Compliance Work Paper |
