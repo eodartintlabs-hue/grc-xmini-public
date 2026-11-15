@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0.0",
+  "engine": {
+    "name": "CryptoScan",
+    "version": "1.5.0",
+    "catalogs": [{ "path": "rules/crypto_catalog.json", "version": "1.1.0", "last_updated": "2026-11-01" }]
+  },
+  "generated_at": "2026-11-15T15:00:00Z",
+  "target": { "identifier": "aoc-12-no-fips-mode", "provenance_file": "bundle_provenance.json" },
+  "scope": {
+    "assessed_controls": ["SI-7", "SC-13"],
+    "assessed_aocs": ["AOC-09", "AOC-12"],
+    "ecosystems": ["pypi", "system"],
+    "limitations": ["Operational environment not determinable from manifests alone."]
+  },
+  "findings": [
+    {
+      "finding_id": "cryptoscan-3f9a1c2e7b",
+      "rule_id": "crypto:cryptography",
+      "aoc": { "id": "AOC-09", "title": "Crypto Dependencies on Unsupported Libraries" },
+      "controls": ["SI-7"],
+      "determination": "PASS",
+      "subject": { "kind": "package", "name": "cryptography", "version": "42.0.0", "ecosystem": "pypi" },
+      "location": { "kind": "manifest", "path": "requirements.txt" },
+      "detection": { "method": "manifest", "confidence": "HIGH" },
+      "title": "Supported cryptographic library: cryptography (42.0.0)",
+      "message": "Version is within the supported lifecycle."
+    },
+    {
+      "finding_id": "cryptoscan-8d21e0a4c9",
+      "rule_id": "crypto:cryptography:fips",
+      "aoc": { "id": "AOC-12", "title": "Lack of FIPS Mode" },
+      "controls": ["SC-13"],
+      "determination": "CANNOT_DETERMINE_STATICALLY",
+      "determination_detail": "CAPABLE_IF_CONFIGURED",
+      "subject": { "kind": "package", "name": "cryptography", "version": "42.0.0", "ecosystem": "pypi" },
+      "location": { "kind": "manifest", "path": "requirements.txt" },
+      "detection": { "method": "manifest", "confidence": "MEDIUM" },
+      "title": "FIPS validation status unverified: cryptography (42.0.0)",
+      "message": "pyca/cryptography is not itself a validated module; it can use a validated OpenSSL FIPS provider only if the runtime is configured for it.",
+      "extensions": { "fips": { "fips_status": "CAPABLE_IF_CONFIGURED" } }
+    },
+    {
+      "finding_id": "cryptoscan-b1c4f7e2a0",
+      "rule_id": "crypto:pycrypto",
+      "aoc": { "id": "AOC-09", "title": "Crypto Dependencies on Unsupported Libraries" },
+      "controls": ["SI-7", "SC-13"],
+      "determination": "FAIL",
+      "determination_detail": "FAIL_DEPRECATED",
+      "severity": "CRITICAL",
+      "subject": { "kind": "package", "name": "pycrypto", "version": "2.6.1", "ecosystem": "pypi" },
+      "location": { "kind": "manifest", "path": "requirements.txt" },
+      "detection": { "method": "manifest", "confidence": "HIGH" },
+      "title": "Deprecated cryptographic library: pycrypto (2.6.1)",
+      "message": "PyCrypto has been unmaintained since 2013 and contains unpatched vulnerabilities.",
+      "remediation": "Migrate to a library backed by a CMVP-validated module."
+    },
+    {
+      "finding_id": "fipsdisc-5e7f20c1aa",
+      "rule_id": "fips-alg:md5",
+      "aoc": { "id": "AOC-03", "title": "Weak Encryption Check" },
+      "controls": ["SC-13"],
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "subject": { "kind": "algorithm", "name": "md5", "parameters": { "purpose": "unknown" } },
+      "location": { "kind": "file", "path": "src/fips_bypass.py", "line_start": 13 },
+      "detection": { "method": "ast", "confidence": "HIGH" },
+      "title": "Non-approved hash algorithm: MD5",
+      "message": "hashlib.md5() called without usedforsecurity=False.",
+      "remediation": "Use SHA-256/384 from a validated module, or pass usedforsecurity=False for non-security use.",
+      "evidence": { "snippet": "digest = hashlib.md5(data).hexdigest()", "references": ["NIST SP 800-131A Rev. 2 §9"] }
+    },
+    {
+      "finding_id": "fipsdisc-0a9b3d6e11",
+      "rule_id": "fips-cfg:kernel-fips-disabled",
+      "aoc": { "id": "AOC-12", "title": "Lack of FIPS Mode" },
+      "controls": ["SC-13", "CM-6"],
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "subject": { "kind": "config_setting", "name": "grub:fips" },
+      "location": { "kind": "file", "path": "etc/default/grub", "line_start": 8 },
+      "detection": { "method": "config", "confidence": "HIGH" },
+      "title": "Kernel FIPS mode explicitly disabled",
+      "message": "GRUB_CMDLINE_LINUX sets fips=0.",
+      "remediation": "Set fips=1 and enable the FIPS crypto policy.",
+      "extensions": { "fips": { "approved_mode_evidence": ["etc/default/grub:fips=0"] } }
+    }
+  ]
+}

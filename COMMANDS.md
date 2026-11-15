@@ -49,17 +49,19 @@ Because `scripts/transform_scans.py` relies only on built-in Python 3 modules an
 
 ---
 
-## 2. Testing & Compliance Invariant Engine (Engine #7)
+## 2. Testing & Compliance Invariant Engine (Engine #8)
 
 ### `./grc test [suite] [--verbose]` *(Aliases: `python3 scripts/grc_test.py`)*
 Executes unified invariant verification across all compliance engines without requiring external dependencies (100% Python Standard Library).
-- `./grc test` / `./grc test all`: Executes comprehensive multi-engine validation across all 7 compliance engines plus the unit test suite.
+- `./grc test` / `./grc test all`: Executes comprehensive multi-engine validation across all 8 test suites plus the unit test suite.
 - `./grc test unit`: Executes test discovery across `testing/test_*.py`.
 - `./grc test transform`: Validates the scan-to-POA&M transformation engine against synthetic scan fixtures.
 - `./grc test bundle`: Validates Git bundle packaging, cryptographic integrity checking, extraction, and teardown.
-- `./grc test crypto`: Validates the static deprecated & EOL cryptographic library scanner against synthetic code.
+- `./grc test crypto`: Validates the static deprecated & EOL cryptographic library scanner (Schema v1.0.0) against synthetic code.
+- `./grc test fips`: Validates the FIPS 140-3 discovery, CBOM 1.6, SARIF 2.1.0, CMVP, and cross-engine deduplication suite.
 - `./grc test ami`: Validates AMI cold-mount mock metadata and synthetic rootfs generators.
 - `./grc test sbom`: Validates CycloneDX SBOM parsing and DISA STIG mapping.
+- `./grc test reporter`: Validates Phase 4 SCR/SCN synthesis, `NEEDS_REVIEW` separation, and `sha256sum` sealing.
 
 ---
 
@@ -69,7 +71,7 @@ Executes unified invariant verification across all compliance engines without re
 Displays the **GRCx** ASCII system banner along with a summary of all available top-level subcommands. Use this any time you want a quick reminder of the CLI syntax right in your terminal.
 
 ### `./grc fetch` *(Aliases: `./grc info`, `./grc --version`, `./grc -v`)*
-Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.4.5 — Yokota`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all 10 integrated scanning and transformation engines, and supported compliance frameworks.
+Prints the **GRCx** `neofetch`-style terminal banner showing the active release version and codename (`v1.5.0 — Iwakuni`), target operating systems, air-gap isolation model (`--network none`, `:ro`), all integrated scanning and transformation engines, and supported compliance frameworks.
 
 ### `./grc docker-build`
 Builds the local `grc-scanner:local` Docker container image from `docker/Dockerfile.scanner`. This packages all containerized security scanners (Semgrep, Gitleaks, Checkov, Syft, Grype, Trivy, and OpenSCAP) along with pre-cached vulnerability databases so that all subsequent scans execute completely offline with zero network egress.
@@ -105,7 +107,7 @@ Executes **Phase 5 (AMI Teardown)** by unmounting the cold-mounted guest filesys
 ## 5. Compliance Scanning Commands (Phase 3)
 
 ### `./grc scan --all -w <workspace> [-e <evidence_dir>]` *(Default: `./grc scan -w <workspace>`)*
-Executes the **complete 9-engine compliance suite** against the restored workspace inside the air-gapped `grc-scanner:local` container (`--network none`), followed automatically by **Phase 4 report synthesis**. If `-e <evidence_dir>` is omitted, **GRCx** automatically creates a folder under `./evidence/<bundle-name>/` based on the workspace's provenance manifest.
+Executes the **complete 10-engine compliance suite** (containerized SAST/Secrets/IaC/SBOM/CVE suite plus host-native Crypto, FIPS 140-3, and SBOM STIG engines) against the restored workspace, followed automatically by **Phase 4 report synthesis**. If `-e <evidence_dir>` is omitted, **GRCx** automatically creates a timestamped folder under `./artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-name>/`.
 
 ### `./grc scan --semgrep -w <workspace> [-e <evidence_dir>]`
 Runs only the **Semgrep Static Application Security Testing (SAST)** engine against the target workspace using the 37 custom compliance rules in `rules/custom-baseline-ruleset.yaml` (covering AOC-02 Weak Passwords, AOC-03 Weak Crypto, AOC-04 Command Injection, AOC-05 Improper TLS, AOC-06 Embedded Private Keys, AOC-09 Deprecated Crypto Imports, AOC-10 Unsafe Deserialization, AOC-11 STIG CAT I Violations, and AOC-140 Org Guardrails), writing raw findings to `semgrep_findings.json`.
@@ -129,7 +131,10 @@ Runs only the **Trivy** offline filesystem vulnerability scanner (`--offline-sca
 Runs only the **OpenSCAP** configuration scanner (`oscap xccdf eval`) against cold-mounted Linux AMI root filesystems using DISA STIG / SCAP Security Guide XCCDF profiles, outputting `oscap_results.xml` and `oscap_report.html`.
 
 ### `./grc scan --crypto -w <workspace> [-e <evidence_dir>]`
-Runs only the **Cryptographic Library & End-of-Life (EOL) Version Scanner** (`scripts/crypto_lib_scan.py`) against dependency manifests and shared binaries, checking discovered cryptographic libraries (`pycrypto`, `cryptography`, `OpenSSL`, `Bouncy Castle`) against `rules/crypto_catalog.json` for `AOC-09` (`NIST SP 800-53 SC-13` / `SI-7`).
+Runs only the **Cryptographic Library & End-of-Life (EOL) Version Scanner** (`scripts/crypto_lib_scan.py`) against dependency manifests, lockfiles, and shared binaries across Python, Node.js, Java/Gradle, Go, Rust Cargo, and .NET NuGet, checking discovered cryptographic libraries against `rules/crypto_catalog.json` (`AOC-09` / `NIST SP 800-53 SC-13` & `SI-7`).
+
+### `./grc scan --fips -w <workspace> [-e <evidence_dir>]`
+Runs only the **FIPS 140-3 Cryptographic Discovery, Algorithm Policy, CBOM & CMVP Engine** (`scripts/fips_discovery.py`) against the workspace, writing all 6 FIPS deliverables (`fips_findings.json`, `cbom.cdx.json`, `fips_findings.sarif`, `cmvp_mapping.md`, `fips_assessment.md`, `fips_provenance.json`) followed by Phase 4 SCR/SCN synthesis unless `--no-report` is passed.
 
 ### `./grc scan --sbom -w <workspace> [-e <evidence_dir>]` *(Alias: `--stig`)*
 Runs only the **DISA STIG & DoD Cloud SRG Applicability Mapper** (`scripts/sbom_analyzer.py`) against `sbom.cdx.json` (automatically generating the SBOM via Syft first if not yet present), producing `stig_matrix.md` and `stig_applicability.json`.
@@ -142,7 +147,10 @@ Appending `--no-report` to any `./grc scan` command runs the requested scanner e
 ## 6. Direct Reporting & Standalone Analyzer Commands (Phase 4)
 
 ### `./grc report --evidence <evidence_dir> [--workspace <workspace_dir>] [--ruleset <ruleset.yaml>]`
-Executes **Phase 4 (Compliance Deliverable Synthesis)** on an existing evidence directory containing raw scanner JSON files. It normalizes findings across all engines, maps every defect to **NIST SP 800-53 Rev. 5** controls and **DISA STIG** severity categories (`CAT I` / `CAT II` / `CAT III`), calculates FedRAMP remediation SLAs (30 / 60 / 90 / 180 days), and generates `poam_data.md`, `controls.md`, `ruleset_validation.md`, `scr_scn_package.json`, and the tamper-evident `sha256sum` manifest.
+Executes **Phase 4 (Compliance Deliverable Synthesis)** on an existing evidence directory containing scanner JSON files. It normalizes and deduplicates findings across engines, maps every defect to **NIST SP 800-53 Rev. 5** controls and **DISA STIG** severity categories (`CAT I` / `CAT II` / `CAT III`), calculates FedRAMP remediation SLAs (30 / 90 / 180 days), separates `NEEDS_REVIEW` human/runtime checks from confirmed POA&Ms, and generates `poam_data.md`, `controls.md`, `ruleset_validation.md`, `scr_scn_package.json`, and the tamper-evident `sha256sum` manifest.
+
+### `./grc fips --workspace <dir> [--evidence <dir>] [--dry-run] [--format <all|terminal|json|markdown|sarif|cbom|cmvp>] [--output <file>]`
+Provides direct standalone access to `scripts/fips_discovery.py` (zero Docker required) to assess any unpacked bundle, repository, or cold-mounted rootfs against `rules/fips_algorithm_policy.json` and `rules/cmvp_catalog.json`. Pass `--dry-run` to preview findings in the terminal without writing deliverables to disk.
 
 ### `./grc sbom --sbom <path/to/sbom.cdx.json> [--format <markdown|json|csv>] [--output <file>]`
 Provides direct standalone access to `scripts/sbom_analyzer.py` so you can analyze any external CycloneDX or SPDX SBOM file—even outside of a bundle scan—and generate a DISA STIG / DoD SRG applicability report in Markdown, JSON, or CSV format.

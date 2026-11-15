@@ -322,15 +322,15 @@ Use these copy-pasteable commands from the `GRC-x` root to test any specific Are
 
 ---
 
-### 🛡️ AOC-12: Lack of FIPS Mode (`NIST SP 800-53 SC-13`)
-> **Status**: **Planned (`v1.5.0 — Iwakuni`)** — The synthetic fixture bundle is staged in `GRC-xTEST`, while automated `AOC-12` approved-mode configuration checks ship in `v1.5.0 — Iwakuni` (`./grc fips`).
-* **Target Flaws**: Linux kernel bootloader with `fips=0` in GRUB parameters, system-wide crypto policies set to `DEFAULT` instead of `FIPS`, OpenSSL 3.0 configuration missing `[fips_sect] activate = 1`.
-* **Commands** *(planned `v1.5.0` workflow)*:
+### 🛡️ AOC-12: Lack of FIPS Mode (`NIST SP 800-53 SC-13`, `IA-7`)
+> **Status**: **Active (`v1.5.0 — Iwakuni`)** — Evaluated host-natively via `scripts/fips_discovery.py` (`./grc fips` or `./grc scan --fips`).
+* **Target Flaws**: Linux kernel bootloader with `fips=0` in GRUB parameters, system-wide crypto policies set to `DEFAULT` instead of `FIPS`, OpenSSL 3.0 configuration missing `[fips_sect] activate = 1`, non-FIPS `java.security` provider, and Python `MD5` / `ssl.FIPS_mode` fallback.
+* **Commands**:
   ```bash
   ./grc bundle restore ../GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle -w ./ephemeral_workspace -r v1.0.0 -f --read-only
-  ./grc scan -w ./ephemeral_workspace
+  ./grc scan --fips -w ./ephemeral_workspace
   ```
-* **Expected Output**: Automated `AOC-12` configuration checks ship in `v1.5.0 — Iwakuni` (`./grc fips`). Today, only `crypto_lib_scan.py` library inventory applies to dependency manifests in this fixture.
+* **Expected Output**: All 6 `AOC-12` / `AOC-03` violations flagged across `fips_findings.json`, `fips_assessment.md`, `cbom.cdx.json`, `fips_findings.sarif`, and `poam_data.md`.
 
 ---
 

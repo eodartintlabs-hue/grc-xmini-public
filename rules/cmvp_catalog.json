@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "catalog_metadata": {
+    "title": "NIST CMVP Validated Cryptographic Module Reference Snapshot",
+    "version": "1.0.0",
+    "retrieved_at": "2026-11-14",
+    "last_updated": "2026-11-14",
+    "staleness_threshold_days": 90,
+    "fips_140_2_historical_cutoff": "2026-09-21",
+    "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/validated-modules",
+    "description": "Curated offline NIST CMVP certificate snapshot mapping major cryptographic libraries, providers, and OS base images to FIPS 140-3 Active vs. FIPS 140-2 Historical certificates. Static analysis establishes configuration intent and version alignment only; runtime Operational Environment (OE) verification is always required."
+  },
+  "certificates": {
+    "4282": {
+      "cert_number": "4282",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2028-08-24",
+      "module_name": "OpenSSL FIPS Provider",
+      "vendor": "The OpenSSL Project",
+      "module_versions": ["3.0.8", "3.0.9"],
+      "tested_operational_environments": [
+        "Linux 5.15 on x86_64",
+        "Linux 5.15 on ARMv8-A",
+        "Windows Server 2022 on x86_64",
+        "macOS 12 on Apple M1"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "RSA", "ECDSA", "EdDSA", "DRBG", "KAS-ECC", "KAS-FFC", "KDF"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4282",
+      "retrieved_at": "2026-11-14"
+    },
+    "4985": {
+      "cert_number": "4985",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2030-03-10",
+      "module_name": "OpenSSL FIPS Provider",
+      "vendor": "The OpenSSL Project",
+      "module_versions": ["3.1.2"],
+      "tested_operational_environments": [
+        "Ubuntu 22.04 LTS on x86_64",
+        "RHEL 9 on x86_64 and aarch64"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "KMAC", "RSA", "ECDSA", "EdDSA", "DRBG", "PBKDF"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4985",
+      "retrieved_at": "2026-11-14"
+    },
+    "1747": {
+      "cert_number": "1747",
+      "standard": "FIPS 140-2",
+      "status": "Historical",
+      "sunset_date": "2026-09-21",
+      "module_name": "OpenSSL FIPS Object Module",
+      "vendor": "OpenSSL Software Foundation",
+      "module_versions": ["2.0", "2.0.16"],
+      "tested_operational_environments": ["Legacy Linux / Windows"],
+      "approved_algorithms": ["AES", "SHA-2", "HMAC", "RSA", "ECDSA", "DRBG"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/1747",
+      "retrieved_at": "2026-11-14"
+    },
+    "4743": {
+      "cert_number": "4743",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2029-06-18",
+      "module_name": "BC-FJA (Bouncy Castle FIPS Java API)",
+      "vendor": "Legion of the Bouncy Castle Inc.",
+      "module_versions": ["2.0.0", "2.0.1", "2.1.0"],
+      "tested_operational_environments": [
+        "Java SE 11 / 17 / 21 on Linux x86_64 and ARM64"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "KMAC", "RSA", "ECDSA", "EdDSA", "DRBG", "PBKDF"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4743",
+      "retrieved_at": "2026-11-14"
+    },
+    "3673": {
+      "cert_number": "3673",
+      "standard": "FIPS 140-2",
+      "status": "Historical",
+      "sunset_date": "2026-09-21",
+      "module_name": "BC-FJA (Bouncy Castle FIPS Java API)",
+      "vendor": "Legion of the Bouncy Castle Inc.",
+      "module_versions": ["1.0.2", "1.0.2.1", "1.0.2.3", "1.0.2.4", "1.0.2.5"],
+      "tested_operational_environments": ["Java SE 8 / 11 on Linux"],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "RSA", "ECDSA", "DRBG"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/3673",
+      "retrieved_at": "2026-11-14"
+    },
+    "4759": {
+      "cert_number": "4759",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2029-07-15",
+      "module_name": "AWS-LC Cryptographic Module",
+      "vendor": "Amazon Web Services, Inc.",
+      "module_versions": ["1.0", "2.0", "3.0"],
+      "tested_operational_environments": [
+        "Amazon Linux 2023 on x86_64 and Graviton (aarch64)",
+        "Ubuntu 22.04 on x86_64"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "RSA", "ECDSA", "EdDSA", "DRBG", "HKDF", "TLS-KDF"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4759",
+      "retrieved_at": "2026-11-14"
+    },
+    "4735": {
+      "cert_number": "4735",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2029-05-30",
+      "module_name": "BoringCrypto",
+      "vendor": "Google LLC",
+      "module_versions": ["20230428", "20240301"],
+      "tested_operational_environments": [
+        "Debian / Linux on x86_64 and aarch64"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "HMAC", "RSA", "ECDSA", "DRBG", "HKDF"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735",
+      "retrieved_at": "2026-11-14"
+    },
+    "4718": {
+      "cert_number": "4718",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2029-04-02",
+      "module_name": "wolfCrypt Cryptographic Module",
+      "vendor": "wolfSSL Inc.",
+      "module_versions": ["5.5.4", "5.6.6", "5.7.0"],
+      "tested_operational_environments": [
+        "Linux on x86_64, ARMv8-A, and embedded RTOS"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "RSA", "ECDSA", "EdDSA", "DRBG"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4718",
+      "retrieved_at": "2026-11-14"
+    },
+    "4857": {
+      "cert_number": "4857",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2029-11-12",
+      "module_name": "Red Hat Enterprise Linux 9 OpenSSL Cryptographic Module",
+      "vendor": "Red Hat, Inc.",
+      "module_versions": ["3.0.7"],
+      "tested_operational_environments": [
+        "Red Hat Enterprise Linux 9 on x86_64, aarch64, ppc64le, s390x"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "RSA", "ECDSA", "EdDSA", "DRBG"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4857",
+      "retrieved_at": "2026-11-14"
+    },
+    "4794": {
+      "cert_number": "4794",
+      "standard": "FIPS 140-3",
+      "status": "Active",
+      "sunset_date": "2029-09-01",
+      "module_name": "Ubuntu 22.04 OpenSSL Cryptographic Module",
+      "vendor": "Canonical Ltd.",
+      "module_versions": ["3.0.2"],
+      "tested_operational_environments": [
+        "Ubuntu Pro 22.04 LTS on x86_64 and aarch64"
+      ],
+      "approved_algorithms": ["AES", "SHA-2", "SHA-3", "HMAC", "RSA", "ECDSA", "DRBG"],
+      "source_url": "https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4794",
+      "retrieved_at": "2026-11-14"
+    }
+  },
+  "module_mappings": [
+    {
+      "id": "openssl-3-fips",
+      "patterns": ["^openssl$", "^libssl.*", "^libcrypto.*", "^pyopenssl$"],
+      "ecosystems": ["c_cpp", "python", "pypi", "system", "deb", "rpm", "alpine", "rust", "cargo"],
+      "min_version": "3.0.0",
+      "cert_numbers": ["4282", "4985", "4857", "4794"],
+      "required_mode_signals": ["openssl_fips_enabled", "kernel_fips_enabled", "os_fips_image"],
+      "condition_note": "Requires OpenSSL 3 FIPS provider activation ([fips_sect] activate = 1 / default_properties = fips=yes or OSSL_PROVIDER_load('fips'))."
+    },
+    {
+      "id": "openssl-1-historical",
+      "patterns": ["^openssl$", "^libssl.*", "^libcrypto.*"],
+      "ecosystems": ["c_cpp", "system", "deb", "rpm", "alpine"],
+      "max_version_exclusive": "3.0.0",
+      "cert_numbers": ["1747"],
+      "required_mode_signals": ["openssl_fips_enabled"],
+      "condition_note": "OpenSSL 1.x FIPS Object Module 2.0 holds only Historical FIPS 140-2 validation (sunset 2026-09-21) and is End-of-Life."
+    },
+    {
+      "id": "cryptography-pyca",
+      "patterns": ["^cryptography$"],
+      "ecosystems": ["python", "pypi"],
+      "min_version": "41.0.0",
+      "cert_numbers": ["4282", "4985", "4857", "4794"],
+      "required_mode_signals": ["openssl_fips_enabled", "os_fips_image"],
+      "condition_note": "PyCA cryptography must be dynamically linked against the host's validated OpenSSL 3 FIPS provider (not default static PyPI wheels) with FIPS mode enabled."
+    },
+    {
+      "id": "bc-fips-v2",
+      "patterns": ["^bc-fips.*", "^bctls-fips.*", "^bcpkix-fips.*"],
+      "ecosystems": ["java", "maven", "gradle"],
+      "min_version": "2.0.0",
+      "cert_numbers": ["4743"],
+      "required_mode_signals": ["java_fips_enabled"],
+      "condition_note": "BC-FJA 2.x requires JVM provider registration and CryptoServicesRegistrar.setApprovedOnlyMode(true)."
+    },
+    {
+      "id": "bc-fips-v1-historical",
+      "patterns": ["^bc-fips.*", "^bctls-fips.*", "^bcpkix-fips.*"],
+      "ecosystems": ["java", "maven", "gradle"],
+      "min_version": "1.0.0",
+      "max_version_exclusive": "2.0.0",
+      "cert_numbers": ["3673"],
+      "required_mode_signals": ["java_fips_enabled"],
+      "condition_note": "BC-FJA 1.0.2.x holds only FIPS 140-2 certificate #3673, which moved to Historical status on 2026-09-21; upgrade to BC-FJA 2.0.x (FIPS 140-3 cert #4743)."
+    },
+    {
+      "id": "aws-lc-fips",
+      "patterns": ["^aws-lc-rs$", "^aws-lc-fips-sys$", "^aws-lc$"],
+      "ecosystems": ["rust", "cargo", "c_cpp", "system"],
+      "min_version": "1.0.0",
+      "cert_numbers": ["4759"],
+      "required_mode_signals": ["rust_fips_feature", "os_fips_image"],
+      "condition_note": "aws-lc-rs / rustls requires Cargo feature 'fips' (or 'aws-lc-fips-sys') to link the CMVP-validated AWS-LC FIPS module."
+    },
+    {
+      "id": "boringcrypto",
+      "patterns": ["^boring$", "^boring-sys$", "^boringssl$"],
+      "ecosystems": ["rust", "cargo", "c_cpp", "go", "golang"],
+      "cert_numbers": ["4735"],
+      "required_mode_signals": ["go_boringcrypto_enabled", "rust_fips_feature"],
+      "condition_note": "Requires BoringCrypto FIPS build flag (GOEXPERIMENT=boringcrypto or crate 'fips' feature)."
+    },
+    {
+      "id": "wolfcrypt-fips",
+      "patterns": ["^wolfssl.*", "^wolfcrypt.*"],
+      "ecosystems": ["c_cpp", "system", "python", "pypi", "rust", "cargo"],
+      "min_version": "5.5.0",
+      "cert_numbers": ["4718"],
+      "required_mode_signals": ["wolfcrypt_fips_enabled"],
+      "condition_note": "Requires commercial wolfCrypt FIPS 140-3 build (--enable-fips=v5)."
+    }
+  ],
+  "base_image_mappings": [
+    {
+      "pattern": "registry\\.access\\.redhat\\.com/ubi9|rhel9",
+      "cert_number": "4857",
+      "vendor": "Red Hat, Inc.",
+      "note": "RHEL 9 / UBI 9 ships the validated OpenSSL 3 FIPS module; host kernel must boot with fips=1."
+    },
+    {
+      "pattern": "ubuntu.*22\\.04.*fips|ubuntu-pro-fips",
+      "cert_number": "4794",
+      "vendor": "Canonical Ltd.",
+      "note": "Ubuntu Pro 22.04 FIPS image includes Canonical's FIPS 140-3 OpenSSL module."
+    },
+    {
+      "pattern": "amazonlinux:2023|al2023",
+      "cert_number": "4759",
+      "vendor": "Amazon Web Services, Inc.",
+      "note": "Amazon Linux 2023 ships AWS-LC Cryptographic Module (#4759)."
+    },
+    {
+      "pattern": "cgr\\.dev/chainguard/.*-fips",
+      "cert_number": "4985",
+      "vendor": "Chainguard (OpenSSL FIPS Provider)",
+      "note": "Chainguard FIPS image configured with OpenSSL 3 FIPS provider."
+    }
+  ]
+}

@@ -39,6 +39,7 @@ try:
         SLA_DAYS_POLICY,
         get_severity_policy,
         sha256_file,
+        split_aoc,
         utc_now_iso,
         utc_now_str,
         utc_today,
@@ -51,6 +52,7 @@ except ImportError:
         SLA_DAYS_POLICY,
         get_severity_policy,
         sha256_file,
+        split_aoc,
         utc_now_iso,
         utc_now_str,
         utc_today,
@@ -88,7 +90,7 @@ NIST_CONTROLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "family": "Identification and Authentication (IA)",
         "description": "Authenticate to cryptographic modules using mechanisms meeting applicable federal laws, regulations, and standards.",
         "stig_cat": "CAT II",
-        "assessed_by": ["CryptoScan", "Semgrep"],
+        "assessed_by": ["CryptoScan", "Semgrep", "FIPSDiscovery"],
     },
     "SI-2": {
         "title": "Flaw Remediation",
@@ -131,35 +133,35 @@ NIST_CONTROLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "family": "System and Information Integrity (SI)",
         "description": "Ensure the system fails to a secure state. Prohibits disabled TLS certificate validation and deprecated TLS 1.0/1.1 protocols.",
         "stig_cat": "CAT I",
-        "assessed_by": ["Semgrep", "Checkov"],
+        "assessed_by": ["Semgrep", "Checkov", "FIPSDiscovery"],
     },
     "SC-8": {
         "title": "Transmission Confidentiality and Integrity",
         "family": "System and Communications Protection (SC)",
         "description": "Protect the confidentiality and integrity of transmitted information using strong cryptography (TLS 1.2+ / 1.3).",
         "stig_cat": "CAT I",
-        "assessed_by": ["Semgrep", "Checkov"],
+        "assessed_by": ["Semgrep", "Checkov", "FIPSDiscovery"],
     },
     "SC-12": {
         "title": "Cryptographic Key Establishment and Management",
         "family": "System and Communications Protection (SC)",
         "description": "Establish and manage cryptographic keys in accordance with NIST SP 800-56A/B and applicable FIPS guidelines.",
         "stig_cat": "CAT I",
-        "assessed_by": ["CryptoScan", "Gitleaks", "Semgrep"],
+        "assessed_by": ["CryptoScan", "Gitleaks", "Semgrep", "FIPSDiscovery"],
     },
     "SC-13": {
         "title": "Cryptographic Protection (FIPS 140 Validation)",
         "family": "System and Communications Protection (SC)",
         "description": "Implement cryptographic modules validated under FIPS 140-2 / 140-3. Enforce OS kernel FIPS mode and validated security providers.",
         "stig_cat": "CAT I",
-        "assessed_by": ["CryptoScan", "Semgrep", "Checkov"],
+        "assessed_by": ["CryptoScan", "Semgrep", "Checkov", "FIPSDiscovery"],
     },
     "SC-28": {
         "title": "Protection of Information at Rest",
         "family": "System and Communications Protection (SC)",
         "description": "Protect the confidentiality and integrity of information at rest (e.g., EBS volume encryption, S3 SSE-KMS).",
         "stig_cat": "CAT I",
-        "assessed_by": ["Checkov", "Semgrep"],
+        "assessed_by": ["Checkov", "Semgrep", "FIPSDiscovery"],
     },
     "AC-3": {
         "title": "Access Enforcement",
@@ -180,7 +182,7 @@ NIST_CONTROLS_CATALOG: Dict[str, Dict[str, Any]] = {
         "family": "Configuration Management (CM)",
         "description": "Establish and document mandatory configuration settings for IT products using hardened baselines (DISA STIG / CIS).",
         "stig_cat": "CAT II",
-        "assessed_by": ["Checkov", "Semgrep"],
+        "assessed_by": ["Checkov", "Semgrep", "FIPSDiscovery"],
     },
     "CM-8": {
         "title": "Information System Component Inventory",
@@ -220,6 +222,84 @@ def normalize_severity_and_cat(raw_sev: str) -> Tuple[str, str]:
     return canonical, str(cat_level)
 
 
+_CONFIDENCE_RANK = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
+_NATIVE_ENGINE_RANK = {"FIPSDiscovery": 2, "CryptoScan": 2}
+
+
+def _infer_semgrep_subject(
+    check_id: str,
+    aoc_id: str,
+    meta: Dict[str, Any],
+    lines_src: str,
+) -> Optional[Dict[str, str]]:
+    """
+    Infers `(subject.kind, subject.name)` for Semgrep `AOC-03`, `AOC-05`, and `AOC-09`
+    findings so cross-engine deduplication (`FINDING_SCHEMA_DRAFT.md` §4) matches
+    `FIPSDiscovery` and `CryptoScan` hits on the exact same file & line.
+    """
+    kind = str(meta.get("subject_kind") or "").strip().lower()
+    name = str(meta.get("subject_name") or "").strip().lower()
+    src_lc = (lines_src or "").lower()
+    cid_lc = (check_id or "").lower()
+
+    if not kind:
+        if aoc_id == "AOC-03":
+            kind = "algorithm"
+        elif aoc_id == "AOC-05":
+            kind = "protocol"
+        elif aoc_id == "AOC-09":
+            kind = "module"
+        else:
+            return None
+
+    if not name:
+        if kind == "algorithm":
+            if re.search(r"3des|tripledes|desede", src_lc):
+                name = "3des"
+            elif re.search(r"\bmd5\b|md5hex", src_lc):
+                name = "md5"
+            elif re.search(r"sha-?1|sha1hex|crypto\.hash\.sha\.new", src_lc):
+                name = "sha-1"
+            elif re.search(r"rc4|arc4|arcfour", src_lc):
+                name = "rc4"
+            elif re.search(r"blowfish", src_lc):
+                name = "blowfish"
+            elif re.search(r"aes/ecb", src_lc):
+                name = "aes"
+            elif re.search(r"\bdes\b|des-cbc|des/", src_lc):
+                name = "des"
+        elif kind == "protocol":
+            if "versiontls10" in src_lc:
+                name = "tls1.0"
+            elif "versiontls11" in src_lc:
+                name = "tls1.1"
+            elif any(
+                tok in src_lc or tok in cid_lc
+                for tok in (
+                    "verify=false",
+                    "_create_unverified_context",
+                    "insecureskipverify",
+                    "x509trustmanager",
+                    "hostnameverifier",
+                    "rejectunauthorized",
+                    "node_tls_reject_unauthorized",
+                    "disabled-tls",
+                )
+            ):
+                name = "tls-cert-verification-disabled"
+        elif kind == "module":
+            if "crypto-js" in src_lc or "crypto-js" in cid_lc:
+                name = "crypto-js"
+            elif "crypto.cipher" in src_lc or "from crypto" in src_lc:
+                name = "pycrypto"
+            elif "golang.org/x/crypto" in src_lc:
+                name = "golang.org/x/crypto"
+
+    if kind and name:
+        return {"kind": kind, "name": name}
+    return None
+
+
 # ==============================================================================
 # NORMALIZED FINDING DATA STRUCTURE
 # ==============================================================================
@@ -243,6 +323,13 @@ class NormalizedFinding:
         remediation: str,
         raw_data: Optional[Dict[str, Any]] = None,
         anchor_date: Optional[datetime.date] = None,
+        determination: Optional[str] = None,
+        determination_detail: Optional[str] = None,
+        aoc_id: Optional[str] = None,
+        subject: Optional[Dict[str, Any]] = None,
+        detection: Optional[Dict[str, Any]] = None,
+        clean_file_only: Optional[str] = None,
+        also_reported_by: Optional[List[str]] = None,
     ):
         self.finding_id = finding_id
         self.source_tool = source_tool
@@ -254,17 +341,33 @@ class NormalizedFinding:
         self.line_number = line_number
         self.message = message
         self.aoc = aoc
+        self.aoc_id = aoc_id or split_aoc(aoc)["id"]
         self.nist_controls = nist_controls if nist_controls else ["CM-6"]
         self.remediation = remediation
         self.raw_data = raw_data or {}
+        self.determination = determination
+        self.determination_detail = determination_detail
+        self.subject = subject or {}
+        self.detection = detection or {}
+        self.clean_file_only = clean_file_only or (
+            file_path.rsplit(":", 1)[0] if (line_number is not None and file_path.endswith(f":{line_number}")) else file_path
+        )
+        self.also_reported_by: List[str] = list(also_reported_by or [])
 
         # Calculate FedRAMP SLA days using unified 30/30/90/180 policy
         self.sla_days = SLA_DAYS_MAP.get(self.severity, 90)
         base_date = anchor_date if anchor_date else utc_today()
         self.target_date = (base_date + datetime.timedelta(days=self.sla_days)).isoformat()
 
+    def matches_control(self, ctl_id: str) -> bool:
+        """Returns True if `ctl_id` matches directly or as the base family of an enhancement (e.g., SC-8(1) -> SC-8)."""
+        for c in self.nist_controls:
+            if c == ctl_id or c.split("(")[0] == ctl_id:
+                return True
+        return False
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        out: Dict[str, Any] = {
             "finding_id": self.finding_id,
             "source_tool": self.source_tool,
             "rule_or_cve_id": self.rule_or_cve_id,
@@ -281,6 +384,13 @@ class NormalizedFinding:
             "target_completion_date": self.target_date,
             "status": "Open (Identified Out-of-Band)",
         }
+        if self.determination:
+            out["determination"] = self.determination
+        if self.determination_detail:
+            out["determination_detail"] = self.determination_detail
+        if self.also_reported_by:
+            out["also_reported_by"] = sorted(set(self.also_reported_by))
+        return out
 
 
 # ==============================================================================
@@ -303,10 +413,13 @@ class GRCComplianceReporter:
         self.ruleset_path = Path(ruleset_path).resolve() if ruleset_path else None
 
         self.findings: List[NormalizedFinding] = []
+        self.semgrep_audit_findings: List[NormalizedFinding] = []
         self.verification_items: List[Dict[str, Any]] = []
         self.provenance: Dict[str, Any] = {}
         self.baseline_rules: List[Dict[str, Any]] = []
         self.loaded_scanners: Set[str] = set()
+        self.assessed_controls_from_scope: Set[str] = set()
+        self.scoped_scanners: Set[str] = set()
         self.sbom_stig_evidence: Optional[Dict[str, Any]] = None
         self._seen_vuln_keys: Set[Tuple[str, str]] = set()
         self._finding_counter = 1
@@ -325,7 +438,7 @@ class GRCComplianceReporter:
 
     def _anchor_date(self) -> datetime.date:
         """Resolves a stable anchor date from provenance if available, otherwise UTC today."""
-        for key in ("restored_at", "verified_at"):
+        for key in ("restored_at", "verified_at", "scanned_at"):
             ts = self.provenance.get(key)
             if isinstance(ts, str) and len(ts) >= 10:
                 try:
@@ -357,17 +470,22 @@ class GRCComplianceReporter:
     # --------------------------------------------------------------------------
 
     def load_provenance(self) -> None:
-        """Loads bundle or AMI provenance record."""
-        prov_file = self.evidence_dir / "bundle_provenance.json"
-        if not prov_file.exists():
-            prov_file = self.evidence_dir / "ami_provenance.json"
+        """Loads bundle, AMI, or FIPS provenance record."""
+        prov_names = ("bundle_provenance.json", "ami_provenance.json", "fips_provenance.json")
+        prov_file: Optional[Path] = None
+        for name in prov_names:
+            cand = self.evidence_dir / name
+            if cand.exists():
+                prov_file = cand
+                break
+        if prov_file is None and self.workspace_dir:
+            for name in prov_names:
+                cand = self.workspace_dir / name
+                if cand.exists():
+                    prov_file = cand
+                    break
 
-        if not prov_file.exists() and self.workspace_dir:
-            prov_file = self.workspace_dir / "bundle_provenance.json"
-            if not prov_file.exists():
-                prov_file = self.workspace_dir / "ami_provenance.json"
-
-        if prov_file.exists():
+        if prov_file and prov_file.exists():
             try:
                 with open(prov_file, "r", encoding="utf-8") as f:
                     self.provenance = json.load(f)
@@ -379,7 +497,7 @@ class GRCComplianceReporter:
                 print(f"[!] Warning: Failed to parse provenance file {prov_file}: {e}", file=sys.stderr)
 
     def load_baseline_rules(self) -> None:
-        """Loads rule definitions from custom-baseline-ruleset.yaml."""
+        """Loads rule definitions from custom-baseline-ruleset.yaml (rule-by-rule block parser)."""
         if not self.ruleset_path or not self.ruleset_path.exists():
             candidate = Path(__file__).resolve().parent.parent / "rules" / "custom-baseline-ruleset.yaml"
             if candidate.exists():
@@ -390,20 +508,25 @@ class GRCComplianceReporter:
                 with open(self.ruleset_path, "r", encoding="utf-8") as f:
                     content = f.read()
 
-                rule_chunks = re.findall(
-                    r"  - id:\s*([^\n]+).*?severity:\s*([^\n]+).*?message:\s*\"([^\"]+)\".*?aoc:\s*\"([^\"]+)\".*?nist_control:\s*\"([^\"]+)\"",
-                    content,
-                    re.DOTALL,
-                )
-                for chunk in rule_chunks:
-                    r_id, r_sev, r_msg, r_aoc, r_nist = chunk
-                    controls = _extract_nist_controls(r_nist, default="CM-6")
+                blocks = re.split(r"(?m)^  - id:\s*", content)
+                for block in blocks[1:]:
+                    lines = block.splitlines()
+                    if not lines:
+                        continue
+                    r_id = lines[0].strip()
+                    m_sev = re.search(r"(?m)^\s+severity:\s*([^\n]+)", block)
+                    m_msg = re.search(r'(?m)^\s+message:\s*"([^"]+)"', block)
+                    m_aoc = re.search(r'(?m)^\s+aoc:\s*"([^"]+)"', block)
+                    m_nist = re.search(r'(?m)^\s+nist_control:\s*"([^"]+)"', block)
+                    if not (m_sev and m_msg and m_aoc and m_nist):
+                        continue
+                    controls = _extract_nist_controls(m_nist.group(1), default="CM-6")
 
                     self.baseline_rules.append({
-                        "id": r_id.strip(),
-                        "severity": r_sev.strip(),
-                        "message": r_msg.strip(),
-                        "aoc": r_aoc.strip(),
+                        "id": r_id,
+                        "severity": m_sev.group(1).strip(),
+                        "message": m_msg.group(1).strip(),
+                        "aoc": m_aoc.group(1).strip(),
                         "nist_control": ", ".join(controls),
                     })
             except Exception as e:
@@ -423,6 +546,13 @@ class GRCComplianceReporter:
             return
 
         self.loaded_scanners.add("Semgrep")
+        if self.baseline_rules:
+            self.scoped_scanners.add("Semgrep")
+            for rule in self.baseline_rules:
+                for ctl in _extract_nist_controls(rule.get("nist_control", ""), default=""):
+                    if ctl:
+                        self.assessed_controls_from_scope.add(ctl)
+                        self.assessed_controls_from_scope.add(ctl.split("(")[0])
         anchor = self._anchor_date()
         results = data.get("results", []) if isinstance(data, dict) else []
 
@@ -441,6 +571,7 @@ class GRCComplianceReporter:
                 severity, cat_level = normalize_severity_and_cat(raw_sev)
 
                 aoc = str(meta.get("aoc") or "General Security Policy")
+                aoc_id = split_aoc(aoc)["id"]
                 if "AOC-04" in aoc or "AOC-10" in aoc:
                     severity, cat_level = "CRITICAL", "CAT I"
 
@@ -454,6 +585,7 @@ class GRCComplianceReporter:
                     mapped = c if c in NIST_CONTROLS_CATALOG else c.split("(")[0]
                     if mapped not in norm_ctls:
                         norm_ctls.append(mapped)
+                    self.assessed_controls_from_scope.add(mapped)
 
                 title = message.split(":")[0] if ":" in message else check_id
                 remediation = "Remediate source code according to the secure coding baseline; eliminate static credentials, legacy ciphers, or shell execution."
@@ -466,25 +598,33 @@ class GRCComplianceReporter:
                 elif "AOC-05" in aoc:
                     remediation = "Enable strict TLS certificate validation and enforce minimum TLS 1.2 or 1.3."
 
+                lines_src = str(extra.get("lines") or "")
+                inferred_subject = _infer_semgrep_subject(check_id, aoc_id, meta, lines_src)
+                conf = str(meta.get("confidence") or "HIGH").upper()
+
                 loc = f"{path}:{line}" if line else path
-                self.findings.append(
-                    NormalizedFinding(
-                        finding_id=self._make_finding_id("Semgrep", check_id, loc),
-                        source_tool="Semgrep",
-                        rule_or_cve_id=check_id,
-                        title=title,
-                        severity=severity,
-                        cat_level=cat_level,
-                        file_path=loc,
-                        line_number=line,
-                        message=message,
-                        aoc=aoc,
-                        nist_controls=norm_ctls,
-                        remediation=remediation,
-                        raw_data=r,
-                        anchor_date=anchor,
-                    )
+                nf = NormalizedFinding(
+                    finding_id=self._make_finding_id("Semgrep", check_id, loc),
+                    source_tool="Semgrep",
+                    rule_or_cve_id=check_id,
+                    title=title,
+                    severity=severity,
+                    cat_level=cat_level,
+                    file_path=loc,
+                    line_number=line,
+                    message=message,
+                    aoc=aoc,
+                    nist_controls=norm_ctls,
+                    remediation=remediation,
+                    raw_data=r,
+                    anchor_date=anchor,
+                    aoc_id=aoc_id,
+                    subject=inferred_subject,
+                    detection={"method": "ast", "confidence": conf},
+                    clean_file_only=path,
                 )
+                self.findings.append(nf)
+                self.semgrep_audit_findings.append(nf)
             except Exception as rec_err:
                 print(f"[!] Warning: Skipping malformed Semgrep record: {rec_err}", file=sys.stderr)
 
@@ -573,11 +713,141 @@ class GRCComplianceReporter:
                 except Exception as rec_err:
                     print(f"[!] Warning: Skipping malformed Checkov record: {rec_err}", file=sys.stderr)
 
+    def _ingest_schema_envelope(self, data: Dict[str, Any], default_tool: str) -> None:
+        """
+        Ingests any Normalized Finding Envelope v1.0.0 (`rules/finding_schema.json`),
+        including `crypto_findings.json` (`CryptoScan`) and `fips_findings.json` (`FIPSDiscovery`).
+        """
+        if not isinstance(data, dict):
+            return
+        producer = data.get("producer") if isinstance(data.get("producer"), dict) else {}
+        tool_name = str(producer.get("name") or default_tool)
+        self.loaded_scanners.add(tool_name)
+
+        scope = data.get("scope") if isinstance(data.get("scope"), dict) else {}
+        if "assessed_controls" in scope and isinstance(scope.get("assessed_controls"), list):
+            self.scoped_scanners.add(tool_name)
+            for raw_ctl in scope.get("assessed_controls") or []:
+                ctl = str(raw_ctl).strip()
+                if ctl:
+                    self.assessed_controls_from_scope.add(ctl)
+                    self.assessed_controls_from_scope.add(ctl.split("(")[0])
+
+        anchor = self._anchor_date()
+        findings_list = data.get("findings", []) if isinstance(data.get("findings"), list) else []
+
+        for item in findings_list:
+            try:
+                if not isinstance(item, dict):
+                    continue
+                det = str(item.get("determination") or "FAIL").strip().upper()
+                det_detail = str(item.get("determination_detail") or "").strip()
+
+                # Positive evidence (`PASS`) is retained in CBOM/FIPS artifacts, never in POA&Ms
+                if det == "PASS":
+                    continue
+
+                subj = item.get("subject") if isinstance(item.get("subject"), dict) else {}
+                subj_kind = str(subj.get("kind") or "")
+                subj_name = str(subj.get("name") or "Unknown")
+                subj_ver = str(subj.get("version") or "N/A")
+                ecosystem = str(subj.get("ecosystem") or "unknown")
+
+                loc_obj = item.get("location") if isinstance(item.get("location"), dict) else {}
+                clean_file = self.clean_path(str(loc_obj.get("path") or "N/A"))
+                line_start = loc_obj.get("line_start") if isinstance(loc_obj.get("line_start"), int) else None
+                loc_str = f"{clean_file}:{line_start}" if line_start is not None else clean_file
+
+                raw_ctls = item.get("controls") if isinstance(item.get("controls"), list) else ["SC-13"]
+                ctls = [str(c).strip() for c in raw_ctls if str(c).strip()] or ["SC-13"]
+
+                ext = item.get("extensions") if isinstance(item.get("extensions"), dict) else {}
+                ext_fips = ext.get("fips") if isinstance(ext.get("fips"), dict) else {}
+
+                if det in ("CANNOT_DETERMINE_STATICALLY", "NEEDS_REVIEW"):
+                    fips_stat = str(
+                        ext_fips.get("fips_status")
+                        or det_detail
+                        or ("CAPABLE_IF_CONFIGURED" if det == "CANNOT_DETERMINE_STATICALLY" else "NEEDS_REVIEW")
+                    )
+                    self.verification_items.append({
+                        "verification_id": f"VERIFY-{len(self.verification_items) + 1:03d}",
+                        "source_tool": tool_name,
+                        "library_name": subj_name,
+                        "detected_version": subj_ver,
+                        "file_path": loc_str,
+                        "ecosystem": ecosystem,
+                        "compliance_status": det,
+                        "determination_detail": det_detail or det,
+                        "fips_status": fips_stat,
+                        "nist_controls": ctls,
+                        "description": str(
+                            item.get("message")
+                            or item.get("title")
+                            or f"Static inspection could not confirm runtime posture for '{subj_name}'."
+                        ),
+                        "verification_guidance": str(
+                            item.get("remediation")
+                            or "Verify runtime FIPS provider linkage and approved-mode configuration on the deployed target."
+                        ),
+                    })
+                    continue
+
+                raw_sev = str(item.get("severity") or ("MEDIUM" if det == "WARN" else "HIGH")).upper()
+                sev, cat = normalize_severity_and_cat(raw_sev)
+
+                aoc_obj = item.get("aoc") if isinstance(item.get("aoc"), dict) else {}
+                aoc_id = str(aoc_obj.get("id") or "AOC-00")
+                aoc_title = str(aoc_obj.get("title") or "")
+                aoc_str = f"{aoc_id}: {aoc_title}" if aoc_title else aoc_id
+
+                rule_id = str(item.get("rule_id") or f"{tool_name.upper()}-{det}")
+                title = str(item.get("title") or rule_id)
+                message = str(item.get("message") or title)
+                remediation = str(
+                    item.get("remediation")
+                    or "Remediate finding per NIST SP 800-53 Rev. 5 and FIPS 140-3 guidance."
+                )
+                detection = item.get("detection") if isinstance(item.get("detection"), dict) else {}
+
+                self.findings.append(
+                    NormalizedFinding(
+                        finding_id=self._make_finding_id(tool_name, rule_id, loc_str),
+                        source_tool=tool_name,
+                        rule_or_cve_id=rule_id,
+                        title=title,
+                        severity=sev,
+                        cat_level=cat,
+                        file_path=loc_str,
+                        line_number=line_start,
+                        message=message,
+                        aoc=aoc_str,
+                        nist_controls=ctls,
+                        remediation=remediation,
+                        raw_data=item,
+                        anchor_date=anchor,
+                        determination=det,
+                        determination_detail=det_detail or None,
+                        aoc_id=aoc_id,
+                        subject={"kind": subj_kind, "name": subj_name} if (subj_kind and subj_name) else None,
+                        detection=detection,
+                        clean_file_only=clean_file,
+                    )
+                )
+            except Exception as rec_err:
+                print(f"[!] Warning: Skipping malformed {tool_name} schema record: {rec_err}", file=sys.stderr)
+
+    def parse_fips_findings(self) -> None:
+        """Parses fips_findings.json (Normalized Finding Schema v1.0.0)."""
+        data = self._load_json("fips_findings.json", label="FIPSDiscovery")
+        if isinstance(data, dict):
+            self._ingest_schema_envelope(data, default_tool="FIPSDiscovery")
+
     def parse_crypto_scan(self) -> None:
         """
-        Parses crypto_findings.json.
+        Parses crypto_findings.json (supports v1.0.0 Normalized Finding Envelope and legacy payloads).
         - Skips `PASS` / `CONFORMANT_INDICATOR` items from POA&M ingestion.
-        - Routes `CANNOT_DETERMINE_STATICALLY` and `NEEDS_REVIEW` items into
+        - Routes `CANNOT_DETERMINE_STATICALLY`, `NEEDS_REVIEW`, and `WARN_UNVERIFIED` items into
           `self.verification_items` ("Needs Human or Runtime Verification"),
           keeping them out of confirmed FedRAMP POA&M weakness rows.
         - Ingests `NOT_VALIDATED` modules against `SC-13` and `FAIL_*`/`WARN_*`
@@ -592,6 +862,10 @@ class GRCComplianceReporter:
                 data = json.load(f)
         except Exception as e:
             print(f"[!] Warning: Error loading CryptoScan JSON: {e}", file=sys.stderr)
+            return
+
+        if isinstance(data, dict) and "schema_version" in data:
+            self._ingest_schema_envelope(data, default_tool="CryptoScan")
             return
 
         self.loaded_scanners.add("CryptoScan")
@@ -612,8 +886,9 @@ class GRCComplianceReporter:
                     item.get("manifest_file") or "Dependency Manifest / System Libraries"
                 )
 
-                if status in ("CANNOT_DETERMINE_STATICALLY", "NEEDS_REVIEW"):
+                if status in ("CANNOT_DETERMINE_STATICALLY", "NEEDS_REVIEW", "WARN_UNVERIFIED"):
                     raw_ctls = item.get("nist_controls") or ["SC-13"]
+                    norm_status = "NEEDS_REVIEW" if status == "WARN_UNVERIFIED" else status
                     self.verification_items.append({
                         "verification_id": f"VERIFY-{len(self.verification_items) + 1:03d}",
                         "source_tool": "CryptoScan",
@@ -621,7 +896,7 @@ class GRCComplianceReporter:
                         "detected_version": ver,
                         "file_path": manifest_path,
                         "ecosystem": str(item.get("ecosystem") or "unknown"),
-                        "compliance_status": status,
+                        "compliance_status": norm_status,
                         "fips_status": str(item.get("fips_status") or "CAPABLE_IF_CONFIGURED"),
                         "nist_controls": list(raw_ctls),
                         "description": str(
@@ -870,6 +1145,7 @@ class GRCComplianceReporter:
         "semgrep_findings.json": parse_semgrep,
         "checkov_findings.json": parse_checkov,
         "crypto_findings.json": parse_crypto_scan,
+        "fips_findings.json": parse_fips_findings,
         "grype_findings.json": parse_grype,
         "trivy_findings.json": parse_trivy,
         "gitleaks_findings.json": parse_gitleaks,
@@ -884,6 +1160,7 @@ class GRCComplianceReporter:
         return (
             self.provenance.get("bundle_identifier")
             or self.provenance.get("ami_identifier")
+            or self.provenance.get("target_identifier")
             or self.evidence_dir.name
         )
 
@@ -906,16 +1183,81 @@ class GRCComplianceReporter:
         return header
 
     def _control_was_assessed(self, ctl_id: str) -> bool:
-        """Returns True if at least one scanner mapping to `ctl_id` was present in the evidence directory."""
-        meta = NIST_CONTROLS_CATALOG.get(ctl_id, {})
-        assessors = set(meta.get("assessed_by", []))
+        """
+        Returns True if `ctl_id` was explicitly declared in an engine's
+        `scope.assessed_controls`, or if a legacy/unscoped scanner mapping to
+        `ctl_id` was present in the evidence directory.
+        """
         if (
             (self.evidence_dir / "stig_applicability.json").exists()
             or (self.evidence_dir / "sbom_stig_map.json").exists()
             or (self.evidence_dir / "stig_matrix.md").exists()
         ):
             self.loaded_scanners.add("SBOM")
-        return bool(assessors & self.loaded_scanners)
+        if ctl_id in self.assessed_controls_from_scope:
+            return True
+        meta = NIST_CONTROLS_CATALOG.get(ctl_id, {})
+        assessors = set(meta.get("assessed_by", []))
+        unscoped_loaded = self.loaded_scanners - self.scoped_scanners
+        return bool(assessors & unscoped_loaded)
+
+    def _deduplicate_findings(self) -> None:
+        """
+        Cross-engine deduplication (`FINDING_SCHEMA_DRAFT.md` §4):
+        Collapses findings sharing `(path, line_start, aoc.id, subject.kind, lower(subject.name))`
+        when `subject.kind` and `subject.name` are populated.
+        Prefers higher `detection.confidence` (`HIGH > MEDIUM > LOW`), breaking ties in favor
+        of native engines (`FIPSDiscovery`, `CryptoScan`) over external tools (`Semgrep`),
+        and records merged engines in `also_reported_by`.
+        """
+        by_key: Dict[Tuple[str, Optional[int], str, str, str], int] = {}
+        deduped: List[NormalizedFinding] = []
+
+        def _rank(f: NormalizedFinding) -> Tuple[int, int, int]:
+            conf = str(f.detection.get("confidence") or "MEDIUM").upper()
+            conf_score = _CONFIDENCE_RANK.get(conf, 2)
+            native_score = _NATIVE_ENGINE_RANK.get(f.source_tool, 1)
+            sev_score = -SEVERITY_RANK.get(f.severity, 99)
+            return (conf_score, native_score, sev_score)
+
+        for f in self.findings:
+            skind = str(f.subject.get("kind") or "").strip().lower()
+            sname = str(f.subject.get("name") or "").strip().lower()
+            if not skind or not sname:
+                deduped.append(f)
+                continue
+
+            key = (f.clean_file_only, f.line_number, f.aoc_id, skind, sname)
+            if key not in by_key:
+                by_key[key] = len(deduped)
+                deduped.append(f)
+                continue
+
+            idx = by_key[key]
+            existing = deduped[idx]
+            if existing.source_tool == f.source_tool and existing.rule_or_cve_id == f.rule_or_cve_id:
+                continue
+
+            if _rank(f) > _rank(existing):
+                merged_tools = set(existing.also_reported_by) | set(f.also_reported_by)
+                if existing.source_tool != f.source_tool:
+                    merged_tools.add(existing.source_tool)
+                f.also_reported_by = sorted(merged_tools)
+                # Merge any distinct controls from the superseded finding
+                for ctl in existing.nist_controls:
+                    if ctl not in f.nist_controls:
+                        f.nist_controls.append(ctl)
+                deduped[idx] = f
+            else:
+                merged_tools = set(existing.also_reported_by) | set(f.also_reported_by)
+                if f.source_tool != existing.source_tool:
+                    merged_tools.add(f.source_tool)
+                existing.also_reported_by = sorted(merged_tools)
+                for ctl in f.nist_controls:
+                    if ctl not in existing.nist_controls:
+                        existing.nist_controls.append(ctl)
+
+        self.findings = deduped
 
     def _group_verifications_by_control(self) -> Dict[str, List[Dict[str, Any]]]:
         """Indexes verification items by normalized NIST control ID for rollup reporting."""
@@ -1087,8 +1429,12 @@ class GRCComplianceReporter:
             ctl: [] for ctl in NIST_CONTROLS_CATALOG.keys()
         }
         for f in self.findings:
-            for ctl in f.nist_controls:
-                findings_by_control.setdefault(ctl, []).append(f)
+            seen_base: Set[str] = set()
+            for raw_ctl in f.nist_controls:
+                mapped = raw_ctl if raw_ctl in NIST_CONTROLS_CATALOG else raw_ctl.split("(")[0]
+                if mapped not in seen_base:
+                    seen_base.add(mapped)
+                    findings_by_control.setdefault(mapped, []).append(f)
 
         verifications_by_control = self._group_verifications_by_control()
 
@@ -1205,7 +1551,11 @@ class GRCComplianceReporter:
             # Match by trailing rule identifier suffix so path-prefixed Semgrep IDs always match
             return rid.strip().split(".")[-1]
 
-        semgrep_findings = [f for f in self.findings if f.source_tool == "Semgrep"]
+        semgrep_findings = (
+            list(self.semgrep_audit_findings)
+            if self.semgrep_audit_findings
+            else [f for f in self.findings if f.source_tool == "Semgrep"]
+        )
         triggered_norm_ids = {norm_id(f.rule_or_cve_id): f for f in semgrep_findings}
 
         total_rules = len(self.baseline_rules)
@@ -1295,7 +1645,7 @@ class GRCComplianceReporter:
         controls_rollup: Dict[str, Any] = {}
         controls_needing_review = 0
         for ctl_id, meta in NIST_CONTROLS_CATALOG.items():
-            matching = [f.to_dict() for f in self.findings if ctl_id in f.nist_controls]
+            matching = [f.to_dict() for f in self.findings if f.matches_control(ctl_id)]
             c_verifications = verifications_by_control.get(ctl_id, [])
             assessed = self._control_was_assessed(ctl_id)
             if matching:
@@ -1387,8 +1737,17 @@ class GRCComplianceReporter:
         for parser_fn in self.PARSERS.values():
             parser_fn(self)
 
-        # Sort findings and verification items deterministically
+        # Cross-engine deduplication across overlapping AST/lexical/config findings
+        self._deduplicate_findings()
+
+        # Sort findings and verification items deterministically and resequence POA&M IDs
         self.findings.sort(key=lambda x: (SEVERITY_RANK.get(x.severity, 99), x.rule_or_cve_id, x.file_path))
+        for idx, f in enumerate(self.findings, start=1):
+            parts = f.finding_id.split("-")
+            fp_suffix = parts[-1] if len(parts) >= 3 else hashlib.sha256(
+                f"{f.source_tool}|{f.rule_or_cve_id}|{f.file_path}".encode("utf-8")
+            ).hexdigest()[:6].upper()
+            f.finding_id = f"POAM-{idx:03d}-{fp_suffix}"
         self.verification_items.sort(key=lambda v: (v["library_name"], v["file_path"], v["detected_version"]))
         for idx, v in enumerate(self.verification_items, start=1):
             v["verification_id"] = f"VERIFY-{idx:03d}"

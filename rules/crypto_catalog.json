@@ -3,7 +3,7 @@
   "catalog_metadata": {
     "title": "Cryptographic Library Policy & EOL Database",
     "version": "1.1.0",
-    "last_updated": "2026-11-14",
+    "last_updated": "2026-11-15",
     "target_frameworks": [
       "DISA STIG Application Security and Development V5R1",
       "NIST SP 800-53 Rev. 5 (SI-7, SC-12, SC-13)",
@@ -84,7 +84,7 @@
       "eol_versions": [
         { "version": "<1.70", "eol_date": "2021-11-01", "severity": "HIGH" }
       ],
-      "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 1.0.2.4) in approved mode for FIPS 140-3 / SC-13 workloads.",
+      "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 2.0.0) in approved mode for FIPS 140-3 / SC-13 workloads.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -95,8 +95,8 @@
       "min_supported_version": "1.0.2",
       "status": "ACTIVE",
       "fips_status": "CAPABLE_IF_CONFIGURED",
-      "fips_note": "Bouncy Castle FIPS (bc-fips) holds CMVP validation on specific certified versions when JVM provider configuration and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce approved mode.",
-      "remediation": "Verify exact bc-fips version against active NIST CMVP certificate and confirm JVM/application approved-only mode enforcement.",
+      "fips_note": "Bouncy Castle FIPS (bc-fips) holds CMVP FIPS 140-3 validation on 2.0.x (cert #4743; 1.0.2.x cert #3673 moved to Historical status on 2026-09-21) when JVM provider configuration and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce approved mode.",
+      "remediation": "Upgrade bc-fips to >= 2.0.0 (FIPS 140-3 cert #4743) and confirm JVM/application approved-only mode enforcement.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -137,6 +137,68 @@
       "fips_note": "Packages under golang.org/x/crypto lie outside the Go Cryptographic Module boundary (GODEBUG=fips140=on / BoringCrypto) and are not FIPS 140-3 validated.",
       "remediation": "Update golang.org/x/crypto >= v0.17.0 (mitigating Terrapin SSH CVE-2023-48795), and ensure FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only (Go 1.24+) or BoringCrypto rather than golang.org/x/crypto.",
       "nist_controls": ["SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "rust-ring": {
+      "display_name": "Rust ring Cryptography Crate",
+      "ecosystems": ["rust", "cargo", "crates"],
+      "patterns": ["^ring$"],
+      "min_supported_version": "0.17.0",
+      "status": "ACTIVE",
+      "fips_status": "NOT_VALIDATED",
+      "fips_note": "The 'ring' crate does not hold a NIST CMVP FIPS 140-3 validation certificate.",
+      "remediation": "For FIPS 140-3 / SC-13 workloads in Rust (including rustls), migrate from 'ring' to 'aws-lc-rs' with the 'fips' Cargo feature enabled.",
+      "nist_controls": ["SI-7", "SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "rust-aws-lc": {
+      "display_name": "AWS-LC Rust Cryptographic Bindings",
+      "ecosystems": ["rust", "cargo", "crates"],
+      "patterns": ["^aws-lc-rs$", "^aws-lc-fips-sys$"],
+      "min_supported_version": "1.6.0",
+      "status": "ACTIVE",
+      "fips_status": "CAPABLE_IF_CONFIGURED",
+      "fips_note": "aws-lc-rs links the CMVP-validated AWS-LC FIPS module (cert #4759) only when compiled with the 'fips' feature (aws-lc-fips-sys).",
+      "remediation": "Enable the 'fips' Cargo feature on aws-lc-rs / rustls and verify tested Operational Environment alignment.",
+      "nist_controls": ["SI-7", "SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "rustcrypto-crates": {
+      "display_name": "RustCrypto Pure-Rust Algorithm Crates",
+      "ecosystems": ["rust", "cargo", "crates"],
+      "patterns": ["^md-5$", "^sha-1$", "^sha1$", "^des$", "^chacha20poly1305$", "^salsa20$", "^blowfish$", "^rc4$"],
+      "status": "ACTIVE",
+      "fips_status": "NOT_VALIDATED",
+      "fips_note": "Pure-Rust RustCrypto algorithm crates hold no NIST CMVP FIPS 140-3 validation certificate.",
+      "remediation": "Route FIPS-scoped cryptographic operations through 'aws-lc-rs' (with 'fips' feature) or 'openssl' crate linked to an OpenSSL 3 FIPS provider.",
+      "nist_controls": ["SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "rust-openssl": {
+      "display_name": "Rust OpenSSL Bindings",
+      "ecosystems": ["rust", "cargo", "crates"],
+      "patterns": ["^openssl$", "^openssl-sys$"],
+      "min_supported_version": "0.10.55",
+      "status": "ACTIVE",
+      "fips_status": "CAPABLE_IF_CONFIGURED",
+      "fips_note": "Rust 'openssl' crate delegates to the linked OpenSSL library; avoid 'vendored' builds unless explicitly building and activating the CMVP-validated FIPS provider.",
+      "remediation": "Ensure openssl crate >= 0.10.55 dynamically links against a host OpenSSL 3.x installation with the FIPS provider activated.",
+      "nist_controls": ["SI-7", "SC-13"],
+      "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
+    },
+    "dotnet-bouncycastle": {
+      "display_name": ".NET BouncyCastle Standard Package (Non-FIPS)",
+      "ecosystems": ["nuget", "dotnet", "csharp"],
+      "patterns": ["^BouncyCastle\\.Cryptography$", "^Portable\\.BouncyCastle$", "^BouncyCastle\\.NetCore$", "^BouncyCastle$"],
+      "min_supported_version": "2.3.0",
+      "status": "ACTIVE",
+      "fips_status": "NOT_VALIDATED",
+      "eol_versions": [
+        { "version": "1.8.", "eol_date": "2022-12-01", "severity": "HIGH" }
+      ],
+      "fips_note": "Standard NuGet BouncyCastle packages are not FIPS 140-3 validated; .NET System.Security.Cryptography delegates to the OS validated module (CNG / OpenSSL FIPS).",
+      "remediation": "Use .NET built-in System.Security.Cryptography APIs backed by OS FIPS mode (Windows CNG FIPS policy or Linux OpenSSL 3 FIPS provider), or BC-FNA FIPS.",
+      "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     }
   }

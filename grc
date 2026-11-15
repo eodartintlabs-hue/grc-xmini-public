@@ -11,26 +11,25 @@ export PATH="${HOME}/.docker/bin:/usr/local/bin:/opt/homebrew/bin:/Applications/
 
 print_grcfetch() {
     local BW="\033[1;97m"      # Bold White for "GRCx"
-    local P="\033[38;5;135m"   # Purple for "MINI"
+    local P="\033[38;5;135m"   # Purple for "MINI" & keys
     local HP="\033[38;5;198m"  # Hot Pink for title
-    local G="\033[1;32m"       # Bright Green keys
     local W="\033[0;37m"       # White values
     local D="\033[38;5;240m"   # Dim divider
     local R="\033[0m"          # Reset
 
     echo -e ""
     echo -e "  ${BW}        .--.          .--.          .--.                       ${R}"
-    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.4.5 (Yokota Series)${R}"
-    echo -e "  ${BW} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}--------------------------------${R}"
-    echo -e "  ${BW} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${G}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
-    echo -e "  ${BW} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${G}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
-    echo -e "  ${BW}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${G}Assurance:${W} Pure Python Stdlib (Host-Native)${R}"
-    echo -e "  ${BW} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${G}Companion:${W} GRC-xTEST (v1.4.x+ Synchronized)${R}"
-    echo -e "  ${BW}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${G}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
-    echo -e "  ${BW}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${G}Output:${W} Timestamps (YYYY-MM-DD_HHMMSS)${R}"
-    echo -e "  ${BW}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${G}Deliverables:${W} Sealed with sha256sum${R}"
-    echo -e "  ${P}                      ███╗   ███╗   ██╗   ███╗   ██╗   ██╗    ${G}Engines:${W} (7) Transform, Bundle, Crypto, AMI,${R}"
-    echo -e "  ${P}                      ████╗ ████║   ██║   ████╗  ██║   ██║    ${W}         SBOM, Reporter, Test Engine${R}"
+    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.5.0 (Iwakuni Series)${R}"
+    echo -e "  ${BW} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}---------------------------------${R}"
+    echo -e "  ${BW} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${P}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
+    echo -e "  ${BW} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${P}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
+    echo -e "  ${BW}  GGG   \"\"\`GGG @GGG   \`GGG,   GGG             \`GGGGG'        ${P}Assurance:${W} Pure Python Stdlib (Host-Native)${R}"
+    echo -e "  ${BW} ]GGG#     GGG @GGG    ]GGG  ]GGG#     ,G#    ,GGGGG,        ${P}Companion:${W} GRC-xTEST & GRC-xBOT (v1.5.x+ Synced)${R}"
+    echo -e "  ${BW}  @GGGb,,,dGGG @GGG     GGG,  @GGGb,,,dGG\"  ,GGG' \`GGG,      ${P}Frameworks:${W} DISA STIG, NIST 800-53 R5, FedRAMP${R}"
+    echo -e "  ${BW}   \`@GGGG###G# @GGG     \`GGG   \`@GGGG###G\" dGGG'   \`GGGb     ${P}Output:${W} Timestamps (YYYY-MM-DD_HHMMSS)${R}"
+    echo -e "  ${BW}     \`\"%N>\"\`    \`\"%NW\" \`\"%NW\"    \`\"%N>\"\`   \`\"%N\"   \"%N\"\`     ${P}Deliverables:${W} Sealed with sha256sum${R}"
+    echo -e "  ${P}                      ███╗   ███╗   ██╗   ███╗   ██╗   ██╗    ${P}Engines:${W} (8) Transform, Bundle, Crypto, FIPS,${R}"
+    echo -e "  ${P}                      ████╗ ████║   ██║   ████╗  ██║   ██║    ${W}         AMI, SBOM, Reporter, Test Engine${R}"
     echo -e "  ${P}                      ██╔████╔██║   ██║   ██╔██╗ ██║   ██║    ${R}"
     echo -e "  ${P}                      ██║╚██╔╝██║   ██║   ██║╚██╗██║   ██║    ${R}"
     echo -e "  ${P}                      ██║ ╚═╝ ██║   ██║   ██║ ╚████║   ██║    ${R}"
@@ -45,7 +44,7 @@ print_scan_help() {
     echo "Usage: ./grc scan [engine] -w <workspace> [-e <evidence_dir>] [--engine <name>] [--no-report]"
     echo ""
     echo "Scan Modes / Compliance Engines:"
-    echo "  all  (--all)         Run ALL 9 compliance engines (Container Suite + Crypto + SBOM STIG) [Default]"
+    echo "  all  (--all)         Run ALL 10 compliance engines (Container Suite + Crypto + FIPS + SBOM STIG) [Default]"
     echo "  semgrep (--semgrep)  Run Semgrep SAST against the 37-rule custom AOC baseline"
     echo "  gitleaks (--gitleaks)Run Gitleaks secret & private key detection"
     echo "  checkov (--checkov)  Run Checkov IaC (Terraform, K8s, Dockerfile, Ansible) scan"
@@ -54,6 +53,7 @@ print_scan_help() {
     echo "  trivy (--trivy)      Run Trivy offline multi-target vulnerability scanner"
     echo "  oscap (--oscap)      Run OpenSCAP DISA STIG evaluation (AMI cold-mounts)"
     echo "  crypto (--crypto)    Run static cryptographic library & EOL version scanner (AOC-09)"
+    echo "  fips (--fips)        Run FIPS 140-3 conformance, CBOM, SARIF & CMVP assessment engine (AOC-03/05/09/12)"
     echo "  sbom (--sbom)        Run DISA STIG / DoD SRG SBOM applicability mapper"
     echo ""
     echo "Options:"
@@ -73,8 +73,8 @@ if [[ "$#" -eq 0 ]]; then
     echo "                                 artifacts/drop-off/ and run './grc transform' (auto-generates"
     echo "                                 timestamped deliverables in artifacts/pick-up/)"
     echo ""
-    echo "7-Engine Compliance & Invariant Testing Pipeline:"
-    echo "  test           [suite]         Run test suites (all, unit, transform, bundle, crypto, ami, sbom)"
+    echo "8-Engine Compliance & Invariant Testing Pipeline:"
+    echo "  test           [suite]         Run test suites (all, unit, transform, bundle, crypto, fips, ami, sbom, reporter)"
     echo "  bundle restore <file.bundle>   Extract & verify bundle into ephemeral workspace"
     echo "  bundle verify  <file.bundle>   Cryptographic (SHA-256) and Git object validation"
     echo "  bundle clean   --workspace <w> Teardown ephemeral workspace & wipe bundle"
@@ -82,6 +82,7 @@ if [[ "$#" -eq 0 ]]; then
     echo "  ami verify     <ami-id>        Validate AMI metadata, KMS encryption, and root snapshot"
     echo "  ami clean      --workspace <w> Teardown ephemeral volume & audit mount"
     echo "  scan [engine]  -w <w> [-e <e>] Run all (--all) or individual (--engine <name>) compliance engines"
+    echo "  fips           -w <w> [-e <e>] Direct CLI wrapper for FIPS 140-3 discovery, CBOM, SARIF & CMVP mapper"
     echo "  report         -e <evidence>   Synthesize Phase 4 SCR/SCN package & POA&M deliverables"
     echo "  sbom           --sbom <file>   Direct CLI wrapper for DISA STIG / SRG SBOM analyzer"
     echo "  crypto         -w <workspace>  Direct CLI wrapper for cryptographic & EOL library scanner"
@@ -115,6 +116,9 @@ case "${SUBCOMMAND}" in
         ;;
     crypto)
         python3 "${SCRIPT_DIR}/scripts/crypto_lib_scan.py" "$@"
+        ;;
+    fips)
+        python3 "${SCRIPT_DIR}/scripts/fips_discovery.py" "$@"
         ;;
     report)
         python3 "${SCRIPT_DIR}/scripts/grc_reporter.py" "$@"
@@ -151,7 +155,7 @@ case "${SUBCOMMAND}" in
                     SCAN_ENGINE="all"
                     shift
                     ;;
-                --semgrep|--gitleaks|--checkov|--syft|--grype|--trivy|--oscap|--openscap|--crypto|--sbom|--stig)
+                --semgrep|--gitleaks|--checkov|--syft|--grype|--trivy|--oscap|--openscap|--crypto|--fips|--sbom|--stig)
                     SCAN_ENGINE="$(echo "${1#--}" | tr '[:upper:]' '[:lower:]')"
                     shift
                     ;;
@@ -159,7 +163,7 @@ case "${SUBCOMMAND}" in
                     RUN_REPORT="false"
                     shift
                     ;;
-                all|semgrep|gitleaks|checkov|syft|grype|trivy|oscap|openscap|crypto|sbom|stig)
+                all|semgrep|gitleaks|checkov|syft|grype|trivy|oscap|openscap|crypto|fips|sbom|stig)
                     SCAN_ENGINE="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
                     shift
                     ;;
@@ -211,6 +215,9 @@ case "${SUBCOMMAND}" in
         if [[ -f "${RESOLVED_WORKSPACE}/ami_provenance.json" ]]; then
             cp -f "${RESOLVED_WORKSPACE}/ami_provenance.json" "${RESOLVED_EVIDENCE}/ami_provenance.json"
         fi
+        if [[ -f "${RESOLVED_WORKSPACE}/fips_provenance.json" ]]; then
+            cp -f "${RESOLVED_WORKSPACE}/fips_provenance.json" "${RESOLVED_EVIDENCE}/fips_provenance.json"
+        fi
 
         echo "[*] Target Workspace:   ${RESOLVED_WORKSPACE}"
         echo "[*] Evidence Directory: ${RESOLVED_EVIDENCE}"
@@ -248,6 +255,14 @@ case "${SUBCOMMAND}" in
                 --output "${RESOLVED_EVIDENCE}/crypto_findings.json" || true
         }
 
+        run_fips_engine() {
+            echo ""
+            echo "[*] Executing FIPS 140-3 Assessment, CBOM, SARIF & CMVP Mapper (fips_discovery.py)..."
+            python3 "${SCRIPT_DIR}/scripts/fips_discovery.py" \
+                --workspace "${RESOLVED_WORKSPACE}" \
+                --evidence "${RESOLVED_EVIDENCE}" || true
+        }
+
         run_sbom_engine() {
             echo ""
             if [[ ! -f "${RESOLVED_EVIDENCE}/sbom.cdx.json" ]]; then
@@ -273,6 +288,7 @@ case "${SUBCOMMAND}" in
             all)
                 run_container_engine "all"
                 run_crypto_engine
+                run_fips_engine
                 run_sbom_engine
                 ;;
             semgrep|gitleaks|checkov|syft|grype|trivy|oscap)
@@ -280,6 +296,9 @@ case "${SUBCOMMAND}" in
                 ;;
             crypto)
                 run_crypto_engine
+                ;;
+            fips)
+                run_fips_engine
                 ;;
             sbom)
                 run_sbom_engine

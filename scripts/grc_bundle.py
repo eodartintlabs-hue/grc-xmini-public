@@ -340,6 +340,8 @@ class GRCBundleManager:
                 continue
             for f in files:
                 f_path = Path(root) / f
+                if f_path.is_symlink():
+                    continue
                 try:
                     f_path.chmod(0o444)
                 except OSError:

@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "catalog_metadata": {
+    "title": "NIST FIPS 140-3 Approved Security Functions, Parameters & TLS Policy Catalog",
+    "version": "1.0.0",
+    "last_updated": "2026-11-15",
+    "normative_sources": [
+      "NIST SP 800-140C (CMVP Approved Security Functions)",
+      "NIST SP 800-140D (CMVP Approved Sensitive Security Parameter Generation and Establishment Methods)",
+      "NIST SP 800-131A Rev. 2 (Transitioning the Use of Cryptographic Algorithms and Key Lengths)",
+      "NIST FIPS 186-5 (Digital Signature Standard)",
+      "NIST FIPS 180-4 (Secure Hash Standard) & FIPS 202 (SHA-3 Standard)",
+      "NIST FIPS 197 (AES) & FIPS 198-1 (HMAC)",
+      "NIST SP 800-38A / SP 800-38D (Block Cipher Modes of Operation & GCM)",
+      "NIST SP 800-90A Rev. 1 (Recommendation for Random Number Generation Using Deterministic Random Bit Generators)",
+      "NIST SP 800-52 Rev. 2 (Guidelines for the Selection, Configuration, and Use of TLS Implementations)",
+      "NIST SP 800-56A Rev. 3 & SP 800-56B Rev. 2 (Key-Establishment Schemes)",
+      "NIST SP 800-132 (Recommendation for Password-Based Key Derivation)"
+    ]
+  },
+  "hash_algorithms": {
+    "md2": {
+      "rule_id": "fips-alg:md2",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Disallowed hash algorithm: MD2",
+      "message": "MD2 is cryptographically broken and disallowed for all federal cryptographic protection.",
+      "remediation": "Replace MD2 with SHA-256, SHA-384, SHA-512, or SHA-3 from a CMVP-validated cryptographic module.",
+      "references": ["NIST SP 800-131A Rev. 2 §9", "NIST SP 800-140C"]
+    },
+    "md4": {
+      "rule_id": "fips-alg:md4",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Disallowed hash algorithm: MD4",
+      "message": "MD4 is cryptographically broken and disallowed for all federal cryptographic protection.",
+      "remediation": "Replace MD4 with SHA-256, SHA-384, SHA-512, or SHA-3 from a CMVP-validated cryptographic module.",
+      "references": ["NIST SP 800-131A Rev. 2 §9", "NIST SP 800-140C"]
+    },
+    "md5": {
+      "rule_id": "fips-alg:md5",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved hash algorithm: MD5",
+      "message": "MD5 is disallowed as a cryptographic hash function under FIPS 180-4 and NIST SP 800-140C.",
+      "remediation": "Use SHA-256, SHA-384, SHA-512, or SHA-3 from a validated module; if strictly non-security (e.g., ETag/cache key), isolate and pass usedforsecurity=False where supported.",
+      "references": ["NIST SP 800-131A Rev. 2 §9", "NIST SP 800-140C", "FIPS 180-4"]
+    },
+    "sha1": {
+      "rule_id": "fips-alg:sha1",
+      "determination": "FAIL",
+      "hmac_determination": "PASS",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Disallowed hash algorithm for digital signatures / general security hashing: SHA-1",
+      "message": "SHA-1 is disallowed for digital signature generation and collision-resistant security functions (note: HMAC-SHA-1 remains approved with key length >= 112 bits).",
+      "remediation": "Migrate digital signatures and integrity hashing to SHA-256, SHA-384, SHA-512, or SHA-3-256+.",
+      "references": ["NIST SP 800-131A Rev. 2 §9-10", "FIPS 186-5", "NIST SP 800-140C"]
+    },
+    "ripemd160": {
+      "rule_id": "fips-alg:ripemd160",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved hash algorithm: RIPEMD-160",
+      "message": "RIPEMD-160 is not an approved hash function in FIPS 180-4, FIPS 202, or NIST SP 800-140C.",
+      "remediation": "Replace RIPEMD-160 with SHA-256, SHA-384, SHA-512, or SHA-3-256.",
+      "references": ["NIST SP 800-140C", "FIPS 180-4", "FIPS 202"]
+    },
+    "whirlpool": {
+      "rule_id": "fips-alg:whirlpool",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved hash algorithm: Whirlpool",
+      "message": "Whirlpool is not an approved hash function under NIST SP 800-140C.",
+      "remediation": "Replace Whirlpool with SHA-512 or SHA-3-512.",
+      "references": ["NIST SP 800-140C"]
+    },
+    "blake2b": {
+      "rule_id": "fips-alg:blake2b",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved hash algorithm: BLAKE2b",
+      "message": "BLAKE2b is not listed in NIST SP 800-140C approved hash functions.",
+      "remediation": "Use SHA-256, SHA-512, SHA-3, or SHAKE256 from a CMVP-validated module for FIPS-scoped security functions.",
+      "references": ["NIST SP 800-140C", "FIPS 202"]
+    },
+    "blake2s": {
+      "rule_id": "fips-alg:blake2s",
+      "determination": "FAIL",
+      "non_security_determination": "NEEDS_REVIEW",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved hash algorithm: BLAKE2s",
+      "message": "BLAKE2s is not listed in NIST SP 800-140C approved hash functions.",
+      "remediation": "Use SHA-256 or SHA-3-256 from a CMVP-validated module for FIPS-scoped security functions.",
+      "references": ["NIST SP 800-140C", "FIPS 202"]
+    },
+    "approved": [
+      "sha224",
+      "sha256",
+      "sha384",
+      "sha512",
+      "sha512-224",
+      "sha512-256",
+      "sha3-224",
+      "sha3-256",
+      "sha3-384",
+      "sha3-512",
+      "shake128",
+      "shake256"
+    ]
+  },
+  "mac_algorithms": {
+    "approved": [
+      "hmac-sha1",
+      "hmac-sha224",
+      "hmac-sha256",
+      "hmac-sha384",
+      "hmac-sha512",
+      "hmac-sha3-224",
+      "hmac-sha3-256",
+      "hmac-sha3-384",
+      "hmac-sha3-512",
+      "kmac128",
+      "kmac256",
+      "cmac-aes",
+      "gmac-aes"
+    ],
+    "disallowed": {
+      "hmac-md5": {
+        "rule_id": "fips-alg:hmac-md5",
+        "determination": "FAIL",
+        "severity": "HIGH",
+        "aoc": "AOC-03: Weak Encryption Check",
+        "controls": ["SC-13"],
+        "title": "Non-approved MAC algorithm: HMAC-MD5",
+        "message": "HMAC-MD5 uses unapproved MD5 and is disallowed under FIPS 198-1 and NIST SP 800-140C.",
+        "remediation": "Migrate to HMAC-SHA-256, HMAC-SHA-384, HMAC-SHA-512, or KMAC256.",
+        "references": ["FIPS 198-1", "NIST SP 800-131A Rev. 2 §10", "NIST SP 800-140C"]
+      }
+    }
+  },
+  "symmetric_ciphers": {
+    "des": {
+      "rule_id": "fips-alg:des",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Disallowed symmetric cipher: DES",
+      "message": "56-bit DES is withdrawn and disallowed under NIST SP 800-131A Rev. 2.",
+      "remediation": "Migrate to AES-128 or AES-256 in an approved authenticated mode (e.g., AES-256-GCM).",
+      "references": ["NIST SP 800-131A Rev. 2 §2", "FIPS 197", "NIST SP 800-38D"]
+    },
+    "3des": {
+      "rule_id": "fips-alg:3des",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Disallowed symmetric cipher: 3DES / Triple-DES (TDEA)",
+      "message": "Three-key TDEA (3DES) encryption is disallowed after 2023-12-31 per NIST SP 800-131A Rev. 2.",
+      "remediation": "Migrate all symmetric encryption to AES (128, 192, or 256-bit) in GCM, CCM, or CBC+HMAC mode.",
+      "references": ["NIST SP 800-131A Rev. 2 §2", "NIST SP 800-67 Rev. 2 (Withdrawn)", "NIST SP 800-140C"]
+    },
+    "rc2": {
+      "rule_id": "fips-alg:rc2",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved symmetric cipher: RC2",
+      "message": "RC2 is not an approved symmetric algorithm under NIST SP 800-140C.",
+      "remediation": "Replace RC2 with AES-256-GCM from a CMVP-validated module.",
+      "references": ["NIST SP 800-140C", "FIPS 197"]
+    },
+    "rc4": {
+      "rule_id": "fips-alg:rc4",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved stream cipher: RC4 / ARCFOUR",
+      "message": "RC4 has severe statistical biases, is prohibited in TLS (RFC 7465 / SP 800-52 Rev. 2), and is not FIPS-approved.",
+      "remediation": "Replace RC4 with AES-GCM or AES-CTR+HMAC.",
+      "references": ["NIST SP 800-140C", "NIST SP 800-52 Rev. 2 §3.3"]
+    },
+    "blowfish": {
+      "rule_id": "fips-alg:blowfish",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved symmetric cipher: Blowfish",
+      "message": "Blowfish uses a 64-bit block size (vulnerable to birthday attacks) and is not a FIPS-approved algorithm.",
+      "remediation": "Replace Blowfish with AES-256-GCM.",
+      "references": ["NIST SP 800-140C", "FIPS 197"]
+    },
+    "cast5": {
+      "rule_id": "fips-alg:cast5",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved symmetric cipher: CAST5",
+      "message": "CAST5 (CAST-128) is not an approved symmetric cipher under NIST SP 800-140C.",
+      "remediation": "Replace CAST5 with AES-256-GCM.",
+      "references": ["NIST SP 800-140C", "FIPS 197"]
+    },
+    "idea": {
+      "rule_id": "fips-alg:idea",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-approved symmetric cipher: IDEA",
+      "message": "IDEA is not an approved symmetric cipher under NIST SP 800-140C.",
+      "remediation": "Replace IDEA with AES-256-GCM.",
+      "references": ["NIST SP 800-140C", "FIPS 197"]
+    },
+    "chacha20": {
+      "rule_id": "fips-alg:chacha20",
+      "determination": "FAIL",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-FIPS stream cipher: ChaCha20 / ChaCha20-Poly1305",
+      "message": "ChaCha20 and ChaCha20-Poly1305 are modern ciphers, but are not NIST-approved algorithms under FIPS 140-3 / NIST SP 800-140C.",
+      "remediation": "For FIPS 140-3 / SC-13 workloads, use AES-128-GCM or AES-256-GCM (FIPS 197 + SP 800-38D).",
+      "references": ["NIST SP 800-140C", "NIST SP 800-52 Rev. 2 §3.3.1"]
+    },
+    "salsa20": {
+      "rule_id": "fips-alg:salsa20",
+      "determination": "FAIL",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Non-FIPS stream cipher: Salsa20 / XSalsa20",
+      "message": "Salsa20 / XSalsa20 is not an approved algorithm under NIST SP 800-140C.",
+      "remediation": "Use AES-256-GCM from a CMVP-validated module.",
+      "references": ["NIST SP 800-140C", "FIPS 197"]
+    },
+    "aes": {
+      "approved_key_bits": [128, 192, 256],
+      "approved_modes": ["GCM", "CCM", "CBC", "CTR", "CFB", "OFB", "XTS", "KW", "KWP"],
+      "disallowed_modes": {
+        "ECB": {
+          "rule_id": "fips-mode:aes-ecb",
+          "determination": "FAIL",
+          "severity": "HIGH",
+          "aoc": "AOC-03: Weak Encryption Check",
+          "controls": ["SC-13"],
+          "title": "Insecure block cipher mode: AES-ECB",
+          "message": "Electronic Codebook (ECB) mode leaks plaintext block patterns and lacks semantic security for multi-block data.",
+          "remediation": "Replace ECB mode with authenticated AES-GCM (SP 800-38D) or AES-CBC with random IV and HMAC.",
+          "references": ["NIST SP 800-38A Appendix A", "NIST SP 800-38D"]
+        }
+      }
+    }
+  },
+  "parameter_rules": {
+    "rsa_min_bits": {
+      "min_bits": 2048,
+      "rule_id": "fips-param:rsa-short-key",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-12", "SC-13"],
+      "title": "Insufficient RSA modulus size (< 2048 bits)",
+      "message": "RSA key lengths below 2048 bits provide less than 112 bits of security strength and are disallowed.",
+      "remediation": "Generate RSA keys with modulus >= 2048 bits (3072 or 4096 bits recommended).",
+      "references": ["FIPS 186-5 §5.1", "NIST SP 800-131A Rev. 2 §3", "NIST SP 800-56B Rev. 2"]
+    },
+    "dh_min_bits": {
+      "min_bits": 2048,
+      "rule_id": "fips-param:dh-short-group",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-12", "SC-13"],
+      "title": "Insufficient Diffie-Hellman / FFC group size (< 2048 bits)",
+      "message": "Finite-field Diffie-Hellman groups smaller than 2048 bits are disallowed under SP 800-56A Rev. 3 and SP 800-131A Rev. 2.",
+      "remediation": "Use named safe-prime FFDHE groups >= 2048 bits (RFC 7919) or ECDHE with P-256 / P-384.",
+      "references": ["NIST SP 800-56A Rev. 3 §5.5.1.1", "NIST SP 800-131A Rev. 2 §5", "NIST SP 800-140D"]
+    },
+    "dsa_disallowed": {
+      "rule_id": "fips-alg:dsa",
+      "determination": "FAIL",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-13"],
+      "title": "Deprecated signature algorithm: Finite-Field DSA",
+      "message": "Finite-field DSA was removed for new digital signature generation in FIPS 186-5 (prior signatures may only be verified).",
+      "remediation": "Migrate digital signature generation to ECDSA (P-256/P-384), EdDSA (Ed25519/Ed448), or RSA-PSS (>= 2048 bits).",
+      "references": ["FIPS 186-5 §1"]
+    },
+    "ecc_curves": {
+      "approved": ["p-256", "secp256r1", "prime256v1", "nistp256", "p-384", "secp384r1", "nistp384", "p-521", "secp521r1", "nistp521", "ed25519", "ed448"],
+      "legacy_review": ["p-224", "secp224r1", "nistp224"],
+      "disallowed_rule": {
+        "rule_id": "fips-param:ecc-unapproved-curve",
+        "determination": "FAIL",
+        "severity": "HIGH",
+        "aoc": "AOC-03: Weak Encryption Check",
+        "controls": ["SC-12", "SC-13"],
+        "title": "Non-approved elliptic curve parameter",
+        "message": "Curve is outside the NIST-approved curves in FIPS 186-5 / SP 800-56A Rev. 3 (P-256, P-384, P-521, Ed25519, Ed448).",
+        "remediation": "Use NIST P-256 (secp256r1), P-384 (secp384r1), P-521 (secp521r1), or Ed25519/Ed448 inside a validated module.",
+        "references": ["FIPS 186-5", "NIST SP 800-186", "NIST SP 800-56A Rev. 3", "NIST SP 800-140D"]
+      }
+    },
+    "static_iv_or_nonce": {
+      "rule_id": "fips-param:static-iv-nonce",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-12", "SC-13"],
+      "title": "Hardcoded or static initialization vector (IV) / GCM nonce",
+      "message": "Using a constant or hardcoded IV/nonce breaks semantic security and catastrophically compromises AES-GCM / CTR confidentiality and authenticity.",
+      "remediation": "Generate a fresh unique IV/nonce per encryption operation using an approved SP 800-90A Rev. 1 DRBG.",
+      "references": ["NIST SP 800-38D §8", "NIST SP 800-38A Appendix C", "NIST SP 800-90A Rev. 1"]
+    },
+    "pbkdf2_min_iterations": {
+      "min_iterations": 10000,
+      "min_salt_bytes": 16,
+      "rule_id": "fips-param:pbkdf2-weak-params",
+      "determination": "FAIL",
+      "severity": "MEDIUM",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-12", "SC-13"],
+      "title": "Weak PBKDF2 key derivation parameters",
+      "message": "PBKDF2 configured with low iteration count (< 10,000) or short/static salt (< 128 bits).",
+      "remediation": "Configure PBKDF2-HMAC-SHA-256/512 with >= 100,000 iterations (minimum 10,000 per legacy SP 800-132 floor) and a >= 16-byte CSPRNG salt.",
+      "references": ["NIST SP 800-132 §5.1-5.2", "NIST SP 800-140D"]
+    },
+    "non_approved_rng": {
+      "rule_id": "fips-alg:unapproved-prng",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-03: Weak Encryption Check",
+      "controls": ["SC-12", "SC-13"],
+      "title": "Non-cryptographic PRNG used in security context",
+      "message": "Predictable non-cryptographic PRNG invoked to generate keys, tokens, nonces, salts, or credentials instead of an SP 800-90A Rev. 1 DRBG.",
+      "remediation": "Use a CSPRNG backed by an approved SP 800-90A Rev. 1 DRBG (e.g., secrets/os.urandom, crypto/rand, SecureRandom, crypto.randomBytes, RandomNumberGenerator).",
+      "references": ["NIST SP 800-90A Rev. 1", "NIST SP 800-140D"]
+    }
+  },
+  "tls_rules": {
+    "deprecated_protocol": {
+      "disallowed_versions": ["sslv2", "sslv3", "tls1.0", "tls1.1"],
+      "approved_versions": ["tls1.2", "tls1.3"],
+      "rule_id": "fips-tls:deprecated-version",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-05: Unencrypted Traffic / Deprecated TLS",
+      "controls": ["SC-8", "SC-8(1)", "SC-13", "SI-17"],
+      "title": "Deprecated SSL/TLS protocol version (< TLS 1.2)",
+      "message": "SSLv2, SSLv3, TLS 1.0, and TLS 1.1 are disallowed for federal information systems under NIST SP 800-52 Rev. 2.",
+      "remediation": "Enforce TLS 1.2 (with FIPS-approved cipher suites) or TLS 1.3 exclusively.",
+      "references": ["NIST SP 800-52 Rev. 2 §3.1", "NIST SP 800-131A Rev. 2"]
+    },
+    "cert_verification_disabled": {
+      "rule_id": "fips-tls:verification-disabled",
+      "determination": "FAIL",
+      "severity": "CRITICAL",
+      "aoc": "AOC-05: Unencrypted Traffic / Deprecated TLS",
+      "controls": ["SC-8", "SC-8(1)", "SC-23", "SI-17"],
+      "title": "TLS X.509 certificate verification disabled",
+      "message": "Disabling TLS certificate or hostname verification exposes encrypted channels to active man-in-the-middle interception.",
+      "remediation": "Enable strict X.509 certificate chain and hostname verification against a trusted CA bundle.",
+      "references": ["NIST SP 800-52 Rev. 2 §3.5, §4.3"]
+    },
+    "non_approved_cipher_suite": {
+      "rule_id": "fips-tls:unapproved-ciphersuite",
+      "determination": "FAIL",
+      "severity": "HIGH",
+      "aoc": "AOC-05: Unencrypted Traffic / Deprecated TLS",
+      "controls": ["SC-8", "SC-8(1)", "SC-13"],
+      "title": "Non-approved TLS cipher suite configured",
+      "message": "TLS configuration permits weak, anonymous, export, RC4, 3DES, MD5, or non-FIPS cipher suites.",
+      "remediation": "Restrict TLS 1.2/1.3 cipher suites to NIST SP 800-52 Rev. 2 §3.3.1 approved ECDHE/AES-GCM or AES-CCM suites.",
+      "references": ["NIST SP 800-52 Rev. 2 §3.3.1"]
+    }
+  }
+}

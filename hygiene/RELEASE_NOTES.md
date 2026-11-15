@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.4.5 — Yokota` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.5.0 — Iwakuni` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.5.0`](#v150--iwakuni) | Iwakuni | 2026-11-15 | Minor | `_TBD after tagging_` | FIPS 140-3 Static Cryptographic Discovery, Algorithm Policy, Offline NIST CMVP & CBOM Engine (Phases 2–5): `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`), Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`), `rules/fips_algorithm_policy.json`, `rules/cmvp_catalog.json` (Active 140-3 vs. Historical 140-2 + 90-day staleness), CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, D10 manifest expansion (`Cargo`, `NuGet`, `Gradle`, lockfiles), cross-engine `grc_reporter.py` deduplication, purple `grcfetch` banner keys + Triad companion sync (`GRC-xTEST v1.5.0 — Iwakuni` & `GRC-xBOT v1.5.0 — Tsukuba`), and 49 unit tests + all 8 engine suites passing |
 | [`v1.4.5`](#v145--yokota) | Yokota | 2026-11-14 | Bug fix | `f5d139e` | FIPS 140-3 Phase 0 baseline honesty & verification separation: `rules/crypto_catalog.json` v1.1.0 (`fips_status` replacing `fips_capable`), tri-state `crypto_lib_scan.py` statuses (`NOT_VALIDATED` vs. `CANNOT_DETERMINE_STATICALLY`) & ecosystem scoping, `AOC-03` `SI-16` -> `SC-13` remapping, `poam_data.md` Sec. 4 ("Needs Human or Runtime Verification") + `SC-13` `NEEDS REVIEW`, regenerated `demo-evidence/*`, and 42 unit tests passing |
 | [`v1.4.4`](#v144--yokota) | Yokota | 2026-11-02 | Bug fix | `5adf787` | Native Qualys VMDR & Wiz Cloud Security adapters, 4-way scanner auto-detection, vendor remediation URL drafting, and pure standard-library synthetic demo data generator (`scripts/generate_demo_data.py`) |
 | [`v1.4.3`](#v143--yokota) | Yokota | 2026-11-01 | Bug fix | `43839b9` | Multi-worksheet FedRAMP v3.1 POA&M template ingestion (strict Worksheet #1 reading + dynamic header/guidance row skipping) and unified 2-tab `FedRAMP-POAM.xlsx` (`Open POA&M Items` + `Closed POA&M Items`) output in `artifacts/pick-up/` |
@@ -47,6 +48,28 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.5.0 — Iwakuni
+
+**FIPS 140-3 Static Cryptographic Discovery, Algorithm Policy, Offline NIST CMVP & CBOM Engine (Phases 2–5)** · November 15, 2026 · Tag `v1.5.0`
+
+### Minor Capability Additions & Architectural Enhancements
+
+1. **Normalized Finding Envelope Schema v1.0.0 (`rules/finding_schema.json` & `scripts/grc_common.py`)**:
+   - Introduced the canonical Normalized Finding Envelope v1.0.0 schema (`rules/finding_schema.json` + `rules/finding_schema.example.json`) and stdlib runtime validator (`validate_finding_envelope()`), deterministic `make_finding_id()`, `split_aoc()`, symlink-safe `_apply_read_only()` in `scripts/grc_bundle.py`, and read-only teardown support (`_restore_write_and_retry`, `fips_provenance.json` marker) in `scripts/grc_common.py`.
+2. **Phase 2 — Multi-Ecosystem Manifest Fixes, D10 Expansion & Cryptographic Discovery (`scripts/crypto_lib_scan.py` & `scripts/fips_discovery.py`)**:
+   - Fixed `package.json` multi-token semver range parsing, section-aware `pyproject.toml` fallback, `pom.xml` `<properties>` interpolation + `<dependencyManagement>` exclusion, and `go.mod` `replace`/`exclude` directives in `scripts/crypto_lib_scan.py`.
+   - Added parsers for `Cargo.toml`/`Cargo.lock` (including Cargo `features = ["fips"]` extraction), `build.gradle`/`build.gradle.kts`, `*.csproj`/`packages.lock.json`, `package-lock.json`, `poetry.lock`, and `go.sum` with lockfile-over-manifest deduplication, extended `rules/crypto_catalog.json` with Rust and .NET rules, and upgraded `crypto_findings.json` to Normalized Finding Schema v1.0.0 (`SI-7` lifecycle `PASS` separated from `SC-13` FIPS status; unpinned `WARN_UNVERIFIED` routed to `NEEDS_REVIEW`).
+   - Built standalone Python stdlib engine `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`) combining Python `ast` analysis (immune to comments/docstrings, tracking `usedforsecurity=False` context, EdDSA/X25519, RSA/DH key sizes, ECC curves, static IVs, PBKDF2 iterations, and PRNG misuse) with comment-stripping lexical/config analyzers for Go, Java/Kotlin, JS/TS, C/C++, Rust, .NET/C#, `grub`, `crypto-policies`, `openssl.cnf`, `java.security`, `Dockerfile`, Packer `.pkr.hcl`, `nginx.conf`, `.config`, and Kubernetes YAML.
+3. **Phase 3 & Phase 4 — Declarative Algorithm Policy & Offline NIST CMVP Mapping (`rules/fips_algorithm_policy.json` & `rules/cmvp_catalog.json`)**:
+   - Authored `rules/fips_algorithm_policy.json` with NIST citations (`SP 800-131A Rev. 2`, `SP 800-140C/D`, `SP 800-90A Rev. 1`, `FIPS 186-5`, `SP 800-52 Rev. 2`) distinguishing approved uses (e.g., `HMAC-SHA-1`, `Ed25519`, `AES-GCM`) from disallowed algorithms, modes (`AES-ECB`), weak parameters (`RSA < 2048`, `secp256k1`, static IVs), and deprecated TLS (`< 1.2`).
+   - Authored `rules/cmvp_catalog.json` with a 90-day staleness warning, Active FIPS 140-3 certificates vs. post-`2026-09-21` Historical FIPS 140-2 certificates (`FAIL_HISTORICAL_CERT`), module/version/feature/approved-mode correlation, and FIPS container base image recognition.
+4. **Phase 5 — FIPS Deliverables, Cross-Engine Reporter Deduplication & Triad `v1.5.0` Sync (`scripts/grc_reporter.py`, `./grc`, `GRC-xTEST` & `GRC-xBOT`)**:
+   - Emits 6 sealed FIPS deliverables (`fips_findings.json`, CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, `cmvp_mapping.md`, `fips_assessment.md` adhering strictly to §1.1 module-conformance framing, and `fips_provenance.json` + `sha256sum`) plus `--dry-run` preview.
+   - Updated `scripts/grc_reporter.py` and `rules/custom-baseline-ruleset.yaml` for Schema v1.0.0 ingestion, `scope.assessed_controls` tracking, enhancement-to-base control rollup (`SC-8(1)` -> `SC-8`, `SC-28(1)` -> `SC-28`), and cross-engine deduplication (`also_reported_by`) while preserving `ruleset_validation.md` audit logs.
+   - Added multi-language positive/negative fixture builders (`scripts/grc_fixtures.py`), `testing/test_fips_phases_2_5.py` (49 unit tests + all 8 engine suites passing), styled `./grc fetch` metadata keys in Purple matching the `MINI` wordmark with `Companion: GRC-xTEST & GRC-xBOT (v1.5.x+ Synced)`, and synchronized companion `GRC-xTEST` (`v1.5.0 — Iwakuni`, `fips-fixtures/` precision/recall corpus + red fetch keys) and `GRC-xBOT` (`v1.5.0 — Tsukuba`).
 
 ---
 

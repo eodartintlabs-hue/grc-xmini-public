@@ -154,3 +154,225 @@ def create_synthetic_scratch_bundle(dest_bundle: Path) -> Tuple[str, Path]:
         return sha256, dest_bundle
     finally:
         shutil.rmtree(temp_repo, ignore_errors=True)
+
+
+def populate_fips_positive_fixture(workspace: Path) -> None:
+    """
+    Populates a multi-language synthetic workspace exhibiting ONLY approved
+    FIPS 140-3 conformance indicators (zero FAIL findings expected).
+    """
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "etc" / "default").mkdir(parents=True, exist_ok=True)
+    (workspace / "etc" / "crypto-policies").mkdir(parents=True, exist_ok=True)
+    (workspace / "conf").mkdir(parents=True, exist_ok=True)
+    (workspace / "src").mkdir(parents=True, exist_ok=True)
+
+    (workspace / "etc" / "default" / "grub").write_text(
+        'GRUB_CMDLINE_LINUX="crashkernel=auto fips=1"\n',
+        encoding="utf-8",
+    )
+    (workspace / "etc" / "crypto-policies" / "config").write_text("FIPS\n", encoding="utf-8")
+    (workspace / "conf" / "openssl.cnf").write_text(
+        "openssl_conf = openssl_init\n"
+        "[openssl_init]\nproviders = provider_sect\n"
+        "[provider_sect]\nfips = fips_sect\n"
+        "[fips_sect]\nactivate = 1\n",
+        encoding="utf-8",
+    )
+    (workspace / "conf" / "java.security").write_text(
+        "security.provider.1=org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider\n",
+        encoding="utf-8",
+    )
+    (workspace / "Dockerfile").write_text(
+        "FROM cgr.dev/chainguard/python:latest-fips\n"
+        "ENV GOLANG_FIPS=1\n",
+        encoding="utf-8",
+    )
+    (workspace / "Cargo.toml").write_text(
+        '[package]\nname = "clean-fips"\nversion = "0.1.0"\n\n'
+        '[dependencies]\naws-lc-rs = { version = "1.9.3", features = ["fips"] }\n',
+        encoding="utf-8",
+    )
+    (workspace / "Cargo.lock").write_text(
+        '[[package]]\nname = "aws-lc-rs"\nversion = "1.9.3"\n',
+        encoding="utf-8",
+    )
+    (workspace / "pom.xml").write_text(
+        "<project><dependencies><dependency>"
+        "<groupId>org.bouncycastle</groupId>"
+        "<artifactId>bc-fips</artifactId>"
+        "<version>2.0.0</version>"
+        "</dependency></dependencies></project>\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "approved.py").write_text(
+        '"""Comments mentioning hashlib.md5() must never trigger false positives."""\n'
+        "import hashlib, hmac, secrets\n"
+        "from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519\n"
+        "from cryptography.hazmat.primitives.ciphers.aead import AESGCM\n\n"
+        "def run_approved(key: bytes, payload: bytes) -> bytes:\n"
+        "    nonce = secrets.token_bytes(12)\n"
+        "    ct = AESGCM(key).encrypt(nonce, payload, None)\n"
+        "    digest = hashlib.sha256(ct).digest()\n"
+        "    mac = hmac.new(key, digest, hashlib.sha256).digest()\n"
+        "    _rsa = rsa.generate_private_key(public_exponent=65537, key_size=3072)\n"
+        "    _ec = ec.generate_private_key(ec.SECP256R1())\n"
+        "    _ed = ed25519.Ed25519PrivateKey.generate()\n"
+        "    return mac\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "approved.go").write_text(
+        "//go:debug fips140=only\n"
+        "package main\n"
+        'import (\n  "crypto/cipher"\n  "crypto/elliptic"\n  "crypto/rand"\n  "crypto/rsa"\n  "crypto/sha256"\n  "crypto/tls"\n)\n'
+        "func ok(block cipher.Block) {\n"
+        "  _ = sha256.Sum256([]byte(\"ok\"))\n"
+        "  _, _ = cipher.NewGCM(block)\n"
+        "  _, _ = rsa.GenerateKey(rand.Reader, 3072)\n"
+        "  _ = elliptic.P256()\n"
+        "  _ = &tls.Config{MinVersion: tls.VersionTLS13}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "Approved.java").write_text(
+        "import java.security.MessageDigest;\nimport javax.crypto.Cipher;\nimport javax.net.ssl.SSLContext;\n"
+        "public class Approved {\n"
+        "  public void run() throws Exception {\n"
+        '    CryptoServicesRegistrar.setApprovedOnlyMode(true);\n'
+        '    MessageDigest.getInstance("SHA-256");\n'
+        '    Cipher.getInstance("AES/GCM/NoPadding");\n'
+        '    SSLContext.getInstance("TLSv1.3");\n'
+        "  }\n}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "approved.js").write_text(
+        "const crypto = require('crypto');\n"
+        "crypto.setFips(1);\n"
+        "const digest = crypto.createHash('sha256').update('data').digest('hex');\n"
+        "const mac = crypto.createHmac('sha256', Buffer.alloc(32)).update(digest).digest('hex');\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "approved.c").write_text(
+        "#include <openssl/evp.h>\n#include <openssl/provider.h>\n"
+        "void init_fips(void) {\n"
+        '  OSSL_PROVIDER_load(NULL, "fips");\n'
+        "  EVP_default_properties_enable_fips(NULL, 1);\n"
+        "  const EVP_MD *md = EVP_sha256();\n"
+        "  const EVP_CIPHER *c = EVP_aes_256_gcm();\n"
+        "  (void)md; (void)c;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "approved.rs").write_text(
+        "use sha2::Sha256;\n"
+        "pub fn hash_ok() { let _ = sha2::Sha256::new(); }\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "Approved.cs").write_text(
+        "using System.Security.Cryptography;\n"
+        "public class Approved {\n"
+        "  public void Run(byte[] key) {\n"
+        "    using var h = SHA256.Create();\n"
+        "    using var gcm = new AesGcm(key);\n"
+        "    using var rsa = RSA.Create(3072);\n"
+        "  }\n}\n",
+        encoding="utf-8",
+    )
+
+
+def populate_fips_negative_fixture(workspace: Path) -> None:
+    """
+    Populates a multi-language synthetic workspace containing intentional
+    algorithm, cipher-mode, parameter, TLS, and approved-mode violations.
+    """
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "etc" / "default").mkdir(parents=True, exist_ok=True)
+    (workspace / "etc" / "crypto-policies").mkdir(parents=True, exist_ok=True)
+    (workspace / "src").mkdir(parents=True, exist_ok=True)
+
+    (workspace / "etc" / "default" / "grub").write_text(
+        'GRUB_CMDLINE_LINUX="console=tty0 fips=0"\n',
+        encoding="utf-8",
+    )
+    (workspace / "etc" / "crypto-policies" / "config").write_text("LEGACY\n", encoding="utf-8")
+    (workspace / "App.config").write_text(
+        '<configuration><runtime><enforceFIPSPolicy enabled="false"/></runtime></configuration>\n',
+        encoding="utf-8",
+    )
+    (workspace / "requirements.txt").write_text("pycryptodome==3.20.0\n", encoding="utf-8")
+    (workspace / "pom.xml").write_text(
+        "<project><dependencies><dependency>"
+        "<groupId>org.bouncycastle</groupId>"
+        "<artifactId>bc-fips</artifactId>"
+        "<version>1.0.2.5</version>"
+        "</dependency></dependencies></project>\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "bad.py").write_text(
+        "import hashlib, random\n"
+        "from cryptography.hazmat.primitives.asymmetric import rsa, ec\n"
+        "from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes\n\n"
+        "def bad(key: bytes) -> None:\n"
+        "    _ = hashlib.md5(b'payload').hexdigest()\n"
+        "    _ = Cipher(algorithms.AES(key), modes.ECB())\n"
+        "    _ = rsa.generate_private_key(public_exponent=65537, key_size=1024)\n"
+        "    _ = ec.generate_private_key(ec.SECP256K1())\n"
+        "    secret_token = random.randint(1000, 9999)\n"
+        "    _ = secret_token\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "bad.go").write_text(
+        "//go:debug fips140=off\n"
+        "package main\n"
+        'import (\n  "crypto/des"\n  "crypto/md5"\n  "crypto/tls"\n)\n'
+        "func bad() {\n"
+        "  _ = md5.Sum([]byte(\"x\"))\n"
+        "  _, _ = des.NewCipher(make([]byte, 8))\n"
+        "  _ = &tls.Config{MinVersion: tls.VersionTLS10, InsecureSkipVerify: true}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "Bad.java").write_text(
+        "import java.security.MessageDigest;\nimport javax.crypto.Cipher;\nimport javax.net.ssl.SSLContext;\n"
+        "public class Bad {\n"
+        "  public void bad() throws Exception {\n"
+        '    MessageDigest.getInstance("MD5");\n'
+        '    Cipher.getInstance("AES/ECB/PKCS5Padding");\n'
+        '    SSLContext.getInstance("TLSv1.1");\n'
+        "  }\n}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "bad.js").write_text(
+        "const crypto = require('crypto');\n"
+        "crypto.setFips(0);\n"
+        "crypto.createHash('md5').update('x').digest('hex');\n"
+        "crypto.createCipheriv('rc4', Buffer.alloc(16), '');\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "bad.c").write_text(
+        "#include <openssl/evp.h>\n"
+        "void bad_c(void) {\n"
+        "  FIPS_mode_set(0);\n"
+        "  const EVP_MD *m = EVP_md5();\n"
+        "  const EVP_CIPHER *c = EVP_aes_128_ecb();\n"
+        "  (void)m; (void)c;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "bad.rs").write_text(
+        "pub fn bad_rs() {\n"
+        "  let _ = md5::Md5::new();\n"
+        "  let _ = chacha20poly1305::ChaCha20Poly1305::new();\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    (workspace / "src" / "Bad.cs").write_text(
+        "using System.Security.Cryptography;\n"
+        "public class Bad {\n"
+        "  public void Run() {\n"
+        "    using var m = MD5.Create();\n"
+        "    using var r = RSA.Create(1024);\n"
+        "  }\n}\n",
+        encoding="utf-8",
+    )
+

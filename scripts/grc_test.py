@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRC-xMINI (The GRC eXperience) — Unified Compliance Test & Verification Engine
-Engine: scripts/grc_test.py (v1.4.5 — Yokota)
+Engine: scripts/grc_test.py (v1.5.0 — Iwakuni)
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Engine #7 — Test, Mock & Invariant Verification Orchestrator
@@ -159,10 +159,13 @@ class TestEngine:
 
     def test_crypto_scan(self) -> bool:
         """
-        Tests scripts/crypto_lib_scan.py content invariants (P0 #5 numeric version compare,
-        P0 #6 parent 'vendor' path handling, and .so soname version parsing).
+        Tests scripts/crypto_lib_scan.py content invariants (Normalized Schema v1.0.0 validation,
+        P0 #5 numeric version compare, P0 #6 parent 'vendor' path handling, .so soname version
+        parsing, and Rule 1 SI-7 PASS + SC-13 FIPS split).
         """
-        print("[*] [grc_test] Testing Engine #3: crypto_lib_scan.py (EOL Cryptography)...")
+        print("[*] [grc_test] Testing Engine #3: crypto_lib_scan.py (EOL Cryptography & Schema v1.0.0)...")
+        from grc_common import validate_finding_envelope
+
         crypto_script = os.path.join(SCRIPT_DIR, "crypto_lib_scan.py")
         base_temp = Path(tempfile.mkdtemp(prefix="grc_crypto_test_"))
         # Place workspace under a folder containing 'vendor' to guard P0 #6
@@ -193,26 +196,165 @@ class TestEngine:
                 return self._record("crypto_lib_scan", False, "execution or JSON output failed")
 
             payload = json.loads(out_json.read_text(encoding="utf-8"))
+            schema_errors = validate_finding_envelope(payload)
+            if schema_errors:
+                return self._record("crypto_lib_scan", False, f"schema validation failed: {schema_errors[:2]}")
+
             findings = payload.get("findings", [])
-            by_key = {(f["library_name"], f["detected_version"]): f["compliance_status"] for f in findings}
+            by_key = {
+                (
+                    f["subject"]["name"],
+                    f["subject"].get("version", "Unknown"),
+                    tuple(f["controls"]),
+                ): (f["determination"], f.get("determination_detail"))
+                for f in findings
+            }
 
             invariants_ok = (
-                by_key.get(("pycrypto", "2.6.1")) == "FAIL_DEPRECATED"
-                and by_key.get(("cryptography", "9.0")) == "WARN_OUTDATED"
-                and by_key.get(("cryptography", "100.0.0")) == "CANNOT_DETERMINE_STATICALLY"
-                and by_key.get(("pycryptodome", "3.20.0")) == "NOT_VALIDATED"
-                and by_key.get(("golang.org/x/crypto", "0.28.0")) == "NOT_VALIDATED"
-                and by_key.get(("libssl.so.1.1", "1.1")) == "FAIL_EOL"
+                payload.get("schema_version") == "1.0.0"
+                and by_key.get(("pycrypto", "2.6.1", ("SI-7", "SC-13"))) == ("FAIL", "FAIL_DEPRECATED")
+                and by_key.get(("cryptography", "9.0", ("SI-7", "SC-13"))) == ("WARN", "WARN_OUTDATED")
+                and by_key.get(("cryptography", "100.0.0", ("SI-7",))) == ("PASS", None)
+                and by_key.get(("cryptography", "100.0.0", ("SC-13",))) == (
+                    "CANNOT_DETERMINE_STATICALLY",
+                    "CAPABLE_IF_CONFIGURED",
+                )
+                and by_key.get(("pycryptodome", "3.20.0", ("SI-7",))) == ("PASS", None)
+                and by_key.get(("pycryptodome", "3.20.0", ("SC-13",))) == ("FAIL", "NOT_VALIDATED")
+                and by_key.get(("golang.org/x/crypto", "0.28.0", ("SI-7",))) == ("PASS", None)
+                and by_key.get(("golang.org/x/crypto", "0.28.0", ("SC-13",))) == ("FAIL", "NOT_VALIDATED")
+                and by_key.get(("libssl.so.1.1", "1.1", ("SI-7", "SC-12", "SC-13"))) == ("FAIL", "FAIL_EOL")
             )
             return self._record(
                 "crypto_lib_scan",
                 invariants_ok,
-                "DEPRECATED, numeric version compare, tri-state FIPS, vendor path & soname EOL verified"
+                "Schema v1.0.0, DEPRECATED, numeric compare, SI-7/SC-13 split, vendor path & soname EOL verified"
                 if invariants_ok
-                else f"unexpected statuses: {by_key}",
+                else f"unexpected schema findings: {by_key}",
             )
         finally:
             shutil.rmtree(base_temp, ignore_errors=True)
+
+    def test_fips_discovery(self) -> bool:
+        """
+        Tests scripts/fips_discovery.py (Phases 2-5):
+          - Validates `rules/finding_schema.example.json` and `fips_findings.json` against v1.0.0 schema
+          - Verifies `--dry-run` preview writes zero files
+          - Verifies CycloneDX 1.6 CBOM, SARIF 2.1.0, CMVP mapping, FIPS assessment & provenance deliverables
+          - Verifies cross-engine deduplication between Semgrep and FIPSDiscovery in `grc_reporter.py`
+        """
+        print("[*] [grc_test] Testing Engine #7: fips_discovery.py (FIPS 140-3, CBOM, SARIF & CMVP)...")
+        from grc_common import validate_finding_envelope
+
+        example_path = Path(REPO_ROOT) / "rules" / "finding_schema.example.json"
+        if not example_path.is_file():
+            return self._record("fips_discovery", False, "rules/finding_schema.example.json missing")
+        ex_errs = validate_finding_envelope(json.loads(example_path.read_text(encoding="utf-8")))
+        if ex_errs:
+            return self._record("fips_discovery", False, f"example schema invalid: {ex_errs[:2]}")
+
+        fips_script = os.path.join(SCRIPT_DIR, "fips_discovery.py")
+        reporter_script = os.path.join(SCRIPT_DIR, "grc_reporter.py")
+        temp_dir = Path(tempfile.mkdtemp(prefix="grc_fips_test_"))
+        ws = temp_dir / "ws"
+        ev = temp_dir / "ev"
+        ws.mkdir(parents=True)
+        try:
+            (ws / "src").mkdir()
+            (ws / "src" / "app.py").write_text(
+                "import hashlib\n"
+                "def bad_hash(data: bytes) -> str:\n"
+                "    return hashlib.md5(data).hexdigest()\n"
+                "def good_hash(data: bytes) -> str:\n"
+                "    return hashlib.sha256(data).hexdigest()\n",
+                encoding="utf-8",
+            )
+            (ws / "etc" / "default").mkdir(parents=True)
+            (ws / "etc" / "default" / "grub").write_text('GRUB_CMDLINE_LINUX="fips=0"\n', encoding="utf-8")
+            (ws / "requirements.txt").write_text("pycryptodome==3.20.0\n", encoding="utf-8")
+
+            # 1. --dry-run must not create evidence directory
+            res_dry = subprocess.run(
+                [sys.executable, fips_script, "--workspace", str(ws), "--evidence", str(ev), "--dry-run"],
+                capture_output=True,
+                text=True,
+            )
+            if res_dry.returncode != 0 or ev.exists():
+                return self._record("fips_discovery", False, "--dry-run failed or wrote files")
+
+            # 2. Full assessment run
+            res_run = subprocess.run(
+                [sys.executable, fips_script, "--workspace", str(ws), "--evidence", str(ev)],
+                capture_output=True,
+                text=True,
+            )
+            expected_files = (
+                "fips_findings.json",
+                "cbom.cdx.json",
+                "fips_findings.sarif",
+                "cmvp_mapping.md",
+                "fips_assessment.md",
+                "fips_provenance.json",
+                "sha256sum",
+            )
+            if res_run.returncode != 0 or not all((ev / fn).is_file() for fn in expected_files):
+                return self._record("fips_discovery", False, f"missing deliverables: {res_run.stderr.strip()}")
+
+            fips_env = json.loads((ev / "fips_findings.json").read_text(encoding="utf-8"))
+            schema_errs = validate_finding_envelope(fips_env)
+            if schema_errs:
+                return self._record("fips_discovery", False, f"fips_findings.json schema errors: {schema_errs[:2]}")
+
+            cbom = json.loads((ev / "cbom.cdx.json").read_text(encoding="utf-8"))
+            sarif = json.loads((ev / "fips_findings.sarif").read_text(encoding="utf-8"))
+
+            # 3. Cross-engine deduplication check with synthetic Semgrep MD5 hit on src/app.py:3
+            (ev / "semgrep_findings.json").write_text(json.dumps({
+                "results": [
+                    {
+                        "check_id": "rules.grc-aoc03-python-weak-hashing",
+                        "path": "src/app.py",
+                        "start": {"line": 3},
+                        "extra": {
+                            "severity": "WARNING",
+                            "message": "AOC-03 [NIST SP 800-53 SC-13]: Insecure cryptographic hash function (MD5/SHA-1) detected in Python.",
+                            "lines": "    return hashlib.md5(data).hexdigest()",
+                            "metadata": {
+                                "aoc": "AOC-03: Weak Encryption Check",
+                                "nist_control": "SC-13: Cryptographic Protection",
+                                "confidence": "HIGH",
+                                "subject_kind": "algorithm",
+                            },
+                        },
+                    }
+                ]
+            }), encoding="utf-8")
+            res_rep = subprocess.run(
+                [sys.executable, reporter_script, "--evidence", str(ev), "--json"],
+                capture_output=True,
+                text=True,
+            )
+            if res_rep.returncode != 0:
+                return self._record("fips_discovery", False, f"reporter failed: {res_rep.stderr.strip()}")
+
+            pkg = json.loads((ev / "scr_scn_package.json").read_text(encoding="utf-8"))
+            md5_poams = [f for f in pkg.get("findings", []) if f.get("file_path") == "src/app.py:3"]
+            invariants_ok = (
+                cbom.get("specVersion") == "1.6"
+                and sarif.get("version") == "2.1.0"
+                and len(md5_poams) == 1
+                and md5_poams[0]["source_tool"] == "FIPSDiscovery"
+                and md5_poams[0].get("also_reported_by") == ["Semgrep"]
+            )
+            return self._record(
+                "fips_discovery",
+                invariants_ok,
+                "Schema v1.0.0, dry-run, CBOM 1.6, SARIF 2.1.0 & Semgrep cross-engine dedup verified"
+                if invariants_ok
+                else f"md5_poams={md5_poams}",
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_grc_ami(self) -> bool:
         """
@@ -429,7 +571,7 @@ class TestEngine:
     def run_all(self) -> bool:
         """Executes all engine checks and unit test suites with per-suite crash isolation."""
         print("==================================================================")
-        print("  GRC-xMINI (v1.4.5 — Yokota) · COMPREHENSIVE TEST SUITE")
+        print("  GRC-xMINI (v1.5.0 — Iwakuni) · COMPREHENSIVE TEST SUITE")
         print("==================================================================")
 
         suite_runners: Dict[str, Callable[[], bool]] = {
@@ -437,6 +579,7 @@ class TestEngine:
             "transform_scans": self.test_transform_scans,
             "grc_bundle": self.test_grc_bundle,
             "crypto_lib_scan": self.test_crypto_scan,
+            "fips_discovery": self.test_fips_discovery,
             "grc_ami": self.test_grc_ami,
             "sbom_analyzer": self.test_sbom_analyzer,
             "grc_reporter": self.test_grc_reporter,
@@ -472,11 +615,12 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Modes:
-  all         Run complete verification suite across all 6 engines + unit tests (default)
+  all         Run complete verification suite across all 7 engines + unit tests (default)
   unit        Run unit test discovery under testing/
   transform   Test scan-to-POA&M transformation engine against sample fixtures
   bundle      Test Git bundle creation, verification, restoration, and teardown
   crypto      Test EOL cryptographic library scanner against synthetic flaws
+  fips        Test FIPS 140-3 discovery, CBOM, SARIF, CMVP & reporter dedup engine
   ami         Test AMI cold-mount mock metadata and rootfs synthesizer
   sbom        Test CycloneDX SBOM STIG analyzer
   reporter    Test Phase 4 SCR/SCN compliance reporter
@@ -484,6 +628,7 @@ Modes:
 Examples:
   ./grc test
   ./grc test unit
+  ./grc test fips
   ./grc test reporter
   python3 scripts/grc_test.py all --verbose
 """,
@@ -491,7 +636,7 @@ Examples:
     parser.add_argument(
         "mode",
         nargs="?",
-        choices=["all", "unit", "transform", "bundle", "crypto", "ami", "sbom", "reporter"],
+        choices=["all", "unit", "transform", "bundle", "crypto", "fips", "ami", "sbom", "reporter"],
         default="all",
         help="Test target mode (default: all).",
     )
@@ -514,6 +659,7 @@ def main() -> None:
         "transform": engine.test_transform_scans,
         "bundle": engine.test_grc_bundle,
         "crypto": engine.test_crypto_scan,
+        "fips": engine.test_fips_discovery,
         "ami": engine.test_grc_ami,
         "sbom": engine.test_sbom_analyzer,
         "reporter": engine.test_grc_reporter,

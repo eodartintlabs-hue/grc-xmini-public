@@ -25,7 +25,7 @@
 </p>
 
 > **Ledger Scope**: **Bug Fixes, Operational Tweaks, Rule/Catalog Tuning & Hygiene Patches (`vX.Y.Z` where `Z > 0`)**  
-> **Active Series Codename**: `Yokota` (`v1.4.x`) · Previous: `Sasebo` (`v1.3.x`), `Misawa` (`v1.2.0`), `Kadena` (`v1.1.0`), `Yokosuka` (`v1.0.x`)  
+> **Active Series Codename**: `Iwakuni` (`v1.5.x`) · Previous: `Yokota` (`v1.4.x`), `Sasebo` (`v1.3.x`), `Misawa` (`v1.2.0`), `Kadena` (`v1.1.0`), `Yokosuka` (`v1.0.x`)  
 > **Companion Documents**: See [`PATCH_LOG_MINOR.md`](PATCH_LOG_MINOR.md) for minor features, [`PATCH_LOG_MAJOR.md`](PATCH_LOG_MAJOR.md) for major baselines, [`RELEASE_NOTES.md`](RELEASE_NOTES.md) for narrative notes, and [`RELEASING.md`](RELEASING.md) for release procedures. (Planned releases are tracked in **[`ROADMAP.md`](ROADMAP.md)**).
 
 ---

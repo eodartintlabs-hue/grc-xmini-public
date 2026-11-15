@@ -17,7 +17,7 @@
   <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
-> **Current release**: `v1.4.5 — Yokota` (Restricted Beta)  
+> **Current release**: `v1.5.0 — Iwakuni` (Restricted Beta)  
 > This file covers **planned** work only. For what has already shipped, see [`RELEASE_NOTES.md`](RELEASE_NOTES.md) and [`PATCH_LOG.md`](PATCH_LOG.md). Versioning and codename rules are in [`RELEASING.md`](RELEASING.md).  
 > Plans may change. A feature is only considered delivered once it appears in the release notes.
 
@@ -25,49 +25,36 @@
 
 ## Where things stand
 
-GRC-xMINI `v1.4.5` provides the 5-phase bundle and AMI review pipeline with seven compliance engines (including `scripts/grc_test.py`, shared `scripts/grc_common.py` / `scripts/grc_fixtures.py` utilities, and externalized `rules/severity_policy.json`, `rules/stig_catalog.json`, and `rules/crypto_catalog.json` `v1.1.0` catalogs with tri-state `fips_status` and `SC-13` human/runtime verification reporting), plus the standalone multi-scan Tenable / AWS Inspector / Qualys VMDR / Wiz scan-to-FedRAMP POA&M transformer (`./grc transform`) operating across `artifacts/drop-off` and `artifacts/pick-up` with unified 2-tab `FedRAMP-POAM.xlsx` workbooks (`Open POA&M Items` + `Closed POA&M Items`), synthetic dataset generation (`scripts/generate_demo_data.py`), timestamped deliverable outputs (`YYYY-MM-DD_HHMMSS`), comprehensive repository hygiene, GRC-xTEST integration fixtures, and dual desktop navigation pathways. Next up in the `v1.x` Japan series are workstation portability and the dedicated FIPS 140-3 Readiness & Cryptographic Posture Analyzer (`v1.5.0 — Iwakuni`). `v2.0.0` marks general availability.
+GRC-xMINI `v1.5.0` provides the 5-phase bundle and AMI review pipeline across eight host-native Python stdlib compliance and testing engines (`transform_scans.py`, `grc_bundle.py`, `grc_ami.py`, `crypto_lib_scan.py`, `fips_discovery.py`, `sbom_analyzer.py`, `grc_reporter.py`, and `grc_test.py`) plus shared `grc_common.py` / `grc_fixtures.py` utilities and externalized `rules/` catalogs (`severity_policy.json`, `stig_catalog.json`, `crypto_catalog.json` `v1.1.0`, `fips_algorithm_policy.json`, `cmvp_catalog.json`, and `finding_schema.json` `v1.0.0`). It pairs the standalone multi-scan Tenable / AWS Inspector / Qualys VMDR / Wiz scan-to-FedRAMP POA&M transformer (`./grc transform`) with full host-native FIPS 140-3 conformance discovery, CycloneDX 1.6 CBOM, SARIF 2.1.0, offline NIST CMVP mapping (`./grc fips` / `./grc scan --fips`), cross-engine reporter deduplication, and companion `GRC-xTEST` (`v1.5.0`) multi-language fixtures. Next up before `v2.0.0 — Pearl Harbor` general availability are workstation portability enhancements, hardened GitHub URL intake, and optional reporter wording refinements.
 
 ```mermaid
 flowchart LR
-    A["v1.4.x — Yokota<br/>Crypto honesty + portability"] --> I["v1.5.0 — Iwakuni<br/>FIPS 140-3 Readiness Analyzer"]
-    I --> B["v2.0.0 — Pearl Harbor<br/>GA + Helm auditing"]
+    I["v1.5.0 — Iwakuni (Shipped)<br/>FIPS 140-3, CBOM & CMVP Engine"] --> B["v2.0.0 — Pearl Harbor<br/>GA + Helm auditing + Portability"]
     B --> C["v2.1.0 — Kaneohe<br/>Cloud lift, local LLM, OSCAL"]
     C --> D["v2.2.0 — Wahiawa<br/>Supply-chain attestation"]
 ```
 
 | Version | Codename | Focus | Status |
 | :--- | :--- | :--- | :--- |
-| `v1.5.0` | Iwakuni | Standalone FIPS 140-3 readiness & cryptographic posture analyzer (`./grc fips`) + reporter `NO_FINDINGS` / `FINDINGS` / `NOT_ASSESSED` wording transition | Next |
+| `v1.5.x` | Iwakuni | Hardened GitHub URL intake (`GRC_GITHUB_HOSTS`), workstation portability (`./grc doctor`), and optional reporter `NO_FINDINGS` / `FINDINGS` wording transition | Next |
 | `v2.0.0` | Pearl Harbor | General availability; Helm chart compliance engine | Planned |
 | `v2.1.0` | Kaneohe | Cloud execution, air-gapped local LLM, NIST OSCAL export, `./grc diff` | Backlog |
 | `v2.2.0` | Wahiawa | Cosign / Sigstore and SLSA provenance checks; container image auditing | Backlog |
 
 ---
 
-## v1.3.5 — Sasebo: Workstation Portability
+## v1.5.x — Iwakuni Follow-Ons: Workstation Portability & Hardened GitHub Intake
 
-**Problem.** Some defaults in `./grc` and the scanner container assume a specific workstation setup, which causes friction when moving between macOS, Linux, and Windows (WSL2).
+**Problem.** Some defaults in `./grc` and the scanner container assume a specific workstation setup, and remote repository reviews currently require pre-packaged `.bundle` files or local clones.
 
 **Planned changes:**
 
 1. **Container file ownership.** On native Linux, containers running as root leave `evidence/` files owned by `root:root`, which locks out the host user. Containers will run with the host user's UID/GID (`--user $(id -u):$(id -g)`) and writable scratch caches (`/tmp/.cache`) so `semgrep`, `checkov`, `syft`, `grype`, and `trivy` work as non-root.
 2. **Pinned scanner image.** `Dockerfile.scanner` will use version-pinned, SHA-256-verified `linux/amd64` and `linux/arm64` releases of Syft, Grype, Trivy, Semgrep, and Checkov, replacing the floating `install.sh` downloads. This prevents upstream changes from breaking `./grc docker-build`.
-3. **Container runtime support.** Replace macOS-specific Docker checks with a detector that supports Docker Desktop, Colima, Rancher Desktop, Linux Docker Engine, and rootless Podman.
-4. **SELinux volume labels.** Detect SELinux-enforcing hosts (RHEL, Fedora, Rocky) and apply the correct mount labels (`:ro,Z`) so scanners can read `/workspace` and write `/evidence`.
-5. **`./grc doctor`.** A pre-flight check for `git`, `python3` (3.9 or later), container runtime status, disk space, and CPU architecture. `./grc fetch` will detect the host OS and CPU instead of hard-coding `Darwin ARM64`.
-
----
-
-## v1.5.0 — Iwakuni: FIPS 140-3 Readiness & Cryptographic Posture Analyzer
-
-**Goal.** Following Phase 0 baseline honesty fixes in `v1.4.5 — Yokota`, introduce a dedicated, deterministic cryptographic posture analyzer (`scripts/fips_analyzer.py` / `./grc fips`) kept inside `GRC-xMINI` (with companion orchestration and optional Mode 2 Gemma 4 narrative enrichment in a dedicated `GRC-xBOT` minor release on its independent circuit progression, decoupled from `v1.3.0 — Tsukuba` `./grc-bot remediate`).
-
-**Planned implementation:**
-
-- **Standalone analyzer (`scripts/fips_analyzer.py`, Python stdlib-only).** Evaluates dependency manifests, binary/runtime configuration indicators, and algorithm findings together with explicit opt-in runtime/host checks, emitting non-overclaiming `NOT_VALIDATED`, `CANNOT_DETERMINE_STATICALLY`, and `NEEDS_REVIEW` posture deliverables.
-- **Offline CMVP reference snapshot & provenance verification.** Ships a versioned CMVP reference snapshot with a **90-day staleness warning**; verifies catalog signatures using `cosign` or `ssh-keygen -Y verify` when installed, and prints a warning when neither tool is available (making clear that a same-repo SHA-256 checksum alone only checks file integrity against corruption, not publisher authenticity).
-- **Host allowlist (`GRC_GITHUB_HOSTS`).** Introduces `GRC_GITHUB_HOSTS` defaulting to `github.com` for release/advisory metadata fetch paths while keeping GitHub Enterprise Server (GHES) support deferred past v1.
-- **Reporter wording transition (`scripts/grc_reporter.py`).** Updates existing control/summary labels from overclaiming `COMPLIANT` / `NON-COMPLIANT` (when merely 0 findings occurred) to `NO_FINDINGS` / `FINDINGS` / `NOT_ASSESSED` alongside `NEEDS_REVIEW` across Phase 4 deliverables and tests.
+3. **Container runtime support & SELinux labels.** Replace macOS-specific Docker checks with a detector that supports Docker Desktop, Colima, Rancher Desktop, Linux Docker Engine, and rootless Podman, and apply `:ro,Z` mount labels on SELinux-enforcing hosts.
+4. **`./grc doctor`.** A pre-flight check for `git`, `python3` (3.9 or later), container runtime status, disk space, and CPU architecture. `./grc fetch` will detect the host OS and CPU instead of hard-coding `Darwin ARM64`.
+5. **Hardened GitHub URL intake (`Phase 1`).** Strict `https://` scheme validation and configurable host allowlists (`GRC_GITHUB_HOSTS`, defaulting to `github.com`) with hardened `git` flags (`-c core.hooksPath=/dev/null`, `-c protocol.file.allow=never`, `GIT_LFS_SKIP_SMUDGE=1`, no submodule recursion by default).
+6. **Optional CMVP signature verification & reporter wording transition.** Add optional `cosign` / `ssh-keygen -Y verify` catalog authenticity checks alongside SHA-256 integrity hashes, and evaluate transitioning overall Phase 4 summary labels to `NO_FINDINGS` / `FINDINGS` / `NOT_ASSESSED` alongside `NEEDS_REVIEW`.
 
 ---
 

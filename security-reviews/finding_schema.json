@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grc-xmini.local/schemas/finding/1.0.0",
+  "title": "GRC-xMINI Normalized Finding Envelope",
+  "description": "DRAFT 1.0.0. The contract between GRC-xMINI engines and grc_reporter.py. Native engines (crypto_lib_scan.py, fips_discovery.py, future engines) emit this envelope directly. Third-party tools (Semgrep, Checkov, Grype, Trivy, Gitleaks) keep their native output; their reporter adapters translate into this same record in memory. Severity -> CAT/SLA derivation stays in rules/severity_policy.json and is applied by the reporter, never by engines. See hygiene/FINDING_SCHEMA_DRAFT.md.",
+  "type": "object",
+  "required": ["schema_version", "engine", "generated_at", "scope", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Version of this schema the file conforms to. The reporter uses its presence to tell new-format files from legacy *_findings.json.",
+      "type": "string",
+      "pattern": "^1\\.\\d+\\.\\d+$"
+    },
+    "engine": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "description": "Stable engine label, matches loaded_scanners in grc_reporter.py.", "type": "string", "examples": ["CryptoScan", "FIPSDiscovery", "Semgrep"] },
+        "version": { "type": "string" },
+        "catalogs": {
+          "description": "Every rules/*.json or ruleset the engine evaluated against, with version and SHA-256, so evidence is reproducible.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "version"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "version": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "last_updated": { "type": "string", "format": "date" }
+            }
+          }
+        }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identifier": { "description": "bundle_identifier / ami_identifier from provenance.", "type": "string" },
+        "provenance_file": { "type": "string", "examples": ["bundle_provenance.json", "ami_provenance.json"] },
+        "commit": { "type": "string" }
+      }
+    },
+    "scope": {
+      "description": "What this run actually tested. Replaces the static NIST_CONTROLS_CATALOG[*].assessed_by lookup: a control with zero findings may only roll up as passing if it appears in assessed_controls of at least one loaded engine.",
+      "type": "object",
+      "required": ["assessed_controls"],
+      "additionalProperties": false,
+      "properties": {
+        "assessed_controls": { "type": "array", "items": { "$ref": "#/$defs/control_id" }, "uniqueItems": true },
+        "assessed_aocs": { "type": "array", "items": { "$ref": "#/$defs/aoc_id" }, "uniqueItems": true },
+        "ecosystems": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "limitations": {
+          "description": "Human-readable statements of what the run could NOT see (e.g. 'Go analyzed lexically; constants across files not resolved'). Rendered verbatim in deliverables.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+
+  "$defs": {
+    "control_id": {
+      "description": "NIST SP 800-53 Rev. 5 control, optionally with enhancement. Preserves SC-8(1), SC-28(1).",
+      "type": "string",
+      "pattern": "^[A-Z]{2}-\\d{1,2}(\\(\\d{1,2}\\))?$"
+    },
+    "aoc_id": { "type": "string", "pattern": "^AOC-\\d{2,3}$" },
+    "severity": {
+      "description": "Canonical keys of rules/severity_policy.json.",
+      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+    },
+
+    "finding": {
+      "description": "One finding answers ONE question about ONE subject at ONE location. A library that is both outdated (SI-7) and of unknown FIPS status (SC-13) yields two findings, not one with two statuses.",
+      "type": "object",
+      "required": ["finding_id", "rule_id", "aoc", "controls", "determination", "subject", "location", "detection", "title", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "description": "Deterministic within the engine: same input -> same id across runs. Recommended: first 16 hex of sha256(engine|rule_id|location.path|location.line_start|subject.name).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+        },
+        "rule_id": { "description": "Rule/catalog key that fired (e.g. grc-aoc03-python-weak-hashing, crypto:openssl, CVE-2024-1234).", "type": "string" },
+        "aoc": {
+          "type": "object",
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "$ref": "#/$defs/aoc_id" },
+            "title": { "type": "string" }
+          }
+        },
+        "controls": {
+          "description": "All controls this finding bears on. The reporter must not truncate to the first.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/control_id" }
+        },
+        "determination": {
+          "description": "What the engine concluded. FAIL/WARN -> POA&M. NEEDS_REVIEW/CANNOT_DETERMINE_STATICALLY -> 'Requires Human / Runtime Verification' section, never POA&M, never SLA. PASS -> positive evidence only (rendered as 'conformant indicator' in FIPS deliverables per handoff §1.1).",
+          "enum": ["FAIL", "WARN", "NEEDS_REVIEW", "CANNOT_DETERMINE_STATICALLY", "PASS"]
+        },
+        "determination_detail": {
+          "description": "Engine-specific sub-status preserved for traceability. Free-form but SHOULD be UPPER_SNAKE.",
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "examples": ["FAIL_EOL", "FAIL_DEPRECATED", "WARN_OUTDATED", "WARN_UNVERIFIED", "WARN_UNRECOMMENDED", "FAIL_HISTORICAL_CERT", "NOT_VALIDATED", "CAPABLE_IF_CONFIGURED"]
+        },
+        "severity": {
+          "description": "Required for FAIL and WARN. Omit or INFO otherwise. CAT level and SLA are derived by the reporter from severity_policy.json.",
+          "$ref": "#/$defs/severity"
+        },
+        "subject": {
+          "description": "WHAT the finding is about. Together with location and aoc.id this forms the cross-engine dedup key.",
+          "type": "object",
+          "required": ["kind", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["algorithm", "protocol", "package", "module", "config_setting", "secret", "vulnerability", "iac_resource", "code_pattern"] },
+            "name": { "description": "Normalized, lowercase-insensitive identifier: 'md5', 'tls1.0', 'cryptography', 'openssl.cnf:fips_sect', 'CVE-2024-1234'.", "type": "string" },
+            "version": { "type": "string" },
+            "ecosystem": { "type": "string", "examples": ["pypi", "npm", "maven", "go", "cargo", "nuget", "system", "rpm", "deb"] },
+            "parameters": {
+              "description": "Algorithm/protocol parameters relevant to policy (Phase 3).",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "mode": { "type": "string" },
+                "key_bits": { "type": "integer", "minimum": 0 },
+                "curve": { "type": "string" },
+                "purpose": { "enum": ["signature", "hashing", "hmac", "encryption", "key_agreement", "kdf", "rng", "non_security", "unknown"] }
+              }
+            }
+          }
+        },
+        "location": {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["file", "manifest", "package", "host", "image"] },
+            "path": { "description": "Workspace-relative, forward slashes, no leading './'. Omit for host-level findings.", "type": "string" },
+            "line_start": { "type": "integer", "minimum": 1 },
+            "line_end": { "type": "integer", "minimum": 1 },
+            "column": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "detection": {
+          "type": "object",
+          "required": ["method", "confidence"],
+          "additionalProperties": false,
+          "properties": {
+            "method": { "enum": ["ast", "lexical", "manifest", "lockfile", "config", "binary", "external_tool"] },
+            "confidence": {
+              "description": "HIGH: AST/lockfile/exact config key. MEDIUM: lexical match or unpinned manifest range. LOW: heuristic.",
+              "enum": ["HIGH", "MEDIUM", "LOW"]
+            }
+          }
+        },
+        "title": { "type": "string", "maxLength": 200 },
+        "message": { "type": "string" },
+        "remediation": { "type": "string" },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "snippet": { "description": "MUST be redacted for secrets. Max 500 chars.", "type": "string", "maxLength": 500 },
+            "references": {
+              "description": "Normative citations backing the determination.",
+              "type": "array",
+              "items": { "type": "string" },
+              "examples": [["NIST SP 800-131A Rev. 2 §9", "FIPS 180-4"]]
+            }
+          }
+        },
+        "extensions": {
+          "description": "Namespaced, engine-specific data the reporter may ignore. New namespaces need no schema bump.",
+          "type": "object",
+          "properties": {
+            "fips": { "$ref": "#/$defs/fips_extension" }
+          },
+          "additionalProperties": { "type": "object" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "determination": { "enum": ["FAIL", "WARN"] } } },
+          "then": { "required": ["severity", "remediation"] }
+        },
+        {
+          "if": { "properties": { "location": { "properties": { "kind": { "enum": ["file", "manifest"] } } } } },
+          "then": { "properties": { "location": { "required": ["kind", "path"] } } }
+        }
+      ]
+    },
+
+    "fips_extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fips_status": { "enum": ["VALIDATED_MODULE", "CAPABLE_IF_CONFIGURED", "NOT_VALIDATED", "UNKNOWN"] },
+        "module_name": { "type": "string" },
+        "cmvp_cert": { "type": "string", "pattern": "^\\d{1,5}$" },
+        "cert_standard": { "enum": ["FIPS 140-2", "FIPS 140-3"] },
+        "cert_status": { "enum": ["Active", "Historical", "Revoked", "Unknown"] },
+        "operational_environment": { "type": "string" },
+        "approved_mode_evidence": {
+          "description": "Paths/keys that show approved-mode intent (or its absence), e.g. 'etc/default/grub:fips=0'.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

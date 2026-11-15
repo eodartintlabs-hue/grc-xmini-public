@@ -43,11 +43,11 @@ GRCx uses Semantic Versioning: `v<MAJOR>.<MINOR>.<PATCH>`.
 | Security / container | Patch | Rebuilding `grc-scanner:local` for new offline CVE databases or base image packages |
 | Docs | Patch | Documentation, diagrams, file naming, `.gitignore`, formatting |
 
-### Companion Repository Synchronization (`GRC-xTEST`)
+### Companion Repository Synchronization (`GRC-xTEST` & `GRC-xBOT`)
 
-The companion test corpus **`GRC-xTEST`** ([`https://github.com/eodartintlabs-hue/grc-xtest.git`](https://github.com/eodartintlabs-hue/grc-xtest.git)) is maintained on the **same Minor Release Schedule** as `GRC-x`:
-* **Minor Alignment (`v<MAJOR>.<MINOR>.x`)**: Both repositories advance together across minor feature baselines (e.g., `v1.1.0 Kadena`, `v1.2.0 Misawa`, `v1.3.x Sasebo`, `v2.0.0 Pearl Harbor`).
-* **Decoupled Patch Cadence**: `GRC-xTEST` does **not** need to sync down to individual patch releases. When `GRC-x` increments for bug fixes, documentation hygiene, or patch updates (e.g., `v1.3.1`, `v1.3.2`, `v1.3.3`, `v1.3.4`), `GRC-xTEST` remains stable on the active minor series (`v1.3.x`) unless new synthetic bundles, scan schemas, or negative test fixtures are specifically introduced.
+The companion test corpus **`GRC-xTEST`** ([`https://github.com/eodartintlabs-hue/grc-xtest.git`](https://github.com/eodartintlabs-hue/grc-xtest.git)) and companion interactive co-pilot **`GRC-xBOT`** are synchronized on **Minor Release numbering** with `GRC-x`:
+* **Minor Version Alignment (`v<MAJOR>.<MINOR>.x`)**: All three Triad repositories advance together across major and minor feature baselines (e.g., `v1.5.0`, `v2.0.0`). `GRC-xTEST` shares the military installation codenames with `GRC-xMINI` (e.g., `v1.5.0 Iwakuni`), while `GRC-xBOT` retains its own racing-circuit codename progression (e.g., `v1.5.0 Tsukuba`).
+* **Decoupled Patch Cadence**: `GRC-xTEST` and `GRC-xBOT` do **not** need to sync down to individual patch releases. When `GRC-x` increments for bug fixes, documentation hygiene, or patch updates (e.g., `v1.5.1`), `GRC-xTEST` and `GRC-xBOT` remain stable on the active minor series (`v1.5.x`) unless new synthetic fixtures or co-pilot playbook changes are specifically introduced.
 
 ---
 
@@ -57,7 +57,7 @@ Each minor release gets a codename. Patch releases keep the codename of their mi
 
 | Series | Phase | Theme | Codenames |
 | :--- | :--- | :--- | :--- |
-| `v1.x` | Restricted beta and integration testing | U.S. military installations in Japan | Yokosuka (`v1.0.x`), Kadena (`v1.1.0`), Misawa (`v1.2.0`), Sasebo (`v1.3.x`) |
+| `v1.x` | Restricted beta and integration testing | U.S. military installations in Japan | Yokosuka (`v1.0.x`), Kadena (`v1.1.0`), Misawa (`v1.2.0`), Sasebo (`v1.3.x`), Yokota (`v1.4.x`), Iwakuni (`v1.5.x`) |
 | `v2.x` | General availability | Hawaiian cities with U.S. military bases | Pearl Harbor (`v2.0.0`), Kaneohe (`v2.1.0`), Wahiawa (`v2.2.0`); unassigned: Kunia, Kekaha |
 
 Tag annotations use this format: `Release v<MAJOR>.<MINOR>.<PATCH> - <Codename>: <Summary>`.

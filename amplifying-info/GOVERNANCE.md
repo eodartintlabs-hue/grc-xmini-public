@@ -250,7 +250,7 @@ The companion repository **[`GRC-xTEST`](https://github.com/eodartintlabs-hue/gr
 | **`aoc-09-eol-libraries.bundle`** | AOC-09 (Unsupported / EOL Crypto Libraries) | `SI-7`, `SC-12`, `SC-13` | `crypto_lib_scan.py` flags EOL/deprecated crypto dependencies (`pycrypto 2.6.1`, `OpenSSL 1.1.1`, `Bouncy Castle 1.60`, `crypto-js`). |
 | **`aoc-10-critical-cves.bundle`** | AOC-10 (Critical Known Vulnerabilities) | `RA-5`, `SI-2` | Syft + Grype / Trivy flag direct dependencies harboring critical CVEs (`Log4j 2.14.1`, `Spring Core 5.3.17`). |
 | **`aoc-11-stig-cat1.bundle`** | AOC-11 (High-Severity DISA STIG Flaws) | `SA-11`, `SI-10` | Semgrep and Checkov flag plaintext HTTP listeners, debug mode, XXE, and missing `Secure; HttpOnly` cookie flags. |
-| **`aoc-12-no-fips-mode.bundle`** | AOC-12 (Non-FIPS Operating Mode — *Planned `v1.5.0`*) | `SC-13`, `IA-7` | Staged fixture (`fips=0`, `DEFAULT` crypto policy, commented `[fips_sect]`, unconfigured Java/Python FIPS); automated `AOC-12` checks ship in `v1.5.0 — Iwakuni`. |
+| **`aoc-12-no-fips-mode.bundle`** | AOC-12 (Non-FIPS Operating Mode) | `SC-13`, `IA-7` | `fips_discovery.py` (`./grc fips` / `./grc scan --fips`) flags `fips=0` kernel cmdline, `DEFAULT` crypto policy, unactivated `openssl.cnf`, non-FIPS `java.security`, and Python `MD5`/`FIPS_mode` bypasses. |
 | **`aoc-140-org-guardrails.bundle`** | AOC-140 (Organization Guardrails) | `AC-3`, `AU-3` | Semgrep flags credential, authorization header, and secret leakage to logs or `stdout`. |
 | **`aoc-combo-4x.bundle`** | Multi-AOC Composite Suite (AOC-02, 04, 07, 09) | `IA-2`, `SI-4`, `CM-6`, `SC-13` | Integrated 4-in-1 bundle verifying 19 total findings (`13 CAT I`, `6 CAT II`) across Semgrep, Checkov, and `crypto_lib_scan.py`. |
 
