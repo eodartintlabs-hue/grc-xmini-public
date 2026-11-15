@@ -420,6 +420,8 @@ class GRCComplianceReporter:
         self.loaded_scanners: Set[str] = set()
         self.assessed_controls_from_scope: Set[str] = set()
         self.scoped_scanners: Set[str] = set()
+        self.scanner_files_inspected: Dict[str, int] = {}
+        self.scanner_workspace_totals: Dict[str, int] = {}
         self.sbom_stig_evidence: Optional[Dict[str, Any]] = None
         self._seen_vuln_keys: Set[Tuple[str, str]] = set()
         self._finding_counter = 1
@@ -720,18 +722,39 @@ class GRCComplianceReporter:
         """
         if not isinstance(data, dict):
             return
-        producer = data.get("producer") if isinstance(data.get("producer"), dict) else {}
-        tool_name = str(producer.get("name") or default_tool)
+        eng = (
+            data.get("engine")
+            if isinstance(data.get("engine"), dict)
+            else (data.get("producer") if isinstance(data.get("producer"), dict) else {})
+        )
+        tool_name = str(eng.get("name") or default_tool)
         self.loaded_scanners.add(tool_name)
 
         scope = data.get("scope") if isinstance(data.get("scope"), dict) else {}
+        fi = scope.get("files_inspected")
+        files_total = (
+            fi.get("total")
+            if (isinstance(fi, dict) and not isinstance(fi.get("total"), bool) and isinstance(fi.get("total"), int))
+            else None
+        )
+        ws_total = (
+            fi.get("workspace_files_total")
+            if (isinstance(fi, dict) and not isinstance(fi.get("workspace_files_total"), bool) and isinstance(fi.get("workspace_files_total"), int))
+            else None
+        )
+        if files_total is not None:
+            self.scanner_files_inspected[tool_name] = files_total
+        if ws_total is not None:
+            self.scanner_workspace_totals[tool_name] = ws_total
+
         if "assessed_controls" in scope and isinstance(scope.get("assessed_controls"), list):
             self.scoped_scanners.add(tool_name)
-            for raw_ctl in scope.get("assessed_controls") or []:
-                ctl = str(raw_ctl).strip()
-                if ctl:
-                    self.assessed_controls_from_scope.add(ctl)
-                    self.assessed_controls_from_scope.add(ctl.split("(")[0])
+            if files_total is None or files_total > 0:
+                for raw_ctl in scope.get("assessed_controls") or []:
+                    ctl = str(raw_ctl).strip()
+                    if ctl:
+                        self.assessed_controls_from_scope.add(ctl)
+                        self.assessed_controls_from_scope.add(ctl.split("(")[0])
 
         anchor = self._anchor_date()
         findings_list = data.get("findings", []) if isinstance(data.get("findings"), list) else []
@@ -1272,6 +1295,28 @@ class GRCComplianceReporter:
                     grouped.setdefault(mapped, []).append(item)
         return grouped
 
+    def _no_files_assessed(self) -> bool:
+        """
+        Returns True when scanner evidence is present, all file-counting scanners inspected 0 files,
+        and either every loaded scanner reported file counts or FIPSDiscovery saw 0 total workspace
+        files with no other findings/evidence present.
+        """
+        if not self.loaded_scanners or not self.scanner_files_inspected:
+            return False
+        if any(cnt > 0 for cnt in self.scanner_files_inspected.values()):
+            return False
+        if len(self.scanner_files_inspected) == len(self.loaded_scanners):
+            return True
+        fips_ws_total = self.scanner_workspace_totals.get("FIPSDiscovery")
+        if (
+            fips_ws_total == 0
+            and not self.findings
+            and not self.verification_items
+            and self.sbom_stig_evidence is None
+        ):
+            return True
+        return False
+
     def generate_poam_markdown(self) -> str:
         """Generates poam_data.md in formal FedRAMP High / DoD format."""
         now = utc_now_str()
@@ -1294,6 +1339,8 @@ class GRCComplianceReporter:
         low_count = sum(1 for f in self.findings if f.severity in ("LOW", "INFORMATIONAL", "INFO"))
         total_count = len(self.findings)
         verify_count = len(self.verification_items)
+        no_files = self._no_files_assessed()
+        unassessed = (not self.loaded_scanners) or no_files
 
         if total_count > 0:
             overall_posture = "NON-COMPLIANT (Active Findings Identified)"
@@ -1301,8 +1348,16 @@ class GRCComplianceReporter:
             overall_posture = "NEEDS REVIEW (Human / Runtime Verification Required)"
         elif not self.loaded_scanners:
             overall_posture = "NOT ASSESSED (No Scanner Evidence Present)"
+        elif no_files:
+            overall_posture = "NOT ASSESSED (No Assessable Files Found)"
         else:
             overall_posture = "COMPLIANT (Clean Out-of-Band Audit)"
+
+        engines_str = (
+            f"{', '.join(sorted(self.loaded_scanners))} ({len(self.loaded_scanners)} of 10)"
+            if self.loaded_scanners
+            else "None (0 of 10)"
+        )
 
         md = [
             "# Plan of Action and Milestones (POA&M) Datapoints",
@@ -1313,6 +1368,7 @@ class GRCComplianceReporter:
             f"> **Cryptographic Hash (SHA-256)**: `{sha256}`  ",
             f"> **Review Session ID**: `{session_id}`  ",
             f"> **Evaluation Timestamp**: `{now}`  ",
+            f"> **Engines Run**: `{engines_str}`  ",
             f"> **Overall Audit Posture**: **{overall_posture}**  ",
             "",
             "---",
@@ -1323,10 +1379,10 @@ class GRCComplianceReporter:
             "",
             "| Severity Level | DISA STIG Impact Category | Active Findings Count | Mandatory Remediation SLA | Compliance Status |",
             "| :--- | :--- | :--- | :--- | :--- |",
-            f"| **CRITICAL** | **Category I (CAT I)** | **{crit_count}** | **30 Calendar Days** | {'❌ Non-Compliant' if crit_count > 0 else ('⚪ Not Assessed' if not self.loaded_scanners else '✅ Clear')} |",
-            f"| **HIGH** | **Category II (CAT II)** | **{high_count}** | **30 Calendar Days** | {'❌ Non-Compliant' if high_count > 0 else ('⚪ Not Assessed' if not self.loaded_scanners else '✅ Clear')} |",
-            f"| **MEDIUM** | **Category III (CAT III)** | **{med_count}** | **90 Calendar Days** | {'⚠️ Warning' if med_count > 0 else ('⚪ Not Assessed' if not self.loaded_scanners else '✅ Clear')} |",
-            f"| **LOW / INFO** | Informational | **{low_count}** | 180 Calendar Days | {'⚪ Not Assessed' if not self.loaded_scanners else '✅ Monitored'} |",
+            f"| **CRITICAL** | **Category I (CAT I)** | **{crit_count}** | **30 Calendar Days** | {'❌ Non-Compliant' if crit_count > 0 else ('⚪ Not Assessed' if unassessed else '✅ Clear')} |",
+            f"| **HIGH** | **Category II (CAT II)** | **{high_count}** | **30 Calendar Days** | {'❌ Non-Compliant' if high_count > 0 else ('⚪ Not Assessed' if unassessed else '✅ Clear')} |",
+            f"| **MEDIUM** | **Category III (CAT III)** | **{med_count}** | **90 Calendar Days** | {'⚠️ Warning' if med_count > 0 else ('⚪ Not Assessed' if unassessed else '✅ Clear')} |",
+            f"| **LOW / INFO** | Informational | **{low_count}** | 180 Calendar Days | {'⚪ Not Assessed' if unassessed else '✅ Monitored'} |",
             f"| **Needs Verification** | Assessor / Runtime Review | **{verify_count}** | *Excluded from POA&M* | {'🔍 Needs Review (See Sec. 4)' if verify_count > 0 else '—'} |",
             f"| **TOTAL (POA&M Weaknesses)** | — | **{total_count}** | — | **{overall_posture}** |",
             "",
@@ -1349,6 +1405,9 @@ class GRCComplianceReporter:
             elif not self.loaded_scanners:
                 empty_status = "**Not Assessed**"
                 empty_msg = "No scanner evidence files were present in the evidence directory."
+            elif no_files:
+                empty_status = "**Not Assessed**"
+                empty_msg = "No assessable files were found in the target workspace (0 files inspected)."
             else:
                 empty_status = "**Compliant**"
                 empty_msg = "No unmitigated vulnerabilities detected in release."
@@ -1671,7 +1730,7 @@ class GRCComplianceReporter:
             overall_status = "NON_COMPLIANT"
         elif self.verification_items:
             overall_status = "NEEDS_REVIEW"
-        elif not self.loaded_scanners:
+        elif not self.loaded_scanners or self._no_files_assessed():
             overall_status = "NOT_ASSESSED"
         else:
             overall_status = "COMPLIANT"

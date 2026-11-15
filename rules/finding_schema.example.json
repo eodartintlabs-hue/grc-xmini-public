@@ -11,7 +11,16 @@
     "assessed_controls": ["SI-7", "SC-13"],
     "assessed_aocs": ["AOC-09", "AOC-12"],
     "ecosystems": ["pypi", "system"],
-    "limitations": ["Operational environment not determinable from manifests alone."]
+    "limitations": ["Operational environment not determinable from manifests alone."],
+    "files_inspected": {
+      "total": 4,
+      "workspace_files_total": 5,
+      "python": 1,
+      "polyglot_source": 0,
+      "manifests": 2,
+      "deploy_iac": 0,
+      "os_config": 1
+    }
   },
   "findings": [
     {

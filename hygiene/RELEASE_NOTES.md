@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.5.0 — Iwakuni` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.5.1 — Iwakuni` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.5.1`](#v151--iwakuni) | Iwakuni | 2026-11-15 | Bug Fix | _TBD after tagging_ | Priority 1–2 KestrelBridge & FIPS integrity patch (`H1`, `H2`, `H3`, `M2 v2`, `H6`): rebuilt KestrelBridge bundles with `HEAD` and guarded `grc_bundle.py` against empty `HEAD`-less checkouts (auto-cleanup + multi-tag `--ref` skip warnings); blocked `.bundle` files passed as `-w` in `fips_discovery.py` and `crypto_lib_scan.py`; added `scope.files_inspected` to Schema v1.0.0, `stderr` warnings / `--allow-empty` / exit `2` on `0` inspected files in `fips_discovery.py`, and `NOT ASSESSED (No Assessable Files Found)` posture in `grc_reporter.py`; updated `GRC-xTEST/scripts/verify_pipeline.sh` across all 16 bundles (`18` tag/ref snapshots) with exact KestrelBridge baseline assertions |
 | [`v1.5.0`](#v150--iwakuni) | Iwakuni | 2026-11-15 | Minor | `cdbcfc0` | FIPS 140-3 Static Cryptographic Discovery, Algorithm Policy, Offline NIST CMVP & CBOM Engine (Phases 2–5): `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`), Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`), `rules/fips_algorithm_policy.json`, `rules/cmvp_catalog.json` (Active 140-3 vs. Historical 140-2 + 90-day staleness), CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, D10 manifest expansion (`Cargo`, `NuGet`, `Gradle`, lockfiles), cross-engine `grc_reporter.py` deduplication, purple `grcfetch` banner keys + Triad companion sync (`GRC-xTEST v1.5.0 — Iwakuni` & `GRC-xBOT v1.5.0 — Tsukuba`), and 49 unit tests + all 8 engine suites passing |
 | [`v1.4.5`](#v145--yokota) | Yokota | 2026-11-14 | Bug fix | `f5d139e` | FIPS 140-3 Phase 0 baseline honesty & verification separation: `rules/crypto_catalog.json` v1.1.0 (`fips_status` replacing `fips_capable`), tri-state `crypto_lib_scan.py` statuses (`NOT_VALIDATED` vs. `CANNOT_DETERMINE_STATICALLY`) & ecosystem scoping, `AOC-03` `SI-16` -> `SC-13` remapping, `poam_data.md` Sec. 4 ("Needs Human or Runtime Verification") + `SC-13` `NEEDS REVIEW`, regenerated `demo-evidence/*`, and 42 unit tests passing |
 | [`v1.4.4`](#v144--yokota) | Yokota | 2026-11-02 | Bug fix | `5adf787` | Native Qualys VMDR & Wiz Cloud Security adapters, 4-way scanner auto-detection, vendor remediation URL drafting, and pure standard-library synthetic demo data generator (`scripts/generate_demo_data.py`) |
@@ -48,6 +49,34 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.5.1 — Iwakuni
+
+**FIPS Bundle Integrity, Workspace Validation, `files_inspected` Coverage & Reporter Honesty Patch** · November 15, 2026 · Tag `v1.5.1`
+
+This patch release implements the Priority 1 (`H1`, `H2`, `H3`, `M2 v2`) and Priority 2 (`H6`) consensus fixes from [`KESTRELBRIDGE_FIPS_FINAL_DECISIONS.md`](../security-reviews/KESTRELBRIDGE_FIPS_FINAL_DECISIONS.md), eliminating silent empty-workspace false-compliance cascades while preserving the KestrelBridge `v2.0.0` `COMPLIANT (Clean Out-of-Band Audit)` demo posture.
+
+1. **`H1` — KestrelBridge `HEAD` Bundle Rebuilds & Empty-Checkout Protection (`GRC-xTEST/scenarios/kestrelbridge/build_bundle.sh`, `scripts/grc_bundle.py`)**:
+   - Updated both `git bundle create` invocations in `GRC-xTEST/scenarios/kestrelbridge/build_bundle.sh` to include `HEAD` and regenerated all 4 KestrelBridge bundles (`kestrelbridge-v1.0.0.bundle`, `kestrelbridge-v1.5.0.bundle`, `kestrelbridge-v2.0.0.bundle`, `kestrelbridge-fips.bundle`).
+   - Hardened `GRCBundleManager.restore_bundle()` in `scripts/grc_bundle.py` to verify checked-out tracked files (`git ls-files`) and resolved commit hash: if empty or `UNKNOWN`, removes the partial workspace via `safe_rmtree`, skips writing `bundle_provenance.json`, and raises `RuntimeError` listing available refs with an explicit `--ref` hint.
+   - Added a `[WARN]` banner on `stderr` when restoring a multi-tag bundle without `-r` / `--ref`, naming skipped release tags so analysts do not confuse `HEAD` with a historical multi-release audit.
+
+2. **`H2` — Reject Raw `.bundle` Files Passed as `-w` Workspaces (`scripts/fips_discovery.py`, `scripts/crypto_lib_scan.py`)**:
+   - Added `ws.is_dir()` validation in both `fips_discovery.py` and `crypto_lib_scan.py` `main()` entrypoints before scanning, failing cleanly (exit `1`) with an explicit `./grc bundle restore ...` remediation hint whenever a `.bundle` archive or non-directory file is passed to `-w` / `--workspace`.
+
+3. **`H3` — Schema `scope.files_inspected`, Explicit `0`-File Warning & `--allow-empty` Exit `2` (`rules/finding_schema.json`, `scripts/grc_common.py`, `scripts/fips_discovery.py`)**:
+   - Added `scope.files_inspected` (`total`, `python`, `polyglot_source`, `manifests`, `deploy_iac`, `os_config`, optional `workspace_files_total`) to Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`, `rules/finding_schema.example.json`, `security-reviews/finding_schema.json`) and enforced it in `scripts/grc_common.py` (`validate_finding_envelope()`).
+   - Updated `scripts/fips_discovery.py` to exclude provenance metadata filenames (`PROVENANCE_FILENAMES`), count inspected files per scan surface, print `Files Inspected` / `[WARN] No assessable files found` in terminal and Markdown reports, emit `[WARN]` on `stderr`, and exit `2` when `0` assessable files are inspected unless `--allow-empty` is supplied.
+
+4. **`M2 v2` — Empty-Scope `NOT ASSESSED` Reporter Posture (`scripts/grc_reporter.py`)**:
+   - Updated `scripts/grc_reporter.py` to ingest `scope.files_inspected` from Schema v1.0.0 envelopes (`scanner_files_inspected`, `scanner_workspace_totals`), keeping `FIPSDiscovery` registered in `scoped_scanners` when `files_inspected.total == 0` while withholding `assessed_controls_from_scope` so controls report `NOT_ASSESSED`.
+   - Added `NOT ASSESSED (No Assessable Files Found)` posture reporting to `poam_data.md` and `scr_scn_package.json` (`_no_files_assessed()`) for zero-file runs, while preserving `COMPLIANT (Clean Out-of-Band Audit)` whenever inspected workspaces (including KestrelBridge `v2.0.0`) yield `0` findings across `> 0` assessed files.
+
+5. **`H6` — Dynamic Ref Resolution & Baseline Assertions in `GRC-xTEST` (`GRC-xTEST/scripts/verify_pipeline.sh`, `testing/test_fips_phases_2_5.py`)**:
+   - Updated `GRC-xTEST/scripts/verify_pipeline.sh` (Bash 3.2 compatible) to resolve refs per bundle via `git bundle list-heads` across all 16 bundles (`18` tag/ref snapshots), enforce exact KestrelBridge JSON determination counts (`v1.0.0`: `31/0/0/1`, `v1.5.0`: `6/2/1/17`, `v2.0.0`: `0/0/0/31`), deduplicate Docker `[5/5]` across redundant KestrelBridge single-version bundles, and isolate Docker `-e` evidence to a temporary directory.
+   - Expanded `testing/test_fips_phases_2_5.py` with regression tests covering `H1`, `H2`, `H3`, and `M2 v2` (`52` unit tests + all `8` test suite runners passing).
 
 ---
 

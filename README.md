@@ -30,7 +30,7 @@
 ```text
 > ./grc fetch
         .--.          .--.          .--.                       
-  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.5.0 (Iwakuni Series)
+  ,p#G*""TG#Gp, ,p#G*""TG#Gp, ,p#G*""TG#Gp,                  GRC-xMINI v1.5.1 (Iwakuni Series)
  {GGG'     `G# {GGG     `GGG {GGG'     `G#                   --------------------------------
  @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   OS: Darwin ARM64 / Linux Bookworm
  'GGG   ,p#GG# @GGG#**#GGG"  'GGG           `GGG, ,GGG'      Model: Out-of-Band (OOB) / Fail-Open
@@ -51,7 +51,7 @@
 ```
 
 > **Classification**: Internal DevSecOps & Security Compliance Specification  
-> **Release Stage**: `v1.5.0 — Iwakuni` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
+> **Release Stage**: `v1.5.1 — Iwakuni` (**Restricted Beta — Integration Testing Access Only**) · *Full GA Release (`v2.0.0 — Pearl Harbor`) transitions to the **Hawaiian Military Base Cities** series (see [Roadmap](hygiene/ROADMAP.md))*  
 > **Target Frameworks**: DISA STIG, NIST SP 800-53 Rev. 5, FedRAMP High, DoD Cloud Computing SRG, OWASP Top 10  
 > **Operational Model**: Out-of-Band (OOB), Fail-Open, Zero Untrusted Execution, Ephemeral Hygiene  
 > **Companion Repositories**: [`GRC-xTEST`](https://github.com/eodartintlabs-hue/grc-xtest) & `GRC-xBOT` (`v1.5.0 — Tsukuba`)  
@@ -314,7 +314,8 @@ In high-assurance compliance automation, a scanner that outputs zero findings is
 
 | Active Milestone | Series Codename | Status | Summary of Active Capabilities | Full Roadmap & Release Docs |
 | :--- | :--- | :--- | :--- | :--- |
-| **`v1.5.0 — Iwakuni`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **FIPS 140-3 Cryptographic Discovery, Algorithm Policy, Offline CMVP & CBOM Engine (Phases 2–5)**: Added stdlib `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`) with Python AST + 7-language lexical/config analyzers, `rules/fips_algorithm_policy.json`, offline `rules/cmvp_catalog.json` (Active 140-3 vs. post-`2026-09-21` Historical 140-2 certificates + 90-day staleness check), Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`), CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, `cmvp_mapping.md`, `fips_assessment.md`, D10 manifest expansion (`Cargo`, `NuGet`, `Gradle`, lockfiles), cross-engine `grc_reporter.py` deduplication, `GRC-xTEST/fips-fixtures/` corpus, and 49 unit tests + all 8 engine suites passing. | See **[`hygiene/`](hygiene/)** |
+| **`v1.5.1 — Iwakuni`** | 🇯🇵 Japan *(Beta)* | **Active Release** | **FIPS Bundle Integrity, Workspace Validation, `files_inspected` Coverage & Reporter Honesty Patch**: Rebuilt `GRC-xTEST` KestrelBridge `.bundle` files with `HEAD` and guarded `scripts/grc_bundle.py` against empty `HEAD`-less checkouts (auto-cleanup + multi-tag `--ref` skip warnings); blocked `.bundle` files passed as `-w` workspaces in `fips_discovery.py` and `crypto_lib_scan.py`; added `scope.files_inspected` to `rules/finding_schema.json` (v1.0.0), explicit `0`-file warnings / `--allow-empty` / exit `2` in `scripts/fips_discovery.py`, and `NOT ASSESSED (No Assessable Files Found)` posture reporting in `scripts/grc_reporter.py`; modernized `GRC-xTEST/scripts/verify_pipeline.sh` across all 16 bundles (`18` tag/ref snapshots) with exact KestrelBridge baseline assertions and deduplicated Docker sweeps. | See **[`hygiene/`](hygiene/)** |
+| **`v1.5.0 — Iwakuni`** | 🇯🇵 Japan *(Beta)* | *Prior Beta* | **FIPS 140-3 Cryptographic Discovery, Algorithm Policy, Offline CMVP & CBOM Engine (Phases 2–5)**: Added stdlib `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`) with Python AST + 7-language lexical/config analyzers, `rules/fips_algorithm_policy.json`, offline `rules/cmvp_catalog.json` (Active 140-3 vs. post-`2026-09-21` Historical 140-2 certificates + 90-day staleness check), Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`), CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, `cmvp_mapping.md`, `fips_assessment.md`, D10 manifest expansion (`Cargo`, `NuGet`, `Gradle`, lockfiles), cross-engine `grc_reporter.py` deduplication, `GRC-xTEST/fips-fixtures/` corpus, and 49 unit tests + all 8 engine suites passing. | See **[`hygiene/`](hygiene/)** |
 
 > 🗺️ **Looking Ahead to Future Milestones?**  
 > Planned releases—including workstation portability (`./grc doctor` & non-root container UID/GID mapping) and the full **`v2.0.0 — Pearl Harbor`** General Availability launch (Helm chart auditing)—are maintained in the **[`hygiene/`](hygiene/)** governance directory:

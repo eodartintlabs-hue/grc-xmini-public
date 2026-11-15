@@ -62,7 +62,7 @@ except ImportError:
         version_matches_prefix,
     )
 
-ENGINE_VERSION = "1.5.0"
+ENGINE_VERSION = "1.5.1"
 SKIP_DIRS = {".git", "node_modules", "vendor", "__pycache__", ".venv", "venv", "target", "bin", "obj"}
 
 
@@ -1613,6 +1613,16 @@ def main() -> None:
     workspace_path = Path(args.workspace).resolve()
     if not workspace_path.exists():
         print(f"[FATAL] Workspace path does not exist: {workspace_path}", file=sys.stderr)
+        sys.exit(1)
+    if not workspace_path.is_dir():
+        if workspace_path.name.lower().endswith(".bundle"):
+            print(
+                f"[FATAL] Workspace path is a Git bundle file, not a directory: {workspace_path}\n"
+                f"        Restore the bundle first: ./grc bundle restore {workspace_path} -w ./ephemeral_workspace -r <tag> -f --read-only",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[FATAL] Workspace path is not a directory: {workspace_path}", file=sys.stderr)
         sys.exit(1)
 
     cat_path = Path(args.catalog) if args.catalog else None

@@ -488,8 +488,22 @@ def validate_finding_envelope(payload: Any) -> List[str]:
         for aoc_item in scope.get("assessed_aocs", []) or []:
             if not isinstance(aoc_item, str) or not _AOC_ID_RE.match(aoc_item):
                 errors.append(f"Invalid scope.assessed_aocs entry: {aoc_item!r}")
-        for uk in set(scope.keys()) - {"assessed_controls", "assessed_aocs", "ecosystems", "limitations"}:
+        for uk in set(scope.keys()) - {"assessed_controls", "assessed_aocs", "ecosystems", "limitations", "files_inspected"}:
             errors.append(f"Unexpected scope field: '{uk}'")
+        fi = scope.get("files_inspected")
+        if fi is not None:
+            if not isinstance(fi, dict):
+                errors.append("scope.files_inspected must be an object")
+            else:
+                req_fi = {"total", "python", "polyglot_source", "manifests", "deploy_iac", "os_config"}
+                allowed_fi = req_fi | {"workspace_files_total"}
+                for rk in req_fi - set(fi.keys()):
+                    errors.append(f"scope.files_inspected missing required field '{rk}'")
+                for uk in set(fi.keys()) - allowed_fi:
+                    errors.append(f"Unexpected scope.files_inspected field: '{uk}'")
+                for k, v in fi.items():
+                    if isinstance(v, bool) or not isinstance(v, int) or v < 0:
+                        errors.append(f"scope.files_inspected.{k} must be a non-negative integer")
     elif scope is not None:
         errors.append("scope must be an object")
 

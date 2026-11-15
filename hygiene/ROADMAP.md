@@ -17,7 +17,7 @@
   <a href="../docs/grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
-> **Current release**: `v1.5.0 — Iwakuni` (Restricted Beta)  
+> **Current release**: `v1.5.1 — Iwakuni` (Restricted Beta)  
 > This file covers **planned** work only. For what has already shipped, see [`RELEASE_NOTES.md`](RELEASE_NOTES.md) and [`PATCH_LOG.md`](PATCH_LOG.md). Versioning and codename rules are in [`RELEASING.md`](RELEASING.md).  
 > Plans may change. A feature is only considered delivered once it appears in the release notes.
 
@@ -25,11 +25,11 @@
 
 ## Where things stand
 
-GRC-xMINI `v1.5.0` provides the 5-phase bundle and AMI review pipeline across eight host-native Python stdlib compliance and testing engines (`transform_scans.py`, `grc_bundle.py`, `grc_ami.py`, `crypto_lib_scan.py`, `fips_discovery.py`, `sbom_analyzer.py`, `grc_reporter.py`, and `grc_test.py`) plus shared `grc_common.py` / `grc_fixtures.py` utilities and externalized `rules/` catalogs (`severity_policy.json`, `stig_catalog.json`, `crypto_catalog.json` `v1.1.0`, `fips_algorithm_policy.json`, `cmvp_catalog.json`, and `finding_schema.json` `v1.0.0`). It pairs the standalone multi-scan Tenable / AWS Inspector / Qualys VMDR / Wiz scan-to-FedRAMP POA&M transformer (`./grc transform`) with full host-native FIPS 140-3 conformance discovery, CycloneDX 1.6 CBOM, SARIF 2.1.0, offline NIST CMVP mapping (`./grc fips` / `./grc scan --fips`), cross-engine reporter deduplication, and companion `GRC-xTEST` (`v1.5.0`) multi-language fixtures. Next up before `v2.0.0 — Pearl Harbor` general availability are workstation portability enhancements, hardened GitHub URL intake, and optional reporter wording refinements.
+GRC-xMINI `v1.5.1` provides the 5-phase bundle and AMI review pipeline across eight host-native Python stdlib compliance and testing engines (`transform_scans.py`, `grc_bundle.py`, `grc_ami.py`, `crypto_lib_scan.py`, `fips_discovery.py`, `sbom_analyzer.py`, `grc_reporter.py`, and `grc_test.py`) plus shared `grc_common.py` / `grc_fixtures.py` utilities and externalized `rules/` catalogs (`severity_policy.json`, `stig_catalog.json`, `crypto_catalog.json` `v1.1.0`, `fips_algorithm_policy.json`, `cmvp_catalog.json`, and `finding_schema.json` `v1.0.0`). It pairs the standalone multi-scan Tenable / AWS Inspector / Qualys VMDR / Wiz scan-to-FedRAMP POA&M transformer (`./grc transform`) with full host-native FIPS 140-3 conformance discovery, CycloneDX 1.6 CBOM, SARIF 2.1.0, offline NIST CMVP mapping (`./grc fips` / `./grc scan --fips`), `scope.files_inspected` coverage honesty, bundle `HEAD` / empty-checkout protection, cross-engine reporter deduplication, and companion `GRC-xTEST` (`v1.5.1`) multi-language fixtures. Next up before `v2.0.0 — Pearl Harbor` general availability are workstation portability enhancements, hardened GitHub URL intake, and optional reporter wording refinements.
 
 ```mermaid
 flowchart LR
-    I["v1.5.0 — Iwakuni (Shipped)<br/>FIPS 140-3, CBOM & CMVP Engine"] --> B["v2.0.0 — Pearl Harbor<br/>GA + Helm auditing + Portability"]
+    I["v1.5.1 — Iwakuni (Shipped)<br/>FIPS 140-3, CBOM & Integrity Patch"] --> B["v2.0.0 — Pearl Harbor<br/>GA + Helm auditing + Portability"]
     B --> C["v2.1.0 — Kaneohe<br/>Cloud lift, local LLM, OSCAL"]
     C --> D["v2.2.0 — Wahiawa<br/>Supply-chain attestation"]
 ```

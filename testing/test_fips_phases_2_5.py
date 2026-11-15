@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -379,6 +380,168 @@ class TestFIPSPhases2To5(unittest.TestCase):
             }
             for p_path, p_rule in spec["ami_packer"]["expected_fail_pairs"]:
                 self.assertIn((p_path, p_rule), pk_pairs)
+
+    def test_h1_bundle_restore_rejects_head_less_empty_checkout_and_cleans_up(self) -> None:
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            src = tdir / "src_repo"
+            src.mkdir()
+            env = {
+                **os.environ,
+                "GIT_AUTHOR_NAME": "Test",
+                "GIT_AUTHOR_EMAIL": "test@example.com",
+                "GIT_COMMITTER_NAME": "Test",
+                "GIT_COMMITTER_EMAIL": "test@example.com",
+            }
+            subprocess.run(["git", "-C", str(src), "init", "-q", "-b", "main"], check=True, env=env)
+            (src / "app.py").write_text("import hashlib\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(src), "add", "-A"], check=True, env=env)
+            subprocess.run(["git", "-C", str(src), "commit", "-q", "-m", "init"], check=True, env=env)
+            subprocess.run(["git", "-C", str(src), "tag", "-a", "v1.0.0", "-m", "v1.0.0"], check=True, env=env)
+
+            headless_bundle = tdir / "headless.bundle"
+            # Omit HEAD and branches so clone leaves HEAD unborn with 0 files across all Git versions
+            subprocess.run(
+                ["git", "-C", str(src), "bundle", "create", str(headless_bundle), "refs/tags/v1.0.0"],
+                check=True,
+                capture_output=True,
+            )
+
+            ws_dest = tdir / "ws_dest"
+            mgr = grc_bundle.GRCBundleManager(bundle_path=headless_bundle, workspace_root=ws_dest)
+            with self.assertRaises(RuntimeError) as ctx:
+                mgr.restore_bundle()
+            msg = str(ctx.exception)
+            self.assertIn("empty checkout", msg)
+            self.assertIn("v1.0.0", msg)
+            self.assertIn("--ref", msg)
+            # Partial clone directory must be removed cleanly so retries do not require --force
+            self.assertFalse(ws_dest.exists())
+
+            # Restoring with explicit --ref succeeds without --force
+            prov = mgr.restore_bundle(target_ref="v1.0.0", read_only=True)
+            try:
+                self.assertEqual(prov["status"], "RESTORED")
+                self.assertTrue((ws_dest / "app.py").is_file())
+                self.assertTrue((ws_dest / "bundle_provenance.json").is_file())
+            finally:
+                grc_bundle.clean_ephemeral_workspace(ws_dest)
+
+            # Multi-tag bundle without --ref emits a [WARN] listing available tags on stderr
+            kb_bundle = Path(__file__).resolve().parents[2] / "GRC-xTEST" / "bundles" / "kestrelbridge-fips.bundle"
+            if not kb_bundle.is_file():
+                (src / "v2.py").write_text("import hashlib\n", encoding="utf-8")
+                subprocess.run(["git", "-C", str(src), "add", "-A"], check=True, env=env)
+                subprocess.run(["git", "-C", str(src), "commit", "-q", "-m", "v1.5.0"], check=True, env=env)
+                subprocess.run(["git", "-C", str(src), "tag", "-a", "v1.5.0", "-m", "v1.5.0"], check=True, env=env)
+                subprocess.run(["git", "-C", str(src), "tag", "-a", "v2.0.0", "-m", "v2.0.0"], check=True, env=env)
+                kb_bundle = tdir / "multi.bundle"
+                subprocess.run(
+                    ["git", "-C", str(src), "bundle", "create", str(kb_bundle), "HEAD", "main", "--tags"],
+                    check=True,
+                    capture_output=True,
+                )
+            kb_ws = tdir / "kb_ws"
+            kb_mgr = grc_bundle.GRCBundleManager(bundle_path=kb_bundle, workspace_root=kb_ws)
+            err_buf = io.StringIO()
+            with contextlib.redirect_stderr(err_buf):
+                kb_prov = kb_mgr.restore_bundle(read_only=True)
+            try:
+                self.assertEqual(kb_prov["status"], "RESTORED")
+                warn_text = err_buf.getvalue()
+                self.assertIn("[WARN]", warn_text)
+                for tag in ("v1.0.0", "v1.5.0", "v2.0.0"):
+                    self.assertIn(tag, warn_text)
+            finally:
+                grc_bundle.clean_ephemeral_workspace(kb_ws)
+
+    def test_h2_fips_and_crypto_reject_bundle_file_as_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bundle = Path(tmp) / "vendor-release.bundle"
+            fake_bundle.write_bytes(b"not a dir")
+
+            for script_name in ("fips_discovery.py", "crypto_lib_scan.py"):
+                script_path = Path(SCRIPTS_DIR) / script_name
+                res = subprocess.run(
+                    [sys.executable, str(script_path), "-w", str(fake_bundle)],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(res.returncode, 1)
+                self.assertIn("[FATAL]", res.stderr)
+                self.assertIn("./grc bundle restore", res.stderr)
+
+    def test_h3_and_m2_empty_workspace_counts_warning_and_not_assessed_posture(self) -> None:
+        fips_script = Path(SCRIPTS_DIR) / "fips_discovery.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            empty_ws = tdir / "empty_ws"
+            empty_ws.mkdir()
+
+            eng = fips_discovery.FIPSAssessmentEngine(workspace_root=empty_ws)
+            env_out = eng.run()
+            self.assertEqual(env_out["scope"]["files_inspected"]["total"], 0)
+            self.assertEqual(grc_common.validate_finding_envelope(env_out), [])
+            md = eng.build_assessment_markdown()
+            self.assertIn("No assessable files found", md)
+            self.assertNotIn("No `FAIL` or `WARN` assessment findings were detected", md)
+
+            # JSON format exits non-zero, warns on stderr only, keeps stdout pure JSON
+            res_json = subprocess.run(
+                [sys.executable, str(fips_script), "-w", str(empty_ws), "-f", "json"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(res_json.returncode, 0)
+            self.assertIn("No assessable files found", res_json.stderr)
+            parsed = json.loads(res_json.stdout)
+            self.assertEqual(parsed["scope"]["files_inspected"]["total"], 0)
+
+            # --allow-empty returns 0 and writes deliverables that reporter marks NOT ASSESSED
+            ev_empty = tdir / "ev_empty"
+            res_allow = subprocess.run(
+                [sys.executable, str(fips_script), "-w", str(empty_ws), "-e", str(ev_empty), "--allow-empty"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(res_allow.returncode, 0)
+            rep_empty = grc_reporter.GRCComplianceReporter(evidence_dir=ev_empty)
+            rep_empty.run(write_files=True)
+            poam_empty = (ev_empty / "poam_data.md").read_text(encoding="utf-8")
+            self.assertIn("NOT ASSESSED (No Assessable Files Found)", poam_empty)
+            self.assertIn("`FIPSDiscovery (1 of 10)`", poam_empty)
+            pkg_empty = json.loads((ev_empty / "scr_scn_package.json").read_text(encoding="utf-8"))
+            self.assertEqual(pkg_empty["summary"]["overall_status"], "NOT_ASSESSED")
+
+        # Verify rebuilt KestrelBridge v2.0.0 bundle restores without -r and stays COMPLIANT
+        xtest_root = Path(REPO_ROOT).parent / "GRC-xTEST"
+        kb_v2 = xtest_root / "bundles" / "kestrelbridge-v2.0.0.bundle"
+        if kb_v2.is_file():
+            with tempfile.TemporaryDirectory() as tmp2:
+                ws_v2 = Path(tmp2) / "kb_v2"
+                ev_v2 = Path(tmp2) / "ev_v2"
+                mgr = grc_bundle.GRCBundleManager(bundle_path=kb_v2, workspace_root=ws_v2)
+                mgr.restore_bundle(force=True, read_only=True)
+                try:
+                    eng_v2 = fips_discovery.FIPSAssessmentEngine(workspace_root=ws_v2)
+                    env_v2 = eng_v2.run()
+                    eng_v2.write_deliverables(ev_v2)
+                    self.assertGreater(env_v2["scope"]["files_inspected"]["total"], 0)
+                    self.assertEqual(sum(1 for f in env_v2["findings"] if f["determination"] == "FAIL"), 0)
+                    self.assertEqual(sum(1 for f in env_v2["findings"] if f["determination"] == "NEEDS_REVIEW"), 0)
+                    self.assertEqual(sum(1 for f in env_v2["findings"] if f["determination"] == "CANNOT_DETERMINE_STATICALLY"), 0)
+                    self.assertEqual(sum(1 for f in env_v2["findings"] if f["determination"] == "PASS"), 31)
+
+                    rep_v2 = grc_reporter.GRCComplianceReporter(evidence_dir=ev_v2, workspace_dir=ws_v2)
+                    rep_v2.run(write_files=True)
+                    poam_v2 = (ev_v2 / "poam_data.md").read_text(encoding="utf-8")
+                    self.assertIn("COMPLIANT (Clean Out-of-Band Audit)", poam_v2)
+                    self.assertIn("`FIPSDiscovery (1 of 10)`", poam_v2)
+                finally:
+                    grc_bundle.clean_ephemeral_workspace(ws_v2)
 
 
 if __name__ == "__main__":

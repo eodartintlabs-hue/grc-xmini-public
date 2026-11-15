@@ -59,6 +59,21 @@
           "description": "Human-readable statements of what the run could NOT see (e.g. 'Go analyzed lexically; constants across files not resolved'). Rendered verbatim in deliverables.",
           "type": "array",
           "items": { "type": "string" }
+        },
+        "files_inspected": {
+          "description": "Count of files inspected by surface so an empty workspace cannot be mistaken for a clean audit.",
+          "type": "object",
+          "required": ["total", "python", "polyglot_source", "manifests", "deploy_iac", "os_config"],
+          "additionalProperties": false,
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "workspace_files_total": { "type": "integer", "minimum": 0 },
+            "python": { "type": "integer", "minimum": 0 },
+            "polyglot_source": { "type": "integer", "minimum": 0 },
+            "manifests": { "type": "integer", "minimum": 0 },
+            "deploy_iac": { "type": "integer", "minimum": 0 },
+            "os_config": { "type": "integer", "minimum": 0 }
+          }
         }
       }
     },

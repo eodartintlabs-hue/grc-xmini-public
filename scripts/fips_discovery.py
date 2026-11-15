@@ -81,8 +81,9 @@ except ImportError:
     )
 
 ENGINE_NAME = "FIPSDiscovery"
-ENGINE_VERSION = "1.5.0"
+ENGINE_VERSION = "1.5.1"
 CRYPTO_CATALOG_PATH = RULES_DIR / "crypto_catalog.json"
+PROVENANCE_FILENAMES = frozenset({"bundle_provenance.json", "ami_provenance.json", "fips_provenance.json"})
 
 ASSESSED_CONTROLS = [
     "SC-13",
@@ -930,72 +931,129 @@ class WorkspaceCryptoScanner:
         self.assets: List[CryptoAssetRecord] = []
         self.config_signals: List[Dict[str, Any]] = []
         self.ecosystems_seen: Set[str] = set()
+        self.surface_counts: Dict[str, int] = {
+            "python": 0,
+            "polyglot_source": 0,
+            "manifests": 0,
+            "deploy_iac": 0,
+            "os_config": 0,
+        }
+        self.workspace_files_total: int = 0
 
     def scan(self) -> None:
         for root, dirs, files in os.walk(self.workspace_root):
             dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
             r_path = Path(root)
             for fname in sorted(files):
+                if fname in PROVENANCE_FILENAMES:
+                    continue
                 fpath = r_path / fname
                 if fpath.is_symlink():
                     continue
+                self.workspace_files_total += 1
                 rel = str(fpath.relative_to(self.workspace_root)).replace("\\", "/")
                 self._dispatch_file(fpath, rel, fname)
 
     def _dispatch_file(self, fpath: Path, rel: str, fname: str) -> None:
         flc = fname.lower()
         rel_lc = rel.lower()
+        is_manifest = (
+            DependencyExtractor._resolve_parser(fname) is not None
+            or fname.startswith("libcrypto.")
+            or fname.startswith("libssl.")
+            or fname == "openssl"
+        )
+        if is_manifest:
+            self.surface_counts["manifests"] += 1
 
         # Config / Host / IaC checks first
         if rel_lc.endswith("etc/default/grub") or flc == "grub":
+            if not is_manifest:
+                self.surface_counts["os_config"] += 1
             self._scan_grub(fpath, rel)
             return
         if rel_lc.endswith("etc/crypto-policies/config"):
+            if not is_manifest:
+                self.surface_counts["os_config"] += 1
             self._scan_crypto_policy(fpath, rel)
             return
-        if flc.endswith(".cnf") or "openssl" in flc and flc.endswith(".conf"):
+        if flc.endswith(".cnf") or ("openssl" in flc and flc.endswith(".conf")):
+            if not is_manifest:
+                self.surface_counts["os_config"] += 1
             self._scan_openssl_cnf(fpath, rel)
             return
         if flc == "java.security" or flc.endswith(".security"):
+            if not is_manifest:
+                self.surface_counts["os_config"] += 1
             self._scan_java_security(fpath, rel)
             return
         if flc == "dockerfile" or flc.startswith("dockerfile.") or flc == "containerfile":
+            if not is_manifest:
+                self.surface_counts["deploy_iac"] += 1
             self._scan_dockerfile(fpath, rel)
             return
         if flc.endswith(".pkr.hcl") or flc.endswith(".tf"):
+            if not is_manifest:
+                self.surface_counts["deploy_iac"] += 1
             self._scan_iac_hcl(fpath, rel)
             return
+        counted_deploy = False
         if flc in ("app.config", "web.config") or flc.endswith(".config"):
+            if not is_manifest and not counted_deploy:
+                self.surface_counts["deploy_iac"] += 1
+                counted_deploy = True
             self._scan_dotnet_config(fpath, rel)
         if flc == "nginx.conf" or ("nginx" in rel_lc and flc.endswith(".conf")):
+            if not is_manifest and not counted_deploy:
+                self.surface_counts["deploy_iac"] += 1
+                counted_deploy = True
             self._scan_nginx_conf(fpath, rel)
             return
         if flc.endswith((".yaml", ".yml")):
+            if not is_manifest and not counted_deploy:
+                self.surface_counts["deploy_iac"] += 1
+                counted_deploy = True
             self._scan_yaml_config(fpath, rel)
 
         # Source code analyzers
         if flc.endswith(".py"):
+            if not is_manifest:
+                self.surface_counts["python"] += 1
             self.ecosystems_seen.add("pypi")
             self._scan_python(fpath, rel)
         elif flc.endswith(".go"):
+            if not is_manifest:
+                self.surface_counts["polyglot_source"] += 1
             self.ecosystems_seen.add("go")
             self._scan_go(fpath, rel)
         elif flc.endswith((".java", ".kt")):
+            if not is_manifest:
+                self.surface_counts["polyglot_source"] += 1
             self.ecosystems_seen.add("maven")
             self._scan_java(fpath, rel)
         elif flc.endswith((".js", ".mjs", ".cjs", ".ts", ".tsx")):
+            if not is_manifest:
+                self.surface_counts["polyglot_source"] += 1
             self.ecosystems_seen.add("npm")
             self._scan_js_ts(fpath, rel)
         elif flc.endswith((".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")):
+            if not is_manifest:
+                self.surface_counts["polyglot_source"] += 1
             self.ecosystems_seen.add("system")
             self._scan_c_cpp(fpath, rel)
         elif flc.endswith(".rs"):
+            if not is_manifest:
+                self.surface_counts["polyglot_source"] += 1
             self.ecosystems_seen.add("cargo")
             self._scan_rust(fpath, rel)
         elif flc.endswith(".cs"):
+            if not is_manifest:
+                self.surface_counts["polyglot_source"] += 1
             self.ecosystems_seen.add("nuget")
             self._scan_csharp(fpath, rel)
         elif flc.endswith(".sh"):
+            if not is_manifest and not counted_deploy:
+                self.surface_counts["deploy_iac"] += 1
             self._scan_shell(fpath, rel)
 
     def _read_text(self, fpath: Path) -> Optional[str]:
@@ -2775,6 +2833,19 @@ class FIPSAssessmentEngine:
             lims.append(self.staleness_warning)
         return lims
 
+    def files_inspected_summary(self) -> Dict[str, int]:
+        sc = self.ws_scanner.surface_counts
+        total = sc["python"] + sc["polyglot_source"] + sc["manifests"] + sc["deploy_iac"] + sc["os_config"]
+        return {
+            "total": total,
+            "workspace_files_total": self.ws_scanner.workspace_files_total,
+            "python": sc["python"],
+            "polyglot_source": sc["polyglot_source"],
+            "manifests": sc["manifests"],
+            "deploy_iac": sc["deploy_iac"],
+            "os_config": sc["os_config"],
+        }
+
     def build_envelope(self) -> Dict[str, Any]:
         envelope: Dict[str, Any] = {
             "schema_version": "1.0.0",
@@ -2794,6 +2865,7 @@ class FIPSAssessmentEngine:
                 "assessed_aocs": ASSESSED_AOCS,
                 "ecosystems": sorted(self.ws_scanner.ecosystems_seen),
                 "limitations": self._limitations_list(),
+                "files_inspected": self.files_inspected_summary(),
             },
             "findings": self.findings,
         }
@@ -3008,6 +3080,7 @@ class FIPSAssessmentEngine:
         """
         now = utc_now_str()
         tgt = self._target_metadata()["identifier"]
+        fi = self.files_inspected_summary()
         counts = {
             "FAIL": sum(1 for f in self.findings if f["determination"] == "FAIL"),
             "WARN": sum(1 for f in self.findings if f["determination"] == "WARN"),
@@ -3022,19 +3095,33 @@ class FIPSAssessmentEngine:
             f"> **Target Identifier**: `{tgt}`  ",
             f"> **Generated**: `{now}`  ",
             f"> **Engine**: `{ENGINE_NAME} v{ENGINE_VERSION}` (Pure Python Stdlib)  ",
+            (
+                f"> **Files Inspected**: `{fi['total']}` "
+                f"(Python: `{fi['python']}`, Polyglot Source: `{fi['polyglot_source']}`, "
+                f"Manifests: `{fi['manifests']}`, Deploy/IaC: `{fi['deploy_iac']}`, "
+                f"OS Config: `{fi['os_config']}`; Workspace Total: `{fi['workspace_files_total']}`)  "
+            ),
             "> **NIST SP 800-53 Rev. 5 Controls**: `SC-13` (Primary), `SC-12`, `SC-8(1)`, `SC-28(1)`, `IA-7`, `SC-23`, `CM-6`  ",
             "",
             "---",
             "",
             "## 1. Scope, Framing & Static Analysis Limitations",
             "",
+        ]
+        if fi["total"] == 0:
+            lines.extend([
+                "> [!WARNING]",
+                "> **No assessable files found**: Static inspection found `0` assessable cryptographic source, manifest, deploy/IaC, or OS configuration files in the target workspace. Zero findings do not indicate a clean posture.",
+                "",
+            ])
+        lines.extend([
             "* **Module Validation Scope**: FIPS 140-3 validates **cryptographic modules** through the NIST Cryptographic Module Validation Program (CMVP). Applications and source code repositories are **not** module-validated as a whole.",
             "* **Assessment Question**: This assessment evaluates static evidence for the question: *\"Does this code perform all security-relevant cryptography through a FIPS 140-3 validated module, configured in its approved mode, using only approved algorithms and parameters?\"*",
             "* **Historical FIPS 140-2 Sunset**: All FIPS 140-2 module validation certificates transitioned to **Historical** status on **2026-09-21** and are flagged as assessment findings requiring migration to active FIPS 140-3 modules.",
             "* **Indeterminate Static Posture**: Where static source or manifest inspection cannot confirm runtime module linkage, Operational Environment (OE), or approved-mode execution, the determination is recorded as `CANNOT_DETERMINE_STATICALLY` or `NEEDS_REVIEW`, never as a positive pass.",
             "",
             "### Run-Specific Limitations",
-        ]
+        ])
         for lim in self._limitations_list():
             lines.append(f"* {lim}")
 
@@ -3072,7 +3159,9 @@ class FIPSAssessmentEngine:
 
         lines.extend(["", "---", "", "## 4. Actionable Assessment Findings (`FAIL` / `WARN`)", ""])
         actionable = [f for f in self.findings if f["determination"] in ("FAIL", "WARN")]
-        if not actionable:
+        if fi["total"] == 0:
+            lines.append("*No assessable files found in the target workspace (0 files inspected). A clean assessment result cannot be claimed when nothing was inspected.*")
+        elif not actionable:
             lines.append("*No `FAIL` or `WARN` assessment findings were detected in static source or configuration files.*")
         else:
             for idx, f in enumerate(actionable, start=1):
@@ -3151,6 +3240,7 @@ class FIPSAssessmentEngine:
             "upstream_provenance_file": tgt.get("provenance_file"),
             "commit_sha": tgt.get("commit", "UNKNOWN"),
             "engine": {"name": ENGINE_NAME, "version": ENGINE_VERSION},
+            "files_inspected": self.files_inspected_summary(),
             "catalogs": self.build_envelope()["engine"]["catalogs"],
             "cmvp_authenticity": self.cmvp_integrity,
             "staleness_warning": self.staleness_warning,
@@ -3158,6 +3248,7 @@ class FIPSAssessmentEngine:
 
     def build_terminal_preview(self, evidence_dir: Optional[Path] = None, dry_run: bool = False) -> str:
         tgt = self._target_metadata()["identifier"]
+        fi = self.files_inspected_summary()
         fails = sum(1 for f in self.findings if f["determination"] == "FAIL")
         warns = sum(1 for f in self.findings if f["determination"] == "WARN")
         reviews = sum(1 for f in self.findings if f["determination"] in ("NEEDS_REVIEW", "CANNOT_DETERMINE_STATICALLY"))
@@ -3170,6 +3261,12 @@ class FIPSAssessmentEngine:
             f"  Target Workspace : {self.workspace_root} ({tgt})",
             f"  Execution Mode   : {'DRY-RUN PREVIEW (no deliverables written)' if dry_run else 'DELIVERABLE GENERATION'}",
             f"  Evidence Output  : {evidence_dir if evidence_dir and not dry_run else '(stdout / preview)'}",
+            (
+                f"  Files Inspected  : {fi['total']} "
+                f"(python={fi['python']}, polyglot_source={fi['polyglot_source']}, "
+                f"manifests={fi['manifests']}, deploy_iac={fi['deploy_iac']}, "
+                f"os_config={fi['os_config']}; workspace_total={fi['workspace_files_total']})"
+            ),
             "--------------------------------------------------------------------------",
             f"  FAIL Findings                  : {fails}",
             f"  WARN Findings                  : {warns}",
@@ -3178,6 +3275,9 @@ class FIPSAssessmentEngine:
             f"  CBOM Cryptographic Assets      : {len(self.ws_scanner.assets) + len(self.cmvp_mappings)}",
             "--------------------------------------------------------------------------",
         ]
+        if fi["total"] == 0:
+            out.append("  [WARN] No assessable files found in workspace (0 files inspected).")
+            out.append("--------------------------------------------------------------------------")
         if self.staleness_warning:
             out.append(f"  [WARN] {self.staleness_warning}")
             out.append("--------------------------------------------------------------------------")
@@ -3261,6 +3361,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override CMVP snapshot staleness warning threshold in days (default: 90).",
     )
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Return exit code 0 even when 0 assessable files are found in the workspace.",
+    )
     return parser
 
 
@@ -3272,6 +3377,16 @@ def main() -> None:
     if not ws.exists():
         print(f"[FATAL] Workspace path does not exist: {ws}", file=sys.stderr)
         sys.exit(1)
+    if not ws.is_dir():
+        if ws.name.lower().endswith(".bundle"):
+            print(
+                f"[FATAL] Workspace path is a Git bundle file, not a directory: {ws}\n"
+                f"        Restore the bundle first: ./grc bundle restore {ws} -w ./ephemeral_workspace -r <tag> -f --read-only",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[FATAL] Workspace path is not a directory: {ws}", file=sys.stderr)
+        sys.exit(1)
 
     engine = FIPSAssessmentEngine(
         workspace_root=ws,
@@ -3281,6 +3396,13 @@ def main() -> None:
         staleness_days=args.staleness_days,
     )
     envelope = engine.run()
+    fi_total = envelope["scope"]["files_inspected"]["total"]
+    if fi_total == 0:
+        print(
+            f"[WARN] No assessable files found in workspace '{ws}' "
+            f"(0 files inspected across Python, polyglot source, manifests, deploy/IaC, and OS config).",
+            file=sys.stderr,
+        )
 
     if args.format != "all":
         if args.format == "json":
@@ -3303,10 +3425,14 @@ def main() -> None:
             print(f"[SUCCESS] FIPS deliverable written to: {out_p}")
         else:
             print(rendered)
+        if fi_total == 0 and not args.allow_empty:
+            sys.exit(2)
         return
 
     if args.dry_run:
         print(engine.build_terminal_preview(dry_run=True))
+        if fi_total == 0 and not args.allow_empty:
+            sys.exit(2)
         return
 
     if args.evidence:
@@ -3321,6 +3447,8 @@ def main() -> None:
     print(f"[SUCCESS] Wrote {len(written)} FIPS assessment deliverables to: {ev_dir}")
     for fname in written:
         print(f"    - {fname}")
+    if fi_total == 0 and not args.allow_empty:
+        sys.exit(2)
 
 
 if __name__ == "__main__":

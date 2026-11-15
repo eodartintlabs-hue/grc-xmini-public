@@ -254,8 +254,46 @@ class GRCBundleManager:
             )
             print(f"    -> Checked out reference: {target_ref}")
 
-        # Step 5: Gather commit metadata
+        # Step 5: Gather commit metadata & verify non-empty checkout
         commit_info = self._get_commit_metadata(self.workspace_root)
+        try:
+            ls_res = _git("ls-files", cwd=self.workspace_root)
+            tracked_files = [ln for ln in (ls_res.stdout or "").splitlines() if ln.strip()]
+        except RuntimeError:
+            tracked_files = []
+
+        contained_refs = verification.get("contained_references", [])
+        ref_names: List[str] = []
+        tag_names: List[str] = []
+        for r in contained_refs:
+            raw_ref = str(r.get("ref", ""))
+            if raw_ref == "HEAD":
+                continue
+            short_ref = re.sub(r"^refs/(tags|heads)/", "", raw_ref)
+            if short_ref and short_ref not in ref_names:
+                ref_names.append(short_ref)
+            if raw_ref.startswith("refs/tags/") and short_ref not in tag_names:
+                tag_names.append(short_ref)
+
+        if commit_info["commit_hash"] == "UNKNOWN" or not tracked_files:
+            if self.workspace_root.exists():
+                safe_rmtree(self.workspace_root, allowed_markers=("bundle_provenance.json", ".git"))
+            refs_display = ", ".join(ref_names) if ref_names else "none"
+            example_ref = tag_names[0] if tag_names else (ref_names[0] if ref_names else "<ref>")
+            raise RuntimeError(
+                f"Bundle restore produced an empty checkout (commit: {commit_info['commit_hash']}, "
+                f"tracked files: {len(tracked_files)}). Available bundle refs: {refs_display}. "
+                f"Pass --ref {example_ref} to check out a valid release."
+            )
+
+        if not target_ref and len(tag_names) > 1:
+            print(
+                f"[WARN] Bundle '{self.bundle_path.name}' contains multiple release tags ({', '.join(tag_names)}); "
+                f"no --ref was specified, so HEAD ({commit_info['ref']}) was checked out. "
+                f"Pass --ref <tag> to audit a specific release.",
+                file=sys.stderr,
+            )
+
         print(f"    -> Checked out Commit: {commit_info['commit_hash'][:8]} ({commit_info['ref']})")
         print(f"    -> Author: {commit_info['author_name']} <{commit_info['author_email']}>")
         print(f"    -> Subject: {commit_info['subject']}")
