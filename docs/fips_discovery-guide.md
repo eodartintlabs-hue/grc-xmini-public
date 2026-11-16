@@ -69,15 +69,15 @@ NIST CMVP validates **cryptographic modules** (and their Operational Environment
 
 ### 1.2 The Five Conformance Determinations
 
-Where static analysis alone cannot verify runtime FIPS mode or OE binding, `fips_discovery.py` explicitly avoids emitting `PASS`:
+Where static analysis alone cannot verify runtime FIPS mode or Operational Environment (OE) binding—such as when a FIPS-capable library appears in a component directory whose own `Dockerfile` / runtime lacks approved-mode evidence—`fips_discovery.py` explicitly avoids emitting `PASS`. Container `Dockerfile` base-image (`ubi9`) and Python `cryptography` linkage checks (`dnf install python3-cryptography` or `pip install --no-binary cryptography` / `PIP_NO_BINARY=cryptography` vs. prebuilt PyPI wheels bundling non-FIPS OpenSSL) are scoped strictly to the owning component's directory tree (`H7`), while appliance OS configurations under `appliance/rootfs/etc/` (`/etc/default/grub`, `/etc/crypto-policies/config`, `/etc/pki/tls/openssl.cnf`) supply deployment-level OE evidence:
 
 | Determination | Meaning | Example |
 |---|---|---|
-| **`PASS`** | Validated module evidence + approved-mode evidence + approved algorithm/parameters | AES-256-GCM via `secrets`, SHA-384 manifest, `fips=1` + `FIPS` crypto-policy + active `fips_sect` |
+| **`PASS`** | Validated module evidence + component-scoped/appliance approved-mode evidence + approved algorithm/parameters | AES-256-GCM via `secrets`, SHA-384 manifest, source-built/system-linked `cryptography` on UBI 9 CMVP `#4857` (`--no-binary cryptography`), `fips=1` + `FIPS` crypto-policy + active `fips_sect` |
 | **`FAIL`** | Disallowed algorithm/protocol, explicit non-FIPS toggle, or unvalidated/historical crypto module | MD5 security digest, AES-ECB, RSA-1024, TLS 1.0/1.1, `fips=0`, `pycryptodome`, `golang.org/x/crypto`, `bc-fips` 1.0.2.5 (Historical) |
 | **`WARN`** *(reserved in `v1.5.2`)* | Reserved in Finding Schema v1.0.0 and policy engine for transitional or advisory notices (no active rule in `v1.5.2` currently emits `WARN`) | Transitional parameter notice or policy/catalog advisory |
 | **`NEEDS_REVIEW`** | Context-dependent or legacy transition item requiring ISSO/assessor confirmation | `hashlib.md5(..., usedforsecurity=False)` for cache keys (`cache.py`), ECDSA `P-224` legacy partner receipt verification |
-| **`CANNOT_DETERMINE_STATICALLY`** | FIPS-capable wrapper is present, but workspace lacks static evidence that FIPS approved mode is active on the target host/container | `cryptography==42.0.5` in `requirements.txt` without UBI 9/OpenSSL FIPS provider evidence in the same workspace |
+| **`CANNOT_DETERMINE_STATICALLY`** | FIPS-capable wrapper is present, but its owning component/workspace lacks static evidence of approved-mode binding | `cryptography==42.0.5` in `gateway/requirements.txt` installed from a prebuilt PyPI wheel or in a component lacking UBI 9 / OpenSSL FIPS linkage (even if an unrelated `docs-site/Dockerfile` uses UBI 9) |
 
 ---
 
@@ -172,6 +172,8 @@ flowchart TB
   ./grc bundle verify /path/to/vendor-release.bundle
 
   # Phase 2: Restore into an isolated read-only workspace
+  # (-r selects a release tag—recommended on multi-tag bundles and required if a bundle lacks HEAD;
+  #  optional on single-version bundles that carry HEAD)
   ./grc bundle restore /path/to/vendor-release.bundle \
     -w ./ephemeral_workspace \
     -r v1.0.0 \
@@ -197,9 +199,9 @@ Confirm finding counts (`FAIL`, `WARN`, `Indeterminate / Needs Review`, `PASS`, 
 ./grc fips -w ./ephemeral_workspace
 ```
 
-Inspect the printed path at the bottom (`[SUCCESS] Wrote 7 FIPS assessment deliverables to: .../artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<target>_fips`).
+Inspect the printed path at the bottom (`[SUCCESS] Wrote 7 FIPS assessment deliverables to: .../artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>_fips`, UTC timestamp).
 
-#### Step 4: Single-Format & Custom Catalog Invocations (Optional)
+#### Step 4: Single-Format, Policy Gate & Custom Catalog Invocations (Optional)
 
 ```bash
 # Export only a CycloneDX 1.6 CBOM for downstream tooling
@@ -207,6 +209,10 @@ Inspect the printed path at the bottom (`[SUCCESS] Wrote 7 FIPS assessment deliv
 
 # Export only SARIF 2.1.0 for CI code scanning
 ./grc fips -w ./ephemeral_workspace -f sarif -o ./artifacts/pick-up/app-fips.sarif
+
+# Enforce CI policy gates (--fail-on FAIL or NEEDS_REVIEW; default is 'never')
+./grc fips -w ./ephemeral_workspace --dry-run --fail-on FAIL
+./grc fips -w ./ephemeral_workspace --dry-run --fail-on NEEDS_REVIEW
 
 # Export CMVP lineage markdown with a stricter 60-day catalog staleness threshold
 ./grc fips -w ./ephemeral_workspace -f cmvp --staleness-days 60 -o ./artifacts/pick-up/cmvp_lineage.md
@@ -224,8 +230,11 @@ Inspect the printed path at the bottom (`[SUCCESS] Wrote 7 FIPS assessment deliv
 # Option A: Chain fips + grc_reporter.py in one command
 ./grc scan --fips -w ./ephemeral_workspace
 
-# Option B: Or run Phase 4 reporter on an already-generated ./grc fips folder
-./grc report -e artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<target>_fips
+# Option B: Run all host-native engines (crypto + fips, plus sbom if sbom.cdx.json exists) + reporter without Docker
+./grc scan --host-only -w ./ephemeral_workspace
+
+# Option C: Or run Phase 4 reporter on an already-generated ./grc fips folder
+./grc report -e artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>_fips
 
 # Phase 5: Always clean up ephemeral bundle workspace
 ./grc bundle clean -w ./ephemeral_workspace
@@ -275,22 +284,26 @@ Confirm that `GRC-xBOT` reports `vendor-release.bundle` inside `../GRC-xMINI/art
 
 #### Step 4: Execute Preview-First Flow, Then Capture Full FIPS Deliverables
 
-Use `./grc-bot chat` to let `GRC-xBOT` walk through and execute its Preview-First commands (or run the commands `GRC-xBOT` synthesizes inside `~/Desktop/GRC-xMINI`):
+Run `./grc-bot chat` and select the `fips` workflow (or let plain-English routing match it). When multiple staged bundles or multiple release tags exist, `GRC-xBOT` prompts for the target bundle and release tag (`M6`, defaulting to the highest semver tag while warning about skipped tags), confirms `[y/N]` for the Step 1 `--dry-run` preview, and confirms `[y/N]` for Step 2 live execution (`./grc fips` + `./grc report` into `artifacts/pick-up/<ts>_fips`).
+
+If you skipped live execution in chat and want to run the manual `GRC-xMINI` sequence directly:
 
 ```bash
 cd ~/Desktop/GRC-xMINI
 
-# 1. Verify and restore the staged bundle (as recommended by GRC-xBOT)
+# 1. Verify and restore the staged bundle
+#    (-r <tag> is required for HEAD-less bundles and recommended for multi-tag bundles;
+#     optional on single-release bundles that carry HEAD)
 ./grc bundle verify artifacts/drop-off/vendor-release.bundle
 ./grc bundle restore artifacts/drop-off/vendor-release.bundle \
-  -w ./ephemeral_workspace -f --read-only
+  -w ./ephemeral_workspace -r v1.0.0 -f --read-only
 
 # 2. Preview & write full FIPS 140-3 deliverables (Engine #8)
 ./grc fips -w ./ephemeral_workspace --dry-run
 ./grc fips -w ./ephemeral_workspace
 
 # 3. Synthesize Phase 4 SCR/SCN + POA&M (or run './grc-bot guide report')
-./grc report -e artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<target>_fips
+./grc report -e artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>_fips
 
 # 4. Clean up the ephemeral workspace when done
 ./grc bundle clean -w ./ephemeral_workspace
@@ -306,9 +319,9 @@ Finish by running `./grc-bot status` from `~/Desktop/GRC-xBOT` to verify the new
 
 There are **two Triad workflows** depending on whether `GRC-xMINI/artifacts/drop-off/` is empty or staged with a `GRC-xTEST` FIPS bundle:
 
-#### Pattern A: Zero-Staging Triad Practice (Automatic `GRC-xTEST` Fallback)
+#### Pattern A: Zero-Staging Triad Practice (Requires AOC Bundles in `GRC-xTEST`)
 
-When `GRC-xMINI/artifacts/drop-off/` has **no `.bundle` files**, `GRC-xBOT` automatically falls back to `../GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle` in its `fips` guide (`../GRC-xTEST/bundles/aoc-combo-4x.bundle` in `crypto` and `bundle`), and runs the full test harness in `practice`:
+When `GRC-xMINI/artifacts/drop-off/` has **no `.bundle` files**, `GRC-xBOT` automatically falls back to `../GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle` in its `fips` guide (`../GRC-xTEST/bundles/aoc-combo-4x.bundle` in `crypto` and `bundle`), and runs the full test harness in `practice`. *(If your `GRC-xTEST/bundles/` checkout only contains the **KestrelBridge** scenario bundles without the 12 AOC bundles, skip to **Pattern B** below and stage a KestrelBridge bundle.)*
 
 ```bash
 cd ~/Desktop/GRC-xBOT
@@ -325,17 +338,19 @@ cd ~/Desktop/GRC-xBOT
 
 When prompted inside `./grc-bot chat` (with `practice` or `fips` selected), `GRC-xBOT` previews the practice bundle from `../GRC-xTEST/bundles/`, restores it read-only into `../GRC-xMINI/ephemeral_workspace`, scans it, and cleans it up.
 
-#### Pattern B: Staging a Dedicated `GRC-xTEST` FIPS Bundle into `GRC-xBOT`
+#### Pattern B: Staging a Dedicated `GRC-xTEST` FIPS Bundle into `GRC-xBOT` *(Works for AOC or KestrelBridge-Only)*
 
-If you want `GRC-xBOT` to walk an analyst specifically through **AOC-12 (No FIPS Mode)** or the **KestrelBridge** scenario bundles rather than the generic `aoc-combo-4x.bundle` fallback:
+If you want `GRC-xBOT` to walk an analyst specifically through **KestrelBridge** (`v1.0.0` / `v1.5.0` / `v2.0.0`) or **AOC-12 (No FIPS Mode)**:
 
 ```bash
-# 1. Stage a FIPS-focused bundle from GRC-xTEST into GRC-xMINI/artifacts/drop-off/
-cp ~/Desktop/GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle ~/Desktop/GRC-xMINI/artifacts/drop-off/
-# Or stage one of the KestrelBridge single-release bundles:
+# 1. Stage a KestrelBridge bundle (works in KestrelBridge-only setups) OR AOC-12 from GRC-xTEST:
+cp ~/Desktop/GRC-xTEST/bundles/kestrelbridge-fips.bundle ~/Desktop/GRC-xMINI/artifacts/drop-off/
+# Or a single-release KestrelBridge bundle (omits multi-tag prompts):
 # cp ~/Desktop/GRC-xTEST/bundles/kestrelbridge-v1.5.0.bundle ~/Desktop/GRC-xMINI/artifacts/drop-off/
+# Or, when the AOC bundle corpus is present:
+# cp ~/Desktop/GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle ~/Desktop/GRC-xMINI/artifacts/drop-off/
 
-# 2. Launch GRC-xBOT and confirm it detects the staged FIPS test bundle
+# 2. Launch GRC-xBOT and confirm it detects the staged bundle & semantic release tags
 cd ~/Desktop/GRC-xBOT
 ./grc-bot status
 ./grc-bot ask "Walk me through a FIPS 140-3 check on the staged bundle"
@@ -346,21 +361,22 @@ cd ~/Desktop/GRC-xBOT
 ./grc-bot chat
 # Inside chat:
 #   - Pick 'fips' (or 'bundle' if Docker Desktop is running for './grc scan')
-#   - Approve the Preview-First dry-run ([y/N]), then approve Live execution ([y/N]) when prompted
+#   - Select the target bundle and release tag if prompted (e.g., v1.0.0, v1.5.0, or default [v2.0.0])
+#   - Approve Step 1 Preview ([y/N]), then approve Step 2 Live execution ([y/N]) when prompted
 ```
 
 ```bash
-# 4. Run full FIPS 140-3 deliverables against the restored workspace (before or instead of cleanup)
+# 4. Optional manual fallback (only if you answered 'n' to Live execution in Step 3)
 cd ~/Desktop/GRC-xMINI
-./grc bundle restore artifacts/drop-off/aoc-12-no-fips-mode.bundle -w ./ephemeral_workspace -r v1.0.0 -f --read-only
-# Or, if you staged kestrelbridge-v1.5.0.bundle in Step 1 (`-r` optional on single-version KestrelBridge bundles):
+./grc bundle restore artifacts/drop-off/kestrelbridge-fips.bundle -w ./ephemeral_workspace -r v1.5.0 -f --read-only
+# Or, if you staged a single-release bundle built with HEAD (`-r` optional; required for HEAD-less bundles):
 # ./grc bundle restore artifacts/drop-off/kestrelbridge-v1.5.0.bundle -w ./ephemeral_workspace -f --read-only
 ./grc fips -w ./ephemeral_workspace --dry-run
 ./grc fips -w ./ephemeral_workspace
 ./grc bundle clean -w ./ephemeral_workspace
 
 # 5. Optional: remove the practice bundle from drop-off/ after rehearsal
-rm -f ~/Desktop/GRC-xMINI/artifacts/drop-off/aoc-12-no-fips-mode.bundle
+rm -f ~/Desktop/GRC-xMINI/artifacts/drop-off/kestrelbridge-fips.bundle
 ```
 
 ---
@@ -377,16 +393,31 @@ cd ~/Desktop/GRC-xMINI
 ./grc test fips
 
 # 2. Run fips_discovery.py directly against positive and negative multi-language corpora
+#    (requires GRC-xTEST/fips-fixtures/ directory)
 ./grc fips -w ../GRC-xTEST/fips-fixtures/positive --dry-run
 ./grc fips -w ../GRC-xTEST/fips-fixtures/negative --dry-run
 
-# 3. Run the automated GRC-xTEST pipeline harness (tests all bundles + fips-fixtures + ami/packer;
-#    host-native steps run automatically; Section [5/5] runs containerized engines if Docker is up)
+# 3. Run the automated GRC-xTEST pipeline harness (dynamically tests every bundle present
+#    in GRC-xTEST/bundles/ — 4 KestrelBridge bundles / 6 tag snapshots, or 16 bundles / 18 snapshots
+#    when the 12 AOC bundles are also present; [5/5] runs containers if Docker is up)
 cd ~/Desktop/GRC-xTEST
 ./scripts/verify_pipeline.sh
 ```
 
-#### 4.4.2 Single-AOC Bundle Verification (`AOC-12` & `AOC-03`)
+#### 4.4.2 Individual Bundle Verification (KestrelBridge-Only or AOC Corpus)
+
+If your `GRC-xTEST/bundles/` checkout only contains the **KestrelBridge** scenario bundles:
+
+```bash
+cd ~/Desktop/GRC-xMINI
+
+# Verify legacy v1.0.0 baseline via KestrelBridge (no AOC bundles needed)
+./grc bundle restore ../GRC-xTEST/bundles/kestrelbridge-v1.0.0.bundle -w ./ephemeral_kb -f --read-only
+./grc fips -w ./ephemeral_kb --dry-run
+./grc bundle clean -w ./ephemeral_kb
+```
+
+If the full **AOC bundle corpus** (`aoc-*.bundle`) is also present in `GRC-xTEST/bundles/`:
 
 ```bash
 cd ~/Desktop/GRC-xMINI
@@ -467,10 +498,10 @@ cd ~/Desktop/GRC-xMINI
 
 ## 5. Inspecting Deliverables (`jq`) & Operational Notes
 
-Use these commands on any generated folder inside `artifacts/pick-up/<timestamp>_fips/`:
+Use these commands on any generated folder inside `artifacts/pick-up/<UTC_timestamp>_<bundle-stem>@<ref>_fips/`:
 
 ```bash
-EV="artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<target>_fips"
+EV="artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>_fips"
 
 # 1. Verify cryptographic seal across all deliverables
 (cd "$EV" && shasum -a 256 -c sha256sum)
@@ -487,7 +518,8 @@ jq -r '.findings[] | select(.determination != "PASS") | "\(.determination)\t\(.r
 jq '{specVersion, target: .metadata.component.name, assets: (.components | length), sample: [.components[:10][] | {name, type, crypto: .cryptoProperties.assetType}]}' \
   "$EV/cbom.cdx.json"
 
-# 5. Check file coverage, provenance, and catalog staleness status
+# 5. Check target ref, file coverage, provenance, and catalog staleness status
+jq '{target, files_inspected: .scope.files_inspected}' "$EV/fips_findings.json"
 jq '{target_identifier, commit_sha, files_inspected, staleness_warning, catalogs: [.catalogs[] | {path, sha256}]}' \
   "$EV/fips_provenance.json"
 ```
@@ -499,5 +531,6 @@ jq '{target_identifier, commit_sha, files_inspected, staleness_warning, catalogs
 | `[FATAL] Workspace path is a Git bundle file, not a directory` (or `Workspace path does not exist`) | Passed a `.bundle` file directly, passed a non-directory path, or misspelled `-w` directory | Run `./grc bundle restore <file.bundle> -w ./ephemeral_workspace -r <tag> -f --read-only` first, then pass `-w ./ephemeral_workspace`. |
 | `[WARN] No assessable files found in workspace` (`exit 2`) or `NOT ASSESSED (No Assessable Files Found)` in `poam_data.md` | Target directory is empty, holds only metadata (`bundle_provenance.json`), or resulted from a bad `-w` path | Verify you restored the target bundle/repo properly (`ls` workspace). Pass `--allow-empty` only when intentionally testing empty-scope deliverables (`0` files inspected). |
 | `restore_bundle` fails mentioning an `empty checkout` | Bundle lacks `HEAD` (or default branch) and `--ref` was omitted | Pass `-r <tag>` using one of the refs listed in the error message; no `-f` cleanup is needed because `grc_bundle.py` removes partial empty checkouts automatically. |
+| `[ERROR] Docker daemon is not running` when running `./grc scan all` | Docker Desktop is stopped | Start the Docker daemon for full 10-engine container scans, or run `./grc scan --host-only -w <ws>` (host-native `crypto` + `fips` + optional `sbom` + Phase 4 report) without leaving an unsealed pick-up folder (`M7`). |
 | Expected files not created in `artifacts/drop-off/` or missing output with `-o` | `--dry-run` was passed, or expecting `fips_discovery.py` to write to `drop-off/` | Remove `--dry-run` when ready to emit files; outputs are always written to `artifacts/pick-up/` (or `-e` / `-o`). |
-| `./grc scan --fips` rejects `--dry-run`, `-f`, or `--policy` | `./grc scan` only accepts scan-wrapper options (`-w`, `-e`, `--engine`/`--fips`, `--no-report`) | Run `./grc fips [flags]` directly for `--dry-run`, `-f`, `-o`, `--policy`, `--cmvp-catalog`, `--crypto-catalog`, `--staleness-days`, and `--allow-empty`; use `./grc scan --fips` when chaining `grc_reporter.py`. |
+| `./grc scan --fips` rejects `--dry-run`, `-f`, or `--fail-on` | `./grc scan` only accepts scan-wrapper options (`-w`, `-e`, `--engine`/`--fips`, `--host-only`, `--no-report`) | Run `./grc fips [flags]` directly for `--dry-run`, `-f`, `-o`, `--policy`, `--cmvp-catalog`, `--crypto-catalog`, `--staleness-days`, `--allow-empty`, and `--fail-on`; use `./grc scan --fips` or `./grc scan --host-only` when chaining `grc_reporter.py`. |

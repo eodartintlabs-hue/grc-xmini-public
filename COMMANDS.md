@@ -107,7 +107,7 @@ Executes **Phase 5 (AMI Teardown)** by unmounting the cold-mounted guest filesys
 ## 5. Compliance Scanning Commands (Phase 3)
 
 ### `./grc scan --all -w <workspace> [-e <evidence_dir>]` *(Default: `./grc scan -w <workspace>`)*
-Executes the **complete 10-engine compliance suite** (containerized SAST/Secrets/IaC/SBOM/CVE suite plus host-native Crypto, FIPS 140-3, and SBOM STIG engines) against the restored workspace, followed automatically by **Phase 4 report synthesis**. If `-e <evidence_dir>` is omitted, **GRCx** automatically creates a timestamped folder under `./artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-name>/`.
+Executes the **complete 10-engine compliance suite** (containerized SAST/Secrets/IaC/SBOM/CVE suite plus host-native Crypto, FIPS 140-3, and SBOM STIG engines) against the restored workspace, followed automatically by **Phase 4 report synthesis**. Verifies that the Docker daemon is running **before** creating any pick-up directory (`Please start the Docker daemon` on failure). If `-e <evidence_dir>` is omitted, **GRCx** automatically creates a UTC timestamped folder under `./artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>/` (appending `_2`, `_3`, … on same-second collisions).
 
 ### `./grc scan --semgrep -w <workspace> [-e <evidence_dir>]`
 Runs only the **Semgrep Static Application Security Testing (SAST)** engine against the target workspace using the 37 custom compliance rules in `rules/custom-baseline-ruleset.yaml` (covering AOC-02 Weak Passwords, AOC-03 Weak Crypto, AOC-04 Command Injection, AOC-05 Improper TLS, AOC-06 Embedded Private Keys, AOC-09 Deprecated Crypto Imports, AOC-10 Unsafe Deserialization, AOC-11 STIG CAT I Violations, and AOC-140 Org Guardrails), writing raw findings to `semgrep_findings.json`.
@@ -139,6 +139,9 @@ Runs only the **FIPS 140-3 Cryptographic Discovery, Algorithm Policy, CBOM & CMV
 ### `./grc scan --sbom -w <workspace> [-e <evidence_dir>]` *(Alias: `--stig`)*
 Runs only the **DISA STIG & DoD Cloud SRG Applicability Mapper** (`scripts/sbom_analyzer.py`) against `sbom.cdx.json` (automatically generating the SBOM via Syft first if not yet present), producing `stig_matrix.md` and `stig_applicability.json`.
 
+### `./grc scan --host-only -w <workspace> [-e <evidence_dir>]`
+Runs only the **host-native compliance engines** (`crypto_lib_scan.py`, `fips_discovery.py`, and `sbom_analyzer.py` when an existing `sbom.cdx.json` is already present in the evidence directory) plus **Phase 4 report synthesis** (`grc_reporter.py`)—requiring **zero Docker daemon** availability (`M7`). *(Use this explicit opt-in flag when Docker is not running rather than relying on `./grc scan all`, which fails closed before creating an evidence directory if the Docker daemon is stopped.)*
+
 ### `./grc scan <engine> -w <workspace> --no-report`
 Appending `--no-report` to any `./grc scan` command runs the requested scanner engine(s) and writes their raw JSON/XML telemetry to the evidence directory, but skips automatic Phase 4 report synthesis (`poam_data.md`, `controls.md`, `ruleset_validation.md`, `scr_scn_package.json`, and `sha256sum`). This is useful when running multiple individual engines sequentially before calling `./grc report` once at the end.
 
@@ -149,8 +152,8 @@ Appending `--no-report` to any `./grc scan` command runs the requested scanner e
 ### `./grc report --evidence <evidence_dir> [--workspace <workspace_dir>] [--ruleset <ruleset.yaml>]`
 Executes **Phase 4 (Compliance Deliverable Synthesis)** on an existing evidence directory containing scanner JSON files. It normalizes and deduplicates findings across engines, maps every defect to **NIST SP 800-53 Rev. 5** controls and **DISA STIG** severity categories (`CAT I` / `CAT II` / `CAT III`), calculates FedRAMP remediation SLAs (30 / 90 / 180 days), separates `NEEDS_REVIEW` human/runtime checks from confirmed POA&Ms, and generates `poam_data.md`, `controls.md`, `ruleset_validation.md`, `scr_scn_package.json`, and the tamper-evident `sha256sum` manifest.
 
-### `./grc fips --workspace <dir> [--evidence <dir>] [--dry-run] [--format <all|terminal|json|markdown|sarif|cbom|cmvp>] [--output <file>]`
-Provides direct standalone access to `scripts/fips_discovery.py` (zero Docker required) to assess any unpacked bundle, repository, or cold-mounted rootfs against `rules/fips_algorithm_policy.json` and `rules/cmvp_catalog.json`. Pass `--dry-run` to preview findings in the terminal without writing deliverables to disk.
+### `./grc fips --workspace <dir> [--evidence <dir>] [--dry-run] [--format <all|terminal|json|markdown|sarif|cbom|cmvp>] [--output <file>] [--allow-empty] [--fail-on <FAIL|NEEDS_REVIEW|never>]`
+Provides direct standalone access to `scripts/fips_discovery.py` (zero Docker required) to assess any unpacked bundle, repository, or cold-mounted rootfs against `rules/fips_algorithm_policy.json`, `rules/cmvp_catalog.json`, and `rules/crypto_catalog.json`. Pass `--dry-run` to preview findings in the terminal without writing deliverables to disk, `--allow-empty` to return `exit 0` (instead of `exit 2`) on `0`-file workspaces, and `--fail-on {FAIL,NEEDS_REVIEW,never}` for CI/CD policy gating.
 
 ### `./grc sbom --sbom <path/to/sbom.cdx.json> [--format <markdown|json|csv>] [--output <file>]`
 Provides direct standalone access to `scripts/sbom_analyzer.py` so you can analyze any external CycloneDX or SPDX SBOM file—even outside of a bundle scan—and generate a DISA STIG / DoD SRG applicability report in Markdown, JSON, or CSV format.
