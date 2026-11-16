@@ -543,6 +543,202 @@ class TestFIPSPhases2To5(unittest.TestCase):
                 finally:
                     grc_bundle.clean_ephemeral_workspace(ws_v2)
 
+    def test_h5_crypto_bc_fips_historical_remediation_and_reporter_reconciliation(self) -> None:
+        cat = crypto_lib_scan.load_crypto_catalog(Path(REPO_ROOT) / "rules" / "crypto_catalog.json")
+        scanner = crypto_lib_scan.CryptoScanner(cat)
+        findings = scanner.evaluate([
+            ("bc-fips", "1.0.2.5", "signer/pom.xml", "java"),
+            ("bc-fips", "2.0.0", "signer/pom.xml", "java"),
+            ("golang.org/x/crypto", "0.17.0", "partner-client/go.mod", "go"),
+        ])
+        self.assertEqual(findings[0].status, "FAIL_HISTORICAL_FIPS")
+        self.assertEqual(findings[0].severity, "MEDIUM")
+        self.assertIn("3673", findings[0].description)
+
+        self.assertEqual(findings[1].status, "CANNOT_DETERMINE_STATICALLY")
+        self.assertNotIn("Upgrade bc-fips to >= 2.0.0", findings[1].remediation)
+
+        self.assertEqual(findings[2].status, "NOT_VALIDATED")
+        self.assertNotIn(">= v0.17.0", findings[2].remediation)
+
+        schema_recs = crypto_lib_scan._to_schema_findings([findings[0]])
+        hist_recs = [r for r in schema_recs if r["determination"] == "FAIL"]
+        self.assertEqual(len(hist_recs), 1)
+        self.assertEqual(hist_recs[0]["determination_detail"], "FAIL_HISTORICAL_CERT")
+        self.assertEqual(hist_recs[0]["severity"], "MEDIUM")
+
+        # When both CryptoScan and FIPSDiscovery run on KestrelBridge v2.0.0, FIPSDiscovery PASS
+        # supersedes CryptoScan CANNOT_DETERMINE_STATICALLY so reporter stays COMPLIANT
+        xtest_root = Path(REPO_ROOT).parent / "GRC-xTEST"
+        kb_v2 = xtest_root / "bundles" / "kestrelbridge-v2.0.0.bundle"
+        if kb_v2.is_file():
+            with tempfile.TemporaryDirectory() as tmp:
+                ws_v2 = Path(tmp) / "kb_v2"
+                ev_v2 = Path(tmp) / "ev_v2"
+                ev_v2.mkdir(parents=True)
+                mgr = grc_bundle.GRCBundleManager(bundle_path=kb_v2, workspace_root=ws_v2)
+                mgr.restore_bundle(force=True, read_only=True)
+                try:
+                    c_deps = crypto_lib_scan.DependencyExtractor.extract_from_workspace(ws_v2)
+                    c_findings = crypto_lib_scan.CryptoScanner(cat).evaluate(c_deps)
+                    (ev_v2 / "crypto_findings.json").write_text(
+                        crypto_lib_scan.CryptoReporter.to_json(c_findings, str(ws_v2)),
+                        encoding="utf-8",
+                    )
+                    fips_eng = fips_discovery.FIPSAssessmentEngine(workspace_root=ws_v2)
+                    fips_eng.run()
+                    fips_eng.write_deliverables(ev_v2)
+
+                    rep = grc_reporter.GRCComplianceReporter(evidence_dir=ev_v2, workspace_dir=ws_v2)
+                    rep.run(write_files=True)
+                    pkg = json.loads((ev_v2 / "scr_scn_package.json").read_text(encoding="utf-8"))
+                    self.assertEqual(pkg["summary"]["overall_status"], "COMPLIANT")
+                    self.assertEqual(pkg["summary"]["total_findings"], 0)
+                    self.assertEqual(pkg["summary"]["verification_required_count"], 0)
+                finally:
+                    grc_bundle.clean_ephemeral_workspace(ws_v2)
+
+    def test_h7_component_scoped_dockerfile_and_pypi_wheel_linkage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / "svc_repo"
+            (ws / "docs-site").mkdir(parents=True)
+            (ws / "gateway").mkdir(parents=True)
+            (ws / "gateway" / "requirements.txt").write_text("cryptography==42.0.5\n", encoding="utf-8")
+
+            # Unrelated sibling UBI 9 Dockerfile + non-FIPS gateway Dockerfile must NOT promote gateway cryptography
+            (ws / "docs-site" / "Dockerfile").write_text(
+                "FROM registry.access.redhat.com/ubi9/python-312\n",
+                encoding="utf-8",
+            )
+            (ws / "gateway" / "Dockerfile").write_text(
+                "FROM python:3.12-slim-bookworm\nRUN pip install --no-cache-dir -r requirements.txt\n",
+                encoding="utf-8",
+            )
+            env_1 = fips_discovery.FIPSAssessmentEngine(workspace_root=ws).run()
+            crypt_1 = [f for f in env_1["findings"] if f["subject"]["name"] == "cryptography"]
+            self.assertEqual(len(crypt_1), 1)
+            self.assertEqual(crypt_1[0]["determination"], "CANNOT_DETERMINE_STATICALLY")
+
+            # Even with UBI 9 in gateway/Dockerfile + OpenSSL fips_sect, plain pip wheel stays CANNOT_DETERMINE_STATICALLY
+            (ws / "appliance" / "rootfs" / "etc" / "pki" / "tls").mkdir(parents=True)
+            (ws / "appliance" / "rootfs" / "etc" / "pki" / "tls" / "openssl.cnf").write_text(
+                "[provider_sect]\nfips = fips_sect\n[fips_sect]\nactivate = 1\n",
+                encoding="utf-8",
+            )
+            (ws / "gateway" / "Dockerfile").write_text(
+                "FROM registry.access.redhat.com/ubi9/python-312\n"
+                "RUN pip install --no-cache-dir -r requirements.txt\n",
+                encoding="utf-8",
+            )
+            env_2 = fips_discovery.FIPSAssessmentEngine(workspace_root=ws).run()
+            crypt_2 = [f for f in env_2["findings"] if f["subject"]["name"] == "cryptography"]
+            self.assertEqual(crypt_2[0]["determination"], "CANNOT_DETERMINE_STATICALLY")
+
+            # Switching gateway/Dockerfile to --no-binary cryptography promotes it legitimately to PASS
+            (ws / "gateway" / "Dockerfile").write_text(
+                "FROM registry.access.redhat.com/ubi9/python-312\n"
+                "RUN pip install --no-cache-dir --no-binary cryptography -r requirements.txt\n",
+                encoding="utf-8",
+            )
+            env_3 = fips_discovery.FIPSAssessmentEngine(workspace_root=ws).run()
+            crypt_3 = [f for f in env_3["findings"] if f["subject"]["name"] == "cryptography"]
+            self.assertEqual(crypt_3[0]["determination"], "PASS")
+
+    def test_m1_m3_m4_m5_m7_m8_provenance_and_cli_hardening(self) -> None:
+        fips_script = Path(SCRIPTS_DIR) / "fips_discovery.py"
+        with tempfile.TemporaryDirectory() as tmp:
+            tdir = Path(tmp)
+            # M1: --fail-on threshold behavior
+            ws_nr = tdir / "ws_needs_review"
+            ws_nr.mkdir()
+            (ws_nr / "requirements.txt").write_text("cryptography==42.0.5\n", encoding="utf-8")
+
+            r_never = subprocess.run(
+                [sys.executable, str(fips_script), "-w", str(ws_nr), "-f", "json", "--fail-on", "never"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(r_never.returncode, 0)
+            r_fail = subprocess.run(
+                [sys.executable, str(fips_script), "-w", str(ws_nr), "-f", "json", "--fail-on", "FAIL"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(r_fail.returncode, 0)
+            r_nr = subprocess.run(
+                [sys.executable, str(fips_script), "-w", str(ws_nr), "-f", "json", "--fail-on", "NEEDS_REVIEW"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(r_nr.returncode, 1)
+
+            # M4: Planted spoofed fips_provenance.json inside audited workspace must be ignored everywhere
+            (ws_nr / "fips_provenance.json").write_text(
+                json.dumps({"target_identifier": "SPOOFED_TARGET", "commit_sha": "deadbeef1234"}),
+                encoding="utf-8",
+            )
+            env_m4 = fips_discovery.FIPSAssessmentEngine(workspace_root=ws_nr).run()
+            self.assertEqual(env_m4["target"]["identifier"], "ws_needs_review")
+            self.assertNotIn("commit", env_m4["target"])
+            c_m4 = json.loads(crypto_lib_scan.CryptoReporter.to_json([], str(ws_nr)))
+            self.assertEqual(c_m4["target"]["identifier"], "ws_needs_review")
+
+            ev_m4 = tdir / "ev_m4"
+            ev_m4.mkdir()
+            rep_m4 = grc_reporter.GRCComplianceReporter(evidence_dir=ev_m4, workspace_dir=ws_nr)
+            rep_m4.load_provenance()
+            self.assertEqual(rep_m4.provenance, {})
+
+            # M8: Collision suffixing for auto-generated pick-up paths only
+            base_dir = tdir / "2026-11-15_190000_kb@v1.0.0_fips"
+            self.assertEqual(fips_discovery._next_available_evidence_dir(base_dir), base_dir)
+            base_dir.mkdir()
+            d2 = fips_discovery._next_available_evidence_dir(base_dir)
+            self.assertEqual(d2.name, "2026-11-15_190000_kb@v1.0.0_fips_2")
+            d2.mkdir()
+            d3 = fips_discovery._next_available_evidence_dir(base_dir)
+            self.assertEqual(d3.name, "2026-11-15_190000_kb@v1.0.0_fips_3")
+
+        # M3, M5, M7 on KestrelBridge bundles
+        xtest_root = Path(REPO_ROOT).parent / "GRC-xTEST"
+        kb_v15 = xtest_root / "bundles" / "kestrelbridge-v1.5.0.bundle"
+        kb_v2 = xtest_root / "bundles" / "kestrelbridge-v2.0.0.bundle"
+        if kb_v15.is_file() and kb_v2.is_file():
+            with tempfile.TemporaryDirectory() as tmp2:
+                t2 = Path(tmp2)
+                ws15 = t2 / "ws15"
+                mgr15 = grc_bundle.GRCBundleManager(bundle_path=kb_v15, workspace_root=ws15)
+                prov15 = mgr15.restore_bundle(force=True, read_only=True)
+                try:
+                    self.assertEqual(prov15["checked_out_ref"], "v1.5.0")
+                    self.assertIsNone(prov15["verification"]["checksum_verified"])
+                    self.assertEqual(prov15["verification"]["checksum_status"], "NOT_CHECKED")
+                    self.assertTrue(prov15["verification"]["git_bundle_valid"])
+
+                    v_match = mgr15.verify_bundle(expected_sha256=prov15["bundle_sha256"])
+                    self.assertTrue(v_match["checksum_verified"])
+                    self.assertEqual(v_match["checksum_status"], "MATCH")
+
+                    eng15 = fips_discovery.FIPSAssessmentEngine(workspace_root=ws15)
+                    self.assertEqual(eng15._default_evidence_slug(), "kestrelbridge-v1.5.0@v1.5.0")
+                    env15 = eng15.run()
+                    self.assertEqual(env15["target"].get("checked_out_ref"), "v1.5.0")
+                finally:
+                    grc_bundle.clean_ephemeral_workspace(ws15)
+
+                ws20 = t2 / "ws20"
+                ev20 = t2 / "ev20"
+                grc_bundle.GRCBundleManager(bundle_path=kb_v2, workspace_root=ws20).restore_bundle(force=True, read_only=True)
+                try:
+                    res_host = subprocess.run(
+                        [str(Path(REPO_ROOT) / "grc"), "scan", "--host-only", "-w", str(ws20), "-e", str(ev20)],
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(res_host.returncode, 0, res_host.stderr)
+                    self.assertTrue((ev20 / "crypto_findings.json").is_file())
+                    self.assertTrue((ev20 / "fips_findings.json").is_file())
+                    self.assertTrue((ev20 / "sha256sum").is_file())
+                    self.assertIn("COMPLIANT (Clean Out-of-Band Audit)", (ev20 / "poam_data.md").read_text(encoding="utf-8"))
+                finally:
+                    grc_bundle.clean_ephemeral_workspace(ws20)
+
 
 if __name__ == "__main__":
     unittest.main()

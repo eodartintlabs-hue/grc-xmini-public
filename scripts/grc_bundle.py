@@ -163,15 +163,19 @@ class GRCBundleManager:
         self.bundle_sha256 = compute_sha256(self.bundle_path)
         print(f"    -> SHA-256 Digest: {self.bundle_sha256}")
 
-        checksum_verified = True
+        checksum_verified: Optional[bool] = None
+        checksum_status = "NOT_CHECKED"
         if expected_sha256:
             expected_clean = expected_sha256.strip().lower()
             if self.bundle_sha256.lower() != expected_clean:
                 checksum_verified = False
+                checksum_status = "MISMATCH"
                 raise ValueError(
                     f"Bundle cryptographic integrity verification failed: "
                     f"expected {expected_clean}, computed {self.bundle_sha256}"
                 )
+            checksum_verified = True
+            checksum_status = "MATCH"
             print("    -> Cryptographic checksum verified against session baseline: MATCH")
 
         # Execute git bundle verify via _git helper
@@ -193,6 +197,7 @@ class GRCBundleManager:
             "bundle_size_bytes": self.bundle_path.stat().st_size,
             "bundle_sha256": self.bundle_sha256,
             "checksum_verified": checksum_verified,
+            "checksum_status": checksum_status,
             "git_bundle_valid": True,
             "contained_references": refs,
             "verified_at": utc_now_iso(),
@@ -299,6 +304,11 @@ class GRCBundleManager:
         print(f"    -> Subject: {commit_info['subject']}")
 
         # Step 6: Create Bundle Provenance Manifest
+        clean_ref = self._normalize_checked_out_ref(
+            target_ref=target_ref,
+            raw_decorations=commit_info["ref"],
+            commit_hash=commit_info["commit_hash"],
+        )
         provenance = {
             "manifest_schema": "grc-bundle-provenance-v1",
             "session_id": self.session_id,
@@ -307,7 +317,7 @@ class GRCBundleManager:
             "bundle_size_bytes": self.bundle_path.stat().st_size,
             "bundle_sha256": self.bundle_sha256,
             "workspace_path": str(self.workspace_root),
-            "checked_out_ref": target_ref or commit_info["ref"],
+            "checked_out_ref": clean_ref,
             "commit_metadata": commit_info,
             "restored_at": utc_now_iso(),
             "status": "RESTORED",
@@ -339,6 +349,44 @@ class GRCBundleManager:
     # --------------------------------------------------------------------------
     # INTERNAL HELPERS
     # --------------------------------------------------------------------------
+
+    def _normalize_checked_out_ref(
+        self,
+        target_ref: Optional[str],
+        raw_decorations: str,
+        commit_hash: str,
+    ) -> str:
+        """Normalizes raw Git `%D` decorations into a clean tag, branch, or commit token (`M3`)."""
+        if target_ref and target_ref.strip():
+            return re.sub(r"^refs/(?:tags|heads)/", "", target_ref.strip())
+
+        tags: List[str] = []
+        branches: List[str] = []
+        others: List[str] = []
+        for raw_part in str(raw_decorations or "").split(","):
+            part = raw_part.strip()
+            if not part:
+                continue
+            if part.startswith("tag:"):
+                tok = part[len("tag:"):].strip()
+                if tok:
+                    tags.append(tok)
+            elif "->" in part:
+                rhs = part.split("->", 1)[1].strip()
+                if rhs and rhs != "HEAD":
+                    branches.append(rhs)
+            elif part != "HEAD" and not part.startswith("origin/"):
+                others.append(part)
+
+        if tags:
+            return tags[0]
+        if branches:
+            return branches[0]
+        if others:
+            return others[0]
+        if commit_hash and commit_hash != "UNKNOWN":
+            return commit_hash[:8]
+        return "HEAD"
 
     def _parse_bundle_refs(self, verify_output: str) -> List[Dict[str, str]]:
         refs = []

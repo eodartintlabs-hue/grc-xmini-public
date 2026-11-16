@@ -474,8 +474,10 @@ def validate_finding_envelope(payload: Any) -> List[str]:
         if not isinstance(tgt, dict):
             errors.append("target must be an object")
         else:
-            for uk in set(tgt.keys()) - {"identifier", "provenance_file", "commit"}:
+            for uk in set(tgt.keys()) - {"identifier", "provenance_file", "commit", "checked_out_ref"}:
                 errors.append(f"Unexpected target field: '{uk}'")
+            if "checked_out_ref" in tgt and not isinstance(tgt.get("checked_out_ref"), str):
+                errors.append("target.checked_out_ref must be a string")
 
     scope = payload.get("scope")
     if isinstance(scope, dict):

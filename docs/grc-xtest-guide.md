@@ -323,7 +323,7 @@ Use these copy-pasteable commands from the `GRC-x` root to test any specific Are
 ---
 
 ### 🛡️ AOC-12: Lack of FIPS Mode (`NIST SP 800-53 SC-13`, `IA-7`)
-> **Status**: **Active (`v1.5.1 — Iwakuni`)** — Evaluated host-natively via `scripts/fips_discovery.py` (`./grc fips` or `./grc scan --fips`).
+> **Status**: **Active (`v1.5.2 — Iwakuni`)** — Evaluated host-natively via `scripts/fips_discovery.py` (`./grc fips` or `./grc scan --fips`).
 * **Target Flaws**: Linux kernel bootloader with `fips=0` in GRUB parameters, system-wide crypto policies set to `DEFAULT` instead of `FIPS`, OpenSSL 3.0 configuration missing `[fips_sect] activate = 1`, non-FIPS `java.security` provider, and Python `MD5` / `ssl.FIPS_mode` fallback.
 * **Commands**:
   ```bash

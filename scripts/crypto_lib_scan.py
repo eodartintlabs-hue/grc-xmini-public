@@ -62,7 +62,7 @@ except ImportError:
         version_matches_prefix,
     )
 
-ENGINE_VERSION = "1.5.1"
+ENGINE_VERSION = "1.5.2"
 SKIP_DIRS = {".git", "node_modules", "vendor", "__pycache__", ".venv", "venv", "target", "bin", "obj"}
 
 
@@ -93,6 +93,10 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
         "remediation": (
             "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated "
             "FIPS 140-3 provider for SC-13 workloads."
+        ),
+        "fips_remediation": (
+            "Configure and activate a CMVP-validated OpenSSL 3 FIPS provider (e.g., openssl.cnf "
+            "[fips_sect] activate = 1) for SC-13 workloads; run './grc fips' to inspect configuration."
         ),
         "nist_controls": ["SI-7", "SC-12", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
@@ -156,6 +160,10 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
             "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage "
             "against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels."
         ),
+        "fips_remediation": (
+            "Verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than "
+            "default static PyPI wheels; run './grc fips' to evaluate container/OS linkage."
+        ),
         "nist_controls": ["SI-7", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
@@ -183,6 +191,10 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
             "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with "
             "CMVP-validated bc-fips (>= 2.0.0) in approved mode for FIPS 140-3 / SC-13 workloads."
         ),
+        "fips_remediation": (
+            "Replace standard non-FIPS bcprov-* with CMVP-validated bc-fips (>= 2.0.0, cert #4743) "
+            "in approved-only mode for FIPS 140-3 / SC-13 workloads."
+        ),
         "nist_controls": ["SI-7", "SC-12", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
@@ -193,6 +205,19 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
         "min_supported_version": "1.0.2",
         "status": "ACTIVE",
         "fips_status": "CAPABLE_IF_CONFIGURED",
+        "historical_fips_versions": [
+            {
+                "version": "<2.0.0",
+                "cert_number": "3673",
+                "standard": "FIPS 140-2",
+                "sunset_date": "2026-09-21",
+                "severity": "MEDIUM",
+                "note": (
+                    "BC-FJA 1.0.2.x holds only FIPS 140-2 certificate #3673, which moved to Historical status on "
+                    "2026-09-21; upgrade to bc-fips >= 2.0.0 (FIPS 140-3 cert #4743)."
+                ),
+            }
+        ],
         "fips_note": (
             "Bouncy Castle FIPS (bc-fips) holds CMVP FIPS 140-3 validation on 2.0.x (cert #4743; "
             "1.0.2.x cert #3673 moved to Historical status on 2026-09-21) when JVM provider "
@@ -201,6 +226,10 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
         "remediation": (
             "Upgrade bc-fips to >= 2.0.0 (FIPS 140-3 cert #4743) and confirm "
             "JVM/application approved-only mode enforcement."
+        ),
+        "fips_remediation": (
+            "Confirm JVM security.provider priority and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce "
+            "FIPS 140-3 approved-only mode (cert #4743); run './grc fips' to inspect provider configuration."
         ),
         "nist_controls": ["SI-7", "SC-12", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
@@ -237,6 +266,10 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
             "Upgrade node-forge >= 1.3.1 to remediate ASN.1 and signature verification bypass CVEs, "
             "and migrate SC-13 regulated crypto operations to Node.js 'node:crypto' backed by a FIPS-validated OpenSSL provider."
         ),
+        "fips_remediation": (
+            "Migrate SC-13 regulated cryptographic operations from pure-JavaScript node-forge to Node.js "
+            "built-in 'node:crypto' backed by a FIPS-validated OpenSSL provider."
+        ),
         "nist_controls": ["SI-7", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
@@ -256,6 +289,10 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
             "Update golang.org/x/crypto >= v0.17.0 (mitigating Terrapin SSH CVE-2023-48795), and ensure "
             "FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only "
             "(Go 1.24+) or BoringCrypto rather than golang.org/x/crypto."
+        ),
+        "fips_remediation": (
+            "Ensure FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only "
+            "(Go 1.24+) or BoringCrypto rather than unvalidated golang.org/x/crypto packages."
         ),
         "nist_controls": ["SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
@@ -316,6 +353,7 @@ EMBEDDED_CRYPTO_CATALOG: Dict[str, Any] = {
             "unless explicitly building and activating the CMVP-validated FIPS provider."
         ),
         "remediation": "Ensure openssl crate >= 0.10.55 dynamically links against a host OpenSSL 3.x installation with the FIPS provider activated.",
+        "fips_remediation": "Confirm the openssl crate dynamically links against a host OpenSSL 3.x installation with the FIPS provider activated.",
         "nist_controls": ["SI-7", "SC-13"],
         "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries",
     },
@@ -1202,7 +1240,32 @@ class CryptoScanner:
                 remediation=rule.get("remediation", "Pin and verify cryptographic library version."),
             )
 
+        # 5b. Historical FIPS 140-2 certificate only (post-2026-09-21 sunset)
+        for hist in rule.get("historical_fips_versions", []):
+            hist_ver = str(hist.get("version", "")).strip()
+            if not hist_ver or version == "Unknown":
+                continue
+            matched_hist = (
+                version_lt(version, hist_ver.lstrip("<").strip())
+                if hist_ver.startswith("<")
+                else version_matches_prefix(version, hist_ver)
+            )
+            if matched_hist:
+                return dataclasses.replace(
+                    base,
+                    status="FAIL_HISTORICAL_FIPS",
+                    severity=hist.get("severity", "MEDIUM"),
+                    description=hist.get(
+                        "note",
+                        f"Version '{version}' only carries a Historical FIPS 140-2 certificate.",
+                    ),
+                    remediation=rule.get("remediation", "Upgrade to a FIPS 140-3 validated release."),
+                    nist_controls=["SC-13"],
+                    fips_status=fips_status,
+                )
+
         # 6. Maintained version baseline met (SI-7); evaluate SC-13 FIPS 140-3 status explicitly.
+        fips_rem = rule.get("fips_remediation") or rule.get("remediation")
         if fips_status == "NOT_VALIDATED":
             desc = (
                 f"Version '{version}' meets maintenance minimums, but '{name}' is not a "
@@ -1215,10 +1278,7 @@ class CryptoScanner:
                 status="NOT_VALIDATED",
                 severity="MEDIUM",
                 description=desc,
-                remediation=rule.get(
-                    "remediation",
-                    "Migrate SC-13 regulated cryptographic operations to a CMVP-validated module.",
-                ),
+                remediation=fips_rem or "Migrate SC-13 regulated cryptographic operations to a CMVP-validated module.",
                 nist_controls=["SC-13"],
             )
 
@@ -1234,10 +1294,7 @@ class CryptoScanner:
                 status="CANNOT_DETERMINE_STATICALLY",
                 severity="INFO",
                 description=desc,
-                remediation=rule.get(
-                    "remediation",
-                    "Verify runtime FIPS provider linkage and approved-mode configuration on the deployed host.",
-                ),
+                remediation=fips_rem or "Verify runtime FIPS provider linkage and approved-mode configuration on the deployed host.",
                 nist_controls=["SC-13"],
             )
 
@@ -1253,10 +1310,7 @@ class CryptoScanner:
                 status="CONFORMANT_INDICATOR",
                 severity="INFO",
                 description=desc,
-                remediation=rule.get(
-                    "remediation",
-                    "Confirm operational environment matches CMVP Security Policy.",
-                ),
+                remediation=fips_rem or "Confirm operational environment matches CMVP Security Policy.",
                 nist_controls=["SC-13"],
             )
 
@@ -1381,6 +1435,29 @@ def _to_schema_findings(findings: List[CryptoFinding]) -> List[Dict[str, Any]]:
                 "remediation": f.remediation,
                 "extensions": {"fips": {"fips_status": "NOT_VALIDATED"}},
             })
+        elif f.status == "FAIL_HISTORICAL_FIPS":
+            records.append({
+                "finding_id": make_finding_id("cryptoscan", fips_rule_id, loc["path"], None, subj_id_token),
+                "rule_id": fips_rule_id,
+                "aoc": aoc_lifecycle,
+                "controls": ["SC-13"],
+                "determination": "FAIL",
+                "determination_detail": "FAIL_HISTORICAL_CERT",
+                "severity": f.severity,
+                "subject": copy.deepcopy(subj),
+                "location": copy.deepcopy(loc),
+                "detection": {"method": det_method, "confidence": det_conf},
+                "title": f"Historical FIPS 140-2 module certificate only: {f.name}{ver_label}"[:200],
+                "message": f.description,
+                "remediation": f.remediation,
+                "extensions": {
+                    "fips": {
+                        "fips_status": f.fips_status if f.fips_status in ("VALIDATED_MODULE", "CAPABLE_IF_CONFIGURED", "NOT_VALIDATED", "UNKNOWN") else "CAPABLE_IF_CONFIGURED",
+                        "cert_standard": "FIPS 140-2",
+                        "cert_status": "Historical",
+                    }
+                },
+            })
         elif f.status == "CONFORMANT_INDICATOR":
             records.append({
                 "finding_id": make_finding_id("cryptoscan", fips_rule_id, loc["path"], None, subj_id_token),
@@ -1419,7 +1496,7 @@ def _to_schema_findings(findings: List[CryptoFinding]) -> List[Dict[str, Any]]:
 
 def _resolve_workspace_target(workspace: str) -> Dict[str, str]:
     ws = Path(workspace)
-    for prov_name in ("fips_provenance.json", "bundle_provenance.json", "ami_provenance.json"):
+    for prov_name in ("bundle_provenance.json", "ami_provenance.json"):
         p = ws / prov_name
         if p.is_file():
             try:
@@ -1434,6 +1511,9 @@ def _resolve_workspace_target(workspace: str) -> Dict[str, str]:
                 commit = data.get("commit_sha") or data.get("commit_metadata", {}).get("commit_hash")
                 if commit and commit != "UNKNOWN":
                     tgt["commit"] = str(commit)
+                ref = data.get("checked_out_ref")
+                if isinstance(ref, str) and ref.strip():
+                    tgt["checked_out_ref"] = ref.strip()
                 return tgt
             except Exception:
                 pass
@@ -1466,6 +1546,7 @@ class CryptoReporter:
             f"> **Generated**: {now}  ",
             f"> **Workspace**: `{workspace}`  ",
             "> **Framework Reference**: NIST SP 800-53 (SI-7, SC-12, SC-13) / NIST FIPS 140-3 / AOC-09  ",
+            "> **Scope Note**: Evaluates dependency manifest and binary lifecycle / CMVP validation status only. Run `./grc fips -w <workspace>` to evaluate approved-mode configuration, algorithms, and TLS posture.  ",
             "",
             "---",
             "",
@@ -1528,7 +1609,8 @@ class CryptoReporter:
                 "assessed_aocs": ["AOC-09", "AOC-12"],
                 "ecosystems": ecosystems,
                 "limitations": [
-                    "Dependency manifests and shared-object filenames cannot prove runtime Operational Environment (OE) or dynamic FIPS provider activation without configuration/host inspection."
+                    "Assesses dependency manifests and shared-object lifecycle/CMVP validation status only; run './grc fips' to evaluate source algorithms, TLS settings, and approved-mode configuration.",
+                    "Dependency manifests and shared-object filenames cannot prove runtime Operational Environment (OE) or dynamic FIPS provider activation without configuration/host inspection.",
                 ],
             },
             "findings": schema_findings,
@@ -1543,6 +1625,7 @@ class CryptoReporter:
             "=======================================================================",
             f"Workspace: {workspace}",
             f"Crypto Packages Detected: {len(findings)}",
+            "Scope: Dependency manifest & binary lifecycle/CMVP check only (run './grc fips' for approved-mode evaluation).",
             "-----------------------------------------------------------------------",
         ]
         for f in sorted(findings, key=lambda x: (SEVERITY_RANK.get(x.severity.upper(), 99), x.name)):

@@ -20,7 +20,7 @@
   <a href="grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
-> **Engine**: [`scripts/fips_discovery.py`](../scripts/fips_discovery.py) (`FIPSDiscovery` v1.5.1 — Pipeline Engine #8)  
+> **Engine**: [`scripts/fips_discovery.py`](../scripts/fips_discovery.py) (`FIPSDiscovery` v1.5.2 — Pipeline Engine #8)  
 > **CLI Entrypoints**: `./grc fips`, `./grc scan fips` (`./grc scan --fips`), `./grc scan all`, `./grc test fips`, and `python3 scripts/fips_discovery.py`  
 > **Governing Standards**: NIST FIPS 140-3 (SP 800-140C/D), NIST SP 800-131A Rev. 2, FIPS 186-5, NIST SP 800-52 Rev. 2, NIST SP 800-53 Rev. 5 (`SC-13`, `SC-12`, `SC-8`, `SC-8(1)`, `SC-28`, `SC-28(1)`, `IA-7`, `SC-23`, `SI-7`, `SI-17`, `CM-6`)  
 > **Assessed Areas of Concern (AOCs)**: `AOC-03` (Weak/Deprecated Crypto), `AOC-05` (Improper TLS), `AOC-09` (EOL/Unvalidated Crypto Libraries), `AOC-12` (Lack of FIPS Mode)  
@@ -75,7 +75,7 @@ Where static analysis alone cannot verify runtime FIPS mode or OE binding, `fips
 |---|---|---|
 | **`PASS`** | Validated module evidence + approved-mode evidence + approved algorithm/parameters | AES-256-GCM via `secrets`, SHA-384 manifest, `fips=1` + `FIPS` crypto-policy + active `fips_sect` |
 | **`FAIL`** | Disallowed algorithm/protocol, explicit non-FIPS toggle, or unvalidated/historical crypto module | MD5 security digest, AES-ECB, RSA-1024, TLS 1.0/1.1, `fips=0`, `pycryptodome`, `golang.org/x/crypto`, `bc-fips` 1.0.2.5 (Historical) |
-| **`WARN`** *(reserved in `v1.5.1`)* | Reserved in Finding Schema v1.0.0 and policy engine for transitional or advisory notices (no active rule in `v1.5.1` currently emits `WARN`) | Transitional parameter notice or policy/catalog advisory |
+| **`WARN`** *(reserved in `v1.5.2`)* | Reserved in Finding Schema v1.0.0 and policy engine for transitional or advisory notices (no active rule in `v1.5.2` currently emits `WARN`) | Transitional parameter notice or policy/catalog advisory |
 | **`NEEDS_REVIEW`** | Context-dependent or legacy transition item requiring ISSO/assessor confirmation | `hashlib.md5(..., usedforsecurity=False)` for cache keys (`cache.py`), ECDSA `P-224` legacy partner receipt verification |
 | **`CANNOT_DETERMINE_STATICALLY`** | FIPS-capable wrapper is present, but workspace lacks static evidence that FIPS approved mode is active on the target host/container | `cryptography==42.0.5` in `requirements.txt` without UBI 9/OpenSSL FIPS provider evidence in the same workspace |
 
@@ -93,12 +93,13 @@ usage: grc fips [-h] [-w WORKSPACE] [-e EVIDENCE] [--dry-run]
                 [--policy POLICY] [--cmvp-catalog CMVP_CATALOG]
                 [--crypto-catalog CRYPTO_CATALOG]
                 [--staleness-days STALENESS_DAYS] [--allow-empty]
+                [--fail-on {FAIL,NEEDS_REVIEW,never}]
 ```
 
 | Flag | Short | Argument / Choices | Default | Behavior & Operational Notes |
 |---|---|---|---|---|
 | `--workspace` | `-w` | `<dir>` | `.` | Path to unpacked bundle directory (e.g., `./ephemeral_workspace`), local source repo, or cold-mounted AMI rootfs (`./ephemeral_ami_rootfs`). Fails fatally (`exit 1`) if the path does not exist, or if a `.bundle` file or non-directory path is supplied (printing an explicit `./grc bundle restore ...` remediation hint). |
-| `--evidence` | `-e` | `<dir>` | `artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<target>_fips` *(UTC)* | Destination directory for the 6 FIPS deliverables + `sha256sum` when `--format all` runs without `--dry-run`. Created automatically if absent. |
+| `--evidence` | `-e` | `<dir>` | `artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>_fips` *(UTC)* | Destination directory for the 6 FIPS deliverables + `sha256sum` when `--format all` runs without `--dry-run`. Created automatically if absent. When omitted, auto-named folders append `_2`, `_3`, … on same-second collisions (`M8`) and include `@<ref>` when a bundle ref/tag was checked out (`M3`). |
 | `--dry-run` | — | *(boolean switch)* | `False` | Evaluates the workspace and prints the terminal preview (or selected single `--format` output to stdout) **without writing any files to disk**. |
 | `--format` | `-f` | `all`, `terminal`, `json`, `markdown`, `sarif`, `cbom`, `cmvp` | `all` | Controls output rendering:<br>• `all`: Writes all 6 deliverables + `sha256sum` to `--evidence` (unless `--dry-run` is set) and prints summary.<br>• `terminal`: Prints human-readable summary & findings to stdout only.<br>• `json`: Renders `fips_findings.json` envelope.<br>• `markdown`: Renders `fips_assessment.md`.<br>• `sarif`: Renders SARIF 2.1.0 (`fips_findings.sarif`) for `FAIL`/`WARN`/`NEEDS_REVIEW`/`CANNOT_DETERMINE_STATICALLY` findings.<br>• `cbom`: Renders CycloneDX 1.6 CBOM (`cbom.cdx.json`).<br>• `cmvp`: Renders CMVP validation mapping table (`cmvp_mapping.md`). |
 | `--output` | `-o` | `<file>` | `None` | Writes the single rendered artifact to `<file>` (creating parent directories as needed) when `-f` is `json`, `markdown`, `sarif`, `cbom`, or `cmvp`. **Ignored when `--dry-run` is set** (prints to stdout instead). |
@@ -107,15 +108,17 @@ usage: grc fips [-h] [-w WORKSPACE] [-e EVIDENCE] [--dry-run]
 | `--crypto-catalog` | — | `<path>` | `rules/crypto_catalog.json` | Overrides the cryptographic library and EOL version catalog JSON. |
 | `--staleness-days` | — | `<int>` | `90` | Overrides the age threshold (in days) before the offline CMVP catalog emits a staleness warning in `fips_provenance.json` and Markdown reports. |
 | `--allow-empty` | — | *(boolean switch)* | `False` | Permits a `0`-file workspace scan to exit `0` (and write empty-scope deliverables if not in `--dry-run`). Without `--allow-empty`, inspecting `0` assessable files across Python, polyglot source, manifests, deploy/IaC, and OS config emits `[WARN]` on `stderr` and exits with code `2`. |
+| `--fail-on` | — | `FAIL`, `NEEDS_REVIEW`, `never` | `never` | Controls policy-gate exit code after an assessment (`M1`):<br>• `never`: Exit `0` regardless of findings (still exits `2` on `0` inspected files unless `--allow-empty`).<br>• `FAIL`: Exit `1` when any `FAIL` or `WARN` finding exists.<br>• `NEEDS_REVIEW`: Exit `1` when any `FAIL`, `WARN`, `NEEDS_REVIEW`, or `CANNOT_DETERMINE_STATICALLY` finding exists. |
 | `--help` | `-h` | *(boolean switch)* | — | Displays CLI help and exits. |
 
 ### 2.2 Choosing Between `./grc fips`, `./grc scan`, `./grc test`, and Direct Python
 
 | Command | Docker Required? | Runs `grc_reporter.py` (POA&M / SCR-SCN)? | When to Use |
 |---|---|---|---|
-| `./grc fips -w <dir> [flags]` | **No** | No | Direct host-native FIPS assessment, `--dry-run` terminal previews, single-format exports (`-f cbom`, `-f sarif`, etc.), custom policy/catalog testing, and the 6 FIPS deliverables + `sha256sum`. |
-| `./grc scan fips -w <dir> [-e <dir>] [--no-report]` *(or `./grc scan --fips`)* | **No** | **Yes** *(unless `--no-report`)* | Runs `fips_discovery.py` into `<evidence>` (defaults to `artifacts/pick-up/<timestamp>_<bundle>`), copies workspace `bundle_provenance.json` / `ami_provenance.json`, and synthesizes `poam_data.md`, `controls.md`, `ruleset_validation.md`, and `scr_scn_package.json`. *(Note: `./grc scan` only accepts `-w/--workspace`, `-e/--evidence`, `--engine`/`--fips`, and `--no-report`; use `./grc fips` for `--dry-run`, `-f`, `-o`, `--policy`, or `--staleness-days`.)* |
-| `./grc scan all -w <dir> [-e <dir>]` | **Yes** *(Docker Desktop)* | **Yes** *(unless `--no-report`)* | Full 10-engine audit: 7 containerized scanners (`grc-scanner:local` under `--network none`) + host-native `crypto_lib_scan.py` + `fips_discovery.py` + `sbom_analyzer.py` + Phase 4 reporter. |
+| `./grc fips -w <dir> [flags]` | **No** | No | Direct host-native FIPS assessment, `--dry-run` terminal previews, single-format exports (`-f cbom`, `-f sarif`, etc.), custom policy/catalog testing, CI policy gating (`--fail-on`), and the 6 FIPS deliverables + `sha256sum`. |
+| `./grc scan fips -w <dir> [-e <dir>] [--no-report]` *(or `./grc scan --fips`)* | **No** | **Yes** *(unless `--no-report`)* | Runs `fips_discovery.py` into `<evidence>` (defaults to `artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>` UTC), copies workspace `bundle_provenance.json` / `ami_provenance.json`, and synthesizes `poam_data.md`, `controls.md`, `ruleset_validation.md`, and `scr_scn_package.json` (including `**Engines Run**: FIPSDiscovery (...)`). *(Note: `./grc scan` only accepts `-w/--workspace`, `-e/--evidence`, `--engine`/`--fips`, and `--no-report`; use `./grc fips` for `--dry-run`, `-f`, `-o`, `--policy`, `--staleness-days`, or `--fail-on`.)* |
+| `./grc scan --host-only -w <dir> [-e <dir>]` | **No** | **Yes** *(unless `--no-report`)* | Runs host-native engines only (`crypto_lib_scan.py`, `fips_discovery.py`, and `sbom_analyzer.py` when an existing `sbom.cdx.json` is present) without requiring Docker Desktop (`M7`). |
+| `./grc scan all -w <dir> [-e <dir>]` | **Yes** *(Docker Desktop)* | **Yes** *(unless `--no-report`)* | Full 10-engine audit: 7 containerized scanners (`grc-scanner:local` under `--network none`) + host-native `crypto_lib_scan.py` + `fips_discovery.py` + `sbom_analyzer.py` + Phase 4 reporter. Fails fast before creating `artifacts/pick-up/` if the Docker daemon is stopped (`M7`). |
 | `./grc test fips` | **No** | No | Executes the unit and invariant test suite validating `fips_discovery.py` determinations, redaction, CBOM/SARIF builders, and CMVP mapping logic. |
 | `python3 scripts/fips_discovery.py [flags]` | **No** | No | Identical to `./grc fips [flags]`; useful inside CI scripts or cross-repo harnesses such as `GRC-xTEST/scripts/verify_pipeline.sh`. |
 
@@ -125,8 +128,8 @@ usage: grc fips [-h] [-w WORKSPACE] [-e EVIDENCE] [--dry-run]
 
 When run without `--dry-run` and with default `--format all`, [`write_deliverables()`](../scripts/fips_discovery.py) writes **7 sealed files** into the evidence directory (where `<YYYY-MM-DD_HHMMSS>` timestamps are generated in **UTC**):
 
-* **Default path via `./grc fips -w <ws>`**: `GRC-xMINI/artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<target>_fips/`
-* **Default path via `./grc scan fips -w <ws>`**: `GRC-xMINI/artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle>/` (or `<timestamp>/` if no `bundle_provenance.json` is present)
+* **Default path via `./grc fips -w <ws>`**: `GRC-xMINI/artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>_fips/` *(or `_<target>_fips`; `_2`, `_3`, ... on same-second collisions)*
+* **Default path via `./grc scan fips -w <ws>`**: `GRC-xMINI/artifacts/pick-up/<YYYY-MM-DD_HHMMSS>_<bundle-stem>@<ref>/` *(or `<timestamp>/` if no `bundle_provenance.json` is present)*
 
 | File | Schema / Format | Contents & Consumer |
 |---|---|---|
@@ -234,12 +237,12 @@ Inspect the printed path at the bottom (`[SUCCESS] Wrote 7 FIPS assessment deliv
 
 ### 4.2 Use Case 2: `GRC-xBOT` & `GRC-xMINI` (Co-Pilot Guided Assessment of Staged Bundles)
 
-**Scenario**: An analyst or ISSO uses **`GRC-xBOT`** (`v1.5.0 — Tsukuba`) as a guided co-pilot alongside **`GRC-xMINI`** to audit an incoming production `.bundle` staged in `GRC-xMINI/artifacts/drop-off/`. Because `GRC-xBOT` actively watches `../GRC-xMINI/artifacts/drop-off/`, `../GRC-xMINI/artifacts/pick-up/`, and `../GRC-xMINI/ephemeral_workspace`, it tailors exact `GRC-xMINI` commands around your staged files.
+**Scenario**: An analyst or ISSO uses **`GRC-xBOT`** (`v1.5.2 — Tsukuba`) as a guided co-pilot alongside **`GRC-xMINI`** to audit an incoming production `.bundle` staged in `GRC-xMINI/artifacts/drop-off/`. Because `GRC-xBOT` actively watches `../GRC-xMINI/artifacts/drop-off/`, `../GRC-xMINI/artifacts/pick-up/`, and `../GRC-xMINI/ephemeral_workspace`, it tailors exact `GRC-xMINI` commands around your staged files.
 
 > [!IMPORTANT]
 > Two architectural notes when pairing `GRC-xBOT` with `fips_discovery.py`:
-> 1. `GRC-xBOT` routes `"fips"` and `"crypto"` intents through its **`crypto` playbook** (`./grc crypto`, which finishes with the explicit instruction to run `./grc fips -w <workspace>` for full FIPS 140-3, CBOM, SARIF, and CMVP mapping), and routes full multi-engine bundle reviews through its **`bundle` playbook** (`./grc scan -w ./ephemeral_workspace`, which runs `fips_discovery.py` automatically when Docker is up).
-> 2. When `artifacts/drop-off/` contains a `.bundle` and `./ephemeral_workspace` does not yet exist, `GRC-xBOT`'s `crypto` and `bundle` playbooks restore it read-only before scanning.
+> 1. `GRC-xBOT` (`v1.5.2 — Tsukuba`) routes `"fips"`, `"140-3"`, `"cmvp"`, `"cbom"`, and `"aoc-12"` intents directly to its dedicated **`fips` playbook** (`./grc fips -w <workspace> --dry-run` preview, followed by `./grc fips ... && ./grc report ...`), separates general EOL crypto scans under its **`crypto` playbook**, and routes full multi-engine bundle reviews through its **`bundle` playbook** (`./grc scan -w ./ephemeral_workspace`).
+> 2. When `artifacts/drop-off/` contains a `.bundle` and `./ephemeral_workspace` does not yet exist, `GRC-xBOT`'s `fips`, `crypto`, and `bundle` playbooks restore the selected release tag read-only before scanning and disclose any skipped bundles or release tags.
 
 #### Step 1: Stage Your Release Bundle into `GRC-xMINI/artifacts/drop-off/`
 
@@ -262,8 +265,8 @@ Confirm that `GRC-xBOT` reports `vendor-release.bundle` inside `../GRC-xMINI/art
 # Deterministic intent routing (Mode 1: Legacy — zero LLM calls)
 ./grc-bot ask "Audit vendor-release.bundle for FIPS 140-3 mode, CMVP modules, and weak crypto"
 
-# Or jump directly into the crypto/FIPS or bundle walkthrough
-./grc-bot guide crypto
+# Or jump directly into the FIPS 140-3 or full bundle walkthrough
+./grc-bot guide fips
 # ./grc-bot guide bundle
 
 # Optional: Mode 2 (Local Open-Weight Gemma 4 co-pilot over 127.0.0.1:11434)
@@ -305,7 +308,7 @@ There are **two Triad workflows** depending on whether `GRC-xMINI/artifacts/drop
 
 #### Pattern A: Zero-Staging Triad Practice (Automatic `GRC-xTEST` Fallback)
 
-When `GRC-xMINI/artifacts/drop-off/` has **no `.bundle` files**, `GRC-xBOT` automatically falls back to `../GRC-xTEST/bundles/aoc-combo-4x.bundle` in its `crypto` and `bundle` guides, and runs the full test harness in `practice`:
+When `GRC-xMINI/artifacts/drop-off/` has **no `.bundle` files**, `GRC-xBOT` automatically falls back to `../GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle` in its `fips` guide (`../GRC-xTEST/bundles/aoc-combo-4x.bundle` in `crypto` and `bundle`), and runs the full test harness in `practice`:
 
 ```bash
 cd ~/Desktop/GRC-xBOT
@@ -316,11 +319,11 @@ cd ~/Desktop/GRC-xBOT
 # 2. Run guided practice overview (executes './grc test all' — includes fips tests — and stages safe PoA&M fixtures)
 ./grc-bot guide practice
 
-# 3. Watch GRC-xBOT synthesize commands using ../GRC-xTEST/bundles/aoc-combo-4x.bundle automatically
-./grc-bot guide crypto
+# 3. Watch GRC-xBOT synthesize commands using ../GRC-xTEST/bundles/aoc-12-no-fips-mode.bundle automatically
+./grc-bot guide fips
 ```
 
-When prompted inside `./grc-bot chat` (with `practice` or `crypto` selected), `GRC-xBOT` previews `aoc-combo-4x.bundle` from `../GRC-xTEST/bundles/`, restores it read-only into `../GRC-xMINI/ephemeral_workspace`, scans it, and cleans it up.
+When prompted inside `./grc-bot chat` (with `practice` or `fips` selected), `GRC-xBOT` previews the practice bundle from `../GRC-xTEST/bundles/`, restores it read-only into `../GRC-xMINI/ephemeral_workspace`, scans it, and cleans it up.
 
 #### Pattern B: Staging a Dedicated `GRC-xTEST` FIPS Bundle into `GRC-xBOT`
 
@@ -342,7 +345,7 @@ cd ~/Desktop/GRC-xBOT
 # 3. Follow the co-pilot workflow in GRC-xBOT interactive chat
 ./grc-bot chat
 # Inside chat:
-#   - Pick 'crypto' (or 'bundle' if Docker Desktop is running for './grc scan')
+#   - Pick 'fips' (or 'bundle' if Docker Desktop is running for './grc scan')
 #   - Approve the Preview-First dry-run ([y/N]), then approve Live execution ([y/N]) when prompted
 ```
 
@@ -405,7 +408,7 @@ cd ~/Desktop/GRC-xMINI
 
 > **Pre-flight for Docker-based `./grc scan --fips` demos**: If you plan to run `./grc scan --fips` (instead of host-native `./grc fips`), confirm Docker Desktop is up (`docker info >/dev/null 2>&1`) and `grc-scanner:local` is built (`./grc docker-build`) before recording.
 
-**Expected Baseline Progression (`fips_discovery.py` v1.5.1):**
+**Expected Baseline Progression (`fips_discovery.py` v1.5.2):**
 
 | Release | Story | FAIL | NEEDS_REVIEW | CANNOT_DETERMINE_STATICALLY | PASS |
 |---|---|---|---|---|---|

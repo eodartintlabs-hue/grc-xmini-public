@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.5.1 — Iwakuni` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.5.2 — Iwakuni` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.5.2`](#v152--iwakuni) | Iwakuni | 2026-11-15 | Bug Fix | _TBD after tagging_ | Priority 3–5 FIPS reconciliation, component scoping & operational hardening (`H4`, `M6` in `GRC-xBOT v1.5.2`; `H5`, `H7`, `M1`, `M3`, `M4`, `M5`, `M7`, `M8` in `GRC-xMINI` & `GRC-xTEST v1.5.2`): added Historical FIPS 140-2 detection (`FAIL_HISTORICAL_FIPS` / `FAIL_HISTORICAL_CERT`) and `FIPSDiscovery` > `CryptoScan` `verification_items` superseding; scoped OE signals per component sub-tree + Dockerfile Python OpenSSL linkage detection (and rebuilt KestrelBridge `v2.0.0` source-built cryptography bundles); added `--fail-on`, `<bundle-stem>@<ref>` naming + `target.checked_out_ref`, trusted provenance lookup, `checksum_status: "NOT_CHECKED"`, Docker preflight + `--host-only`, same-second `_2` auto-dir collision suffix, `55` unit tests (`8/8` suite runners passing), updated docs, and tracked `KESTRELBRIDGE_FIPS_REVIEW_v3.md` |
 | [`v1.5.1`](#v151--iwakuni) | Iwakuni | 2026-11-15 | Bug Fix | `bf0143d` | Priority 1–2 KestrelBridge & FIPS integrity patch (`H1`, `H2`, `H3`, `M2 v2`, `H6`): rebuilt KestrelBridge bundles with `HEAD` and guarded `grc_bundle.py` against empty `HEAD`-less checkouts (auto-cleanup + multi-tag `--ref` skip warnings); blocked `.bundle` files passed as `-w` in `fips_discovery.py` and `crypto_lib_scan.py`; added `scope.files_inspected` to Schema v1.0.0, `stderr` warnings / `--allow-empty` / exit `2` on `0` inspected files in `fips_discovery.py`, and `NOT ASSESSED (No Assessable Files Found)` posture in `grc_reporter.py`; updated `GRC-xTEST/scripts/verify_pipeline.sh` across all 16 bundles (`18` tag/ref snapshots) with exact KestrelBridge baseline assertions |
 | [`v1.5.0`](#v150--iwakuni) | Iwakuni | 2026-11-15 | Minor | `cdbcfc0` | FIPS 140-3 Static Cryptographic Discovery, Algorithm Policy, Offline NIST CMVP & CBOM Engine (Phases 2–5): `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`), Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`), `rules/fips_algorithm_policy.json`, `rules/cmvp_catalog.json` (Active 140-3 vs. Historical 140-2 + 90-day staleness), CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, D10 manifest expansion (`Cargo`, `NuGet`, `Gradle`, lockfiles), cross-engine `grc_reporter.py` deduplication, purple `grcfetch` banner keys + Triad companion sync (`GRC-xTEST v1.5.0 — Iwakuni` & `GRC-xBOT v1.5.0 — Tsukuba`), and 49 unit tests + all 8 engine suites passing |
 | [`v1.4.5`](#v145--yokota) | Yokota | 2026-11-14 | Bug fix | `f5d139e` | FIPS 140-3 Phase 0 baseline honesty & verification separation: `rules/crypto_catalog.json` v1.1.0 (`fips_status` replacing `fips_capable`), tri-state `crypto_lib_scan.py` statuses (`NOT_VALIDATED` vs. `CANNOT_DETERMINE_STATICALLY`) & ecosystem scoping, `AOC-03` `SI-16` -> `SC-13` remapping, `poam_data.md` Sec. 4 ("Needs Human or Runtime Verification") + `SC-13` `NEEDS REVIEW`, regenerated `demo-evidence/*`, and 42 unit tests passing |
@@ -49,6 +50,28 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.5.2 — Iwakuni
+
+**Priority 3–5 FIPS Reconciliation, Component Scoping & Operational Hardening Patch** · November 15, 2026 · Tag `v1.5.2`
+
+This Triad patch release implements Priorities 3, 4, and 5 from [`KESTRELBRIDGE_FIPS_FINAL_DECISIONS.md`](../security-reviews/KESTRELBRIDGE_FIPS_FINAL_DECISIONS.md) across `GRC-xMINI`, [`GRC-xTEST`](../../GRC-xTEST) (`v1.5.2 — Iwakuni`), and [`GRC-xBOT`](../../GRC-xBOT) (`v1.5.2 — Tsukuba`), alongside tracking [`KESTRELBRIDGE_FIPS_REVIEW_v3.md`](../security-reviews/KESTRELBRIDGE_FIPS_REVIEW_v3.md).
+
+1. **Priority 3 — Dedicated `fips` Playbook & Multi-Tag / Multi-Bundle Disclosure (`GRC-xBOT v1.5.2 — Tsukuba`, `H4`, `M6`)**:
+   - Added `"fips"` as the 8th workflow playbook in `GRC-xBOT` (`./grc fips --dry-run` preview -> sealed 7-file `./grc fips` + `./grc report` synthesis sharing `artifacts/pick-up/<ts>_fips`), updated intent router boosts/tie-breaks, added `_semver_sort_key()` newest-first tag sorting, explicit warnings when bundles or older tags are skipped, `status` tag display, and interactive bundle/tag selection (`17/17` tests passing).
+
+2. **Priority 4 — Cross-Engine Reconciliation (`H5`) & Component-Scoped OE Signal Attribution (`H7`)**:
+   - **`H5`**: Added `historical_fips_versions` in `rules/crypto_catalog.json` and `scripts/crypto_lib_scan.py` so `bouncycastle-fips < 2.0.0` emits `FAIL_HISTORICAL_FIPS` (`MEDIUM`, Schema `FAIL`/`FAIL_HISTORICAL_CERT` for Historical `#3673`), trims `fips_remediation` when `version >= min_supported_version`, and cross-references `./grc fips` scope; updated `scripts/grc_reporter.py` (`_NATIVE_ENGINE_RANK`: `FIPSDiscovery: 3 > CryptoScan: 2`) to deduplicate normalized dependency identifiers and let `FIPSDiscovery` `PASS`/`FAIL` supersede `CryptoScan` `NEEDS_REVIEW` in `verification_items`.
+   - **`H7`**: Added component-tree OE signal scoping (`_scoped_signals_for_manifest()`) and Dockerfile Python `cryptography` linkage detection (`dockerfile_python_system_openssl` vs. `dockerfile_python_pypi_wheel`) in `scripts/fips_discovery.py`, plus rebuilt `GRC-xTEST` KestrelBridge `.bundle` files with `--no-binary cryptography` in `scenarios/kestrelbridge/releases/v2.0.0/gateway/Dockerfile` (`v2.0.0` remains `0/0/0/31` `COMPLIANT`).
+
+3. **Priority 5 — CLI Policy Gating, Provenance Integrity & Operational Ergonomics (`M1`, `M3`, `M4`, `M5`, `M7`, `M8`)**:
+   - **`M1`**: Added `--fail-on {FAIL,NEEDS_REVIEW,never}` (default `never`) in `scripts/fips_discovery.py`.
+   - **`M3` & `M8`**: Added UTC `<bundle-stem>@<ref>` default evidence naming, `target.checked_out_ref` in Schema v1.0.0 (`rules/finding_schema.json`, `scripts/grc_common.py`, `scripts/fips_discovery.py`), normalized `checked_out_ref` in `scripts/grc_bundle.py`, and `_2`/`_3` auto-dir collision suffixes in `grc` + `scripts/fips_discovery.py`.
+   - **`M4` & `M5`**: Restricted workspace provenance lookup to `bundle_provenance.json` and `ami_provenance.json` (ignoring planted `fips_provenance.json`), and changed unverified bundle inspections in `scripts/grc_bundle.py` to emit `"checksum_verified": null` and `"checksum_status": "NOT_CHECKED"`.
+   - **`M7`**: Added pre-`mkdir` Docker daemon health check and `--host-only` scan mode (`crypto` + `fips` + optional `sbom`) in `./grc`.
+   - **Documentation & Verification**: Updated [`docs/fips_discovery-guide.md`](../docs/fips_discovery-guide.md) (`--fail-on`, `--host-only`, `<bundle-stem>@<ref>`, `GRC-xBOT` `fips` routing) and verified all `55` unit tests + `8/8` suite runners and `GRC-xTEST/scripts/verify_pipeline.sh` (`16` bundles / `18` snapshots).
 
 ---
 

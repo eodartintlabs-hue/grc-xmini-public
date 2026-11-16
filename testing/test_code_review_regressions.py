@@ -414,6 +414,7 @@ class TestCodeReviewRegressions(unittest.TestCase):
             ("pycryptodome", "3.20.0", "requirements.txt", "python"),
             ("bcprov-jdk18on", "1.78", "pom.xml", "java"),
             ("bc-fips", "1.0.2.4", "pom.xml", "java"),
+            ("bctls-fips", "2.0.0", "pom.xml", "java"),
             ("golang.org/x/crypto", "0.28.0", "go.mod", "go"),
             ("golang.org/x/crypto/ssh", "0.28.0", "go.mod", "go"),
             # Cross-ecosystem isolation: npm package named openssl must not match system/python rule
@@ -434,7 +435,9 @@ class TestCodeReviewRegressions(unittest.TestCase):
         self.assertEqual(by_name["pycryptodome"].nist_controls, ["SC-13"])
 
         self.assertEqual(by_name["bcprov-jdk18on"].status, "NOT_VALIDATED")
-        self.assertEqual(by_name["bc-fips"].status, "CANNOT_DETERMINE_STATICALLY")
+        self.assertEqual(by_name["bc-fips"].status, "FAIL_HISTORICAL_FIPS")
+        self.assertEqual(by_name["bc-fips"].severity, "MEDIUM")
+        self.assertEqual(by_name["bctls-fips"].status, "CANNOT_DETERMINE_STATICALLY")
         self.assertEqual(by_name["golang.org/x/crypto"].status, "NOT_VALIDATED")
         self.assertEqual(by_name["golang.org/x/crypto/ssh"].status, "NOT_VALIDATED")
         self.assertFalse(any(f.status == "PASS" for f in findings))

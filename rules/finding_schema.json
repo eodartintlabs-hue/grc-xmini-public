@@ -42,8 +42,9 @@
       "additionalProperties": false,
       "properties": {
         "identifier": { "description": "bundle_identifier / ami_identifier from provenance.", "type": "string" },
-        "provenance_file": { "type": "string", "examples": ["bundle_provenance.json", "ami_provenance.json", "fips_provenance.json"] },
-        "commit": { "type": "string" }
+        "provenance_file": { "type": "string", "examples": ["bundle_provenance.json", "ami_provenance.json"] },
+        "commit": { "type": "string" },
+        "checked_out_ref": { "description": "Clean branch, tag, or commit ref checked out from bundle provenance.", "type": "string" }
       }
     },
     "scope": {

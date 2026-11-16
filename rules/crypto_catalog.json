@@ -27,6 +27,7 @@
         { "version": "0.9.8", "eol_date": "2015-12-31", "severity": "CRITICAL" }
       ],
       "remediation": "Upgrade OpenSSL to >= 3.0.14 LTS (or 3.2+) and configure/activate a CMVP-validated FIPS 140-3 provider for SC-13 workloads.",
+      "fips_remediation": "Configure and activate a CMVP-validated OpenSSL 3 FIPS provider (e.g., openssl.cnf [fips_sect] activate = 1) for SC-13 workloads; run './grc fips' to inspect configuration.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -70,6 +71,7 @@
         { "version": "2.", "eol_date": "2020-07-01", "severity": "CRITICAL" }
       ],
       "remediation": "Ensure version >= 41.0.0 (Rust memory-safety bindings) and verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels.",
+      "fips_remediation": "Verify dynamic linkage against a CMVP-validated OpenSSL 3 FIPS provider rather than default static PyPI wheels; run './grc fips' to evaluate container/OS linkage.",
       "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -85,6 +87,7 @@
         { "version": "<1.70", "eol_date": "2021-11-01", "severity": "HIGH" }
       ],
       "remediation": "Upgrade org.bouncycastle dependencies to >= 1.77, and replace standard bcprov-* with CMVP-validated bc-fips (>= 2.0.0) in approved mode for FIPS 140-3 / SC-13 workloads.",
+      "fips_remediation": "Replace standard non-FIPS bcprov-* with CMVP-validated bc-fips (>= 2.0.0, cert #4743) in approved-only mode for FIPS 140-3 / SC-13 workloads.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -95,8 +98,19 @@
       "min_supported_version": "1.0.2",
       "status": "ACTIVE",
       "fips_status": "CAPABLE_IF_CONFIGURED",
+      "historical_fips_versions": [
+        {
+          "version": "<2.0.0",
+          "cert_number": "3673",
+          "standard": "FIPS 140-2",
+          "sunset_date": "2026-09-21",
+          "severity": "MEDIUM",
+          "note": "BC-FJA 1.0.2.x holds only FIPS 140-2 certificate #3673, which moved to Historical status on 2026-09-21; upgrade to bc-fips >= 2.0.0 (FIPS 140-3 cert #4743)."
+        }
+      ],
       "fips_note": "Bouncy Castle FIPS (bc-fips) holds CMVP FIPS 140-3 validation on 2.0.x (cert #4743; 1.0.2.x cert #3673 moved to Historical status on 2026-09-21) when JVM provider configuration and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce approved mode.",
       "remediation": "Upgrade bc-fips to >= 2.0.0 (FIPS 140-3 cert #4743) and confirm JVM/application approved-only mode enforcement.",
+      "fips_remediation": "Confirm JVM security.provider priority and CryptoServicesRegistrar.setApprovedOnlyMode(true) enforce FIPS 140-3 approved-only mode (cert #4743); run './grc fips' to inspect provider configuration.",
       "nist_controls": ["SI-7", "SC-12", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -123,6 +137,7 @@
       "fips_status": "NOT_VALIDATED",
       "fips_note": "Pure-JavaScript node-forge is not a CMVP FIPS 140-3 validated cryptographic module.",
       "remediation": "Upgrade node-forge >= 1.3.1 to remediate ASN.1 and signature verification bypass CVEs, and migrate SC-13 regulated crypto operations to Node.js 'node:crypto' backed by a FIPS-validated OpenSSL provider.",
+      "fips_remediation": "Migrate SC-13 regulated cryptographic operations from pure-JavaScript node-forge to Node.js built-in 'node:crypto' backed by a FIPS-validated OpenSSL provider.",
       "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -136,6 +151,7 @@
       "description": "Go supplementary cryptography packages outside the Go standard library cryptographic module boundary.",
       "fips_note": "Packages under golang.org/x/crypto lie outside the Go Cryptographic Module boundary (GODEBUG=fips140=on / BoringCrypto) and are not FIPS 140-3 validated.",
       "remediation": "Update golang.org/x/crypto >= v0.17.0 (mitigating Terrapin SSH CVE-2023-48795), and ensure FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only (Go 1.24+) or BoringCrypto rather than golang.org/x/crypto.",
+      "fips_remediation": "Ensure FIPS-regulated primitives use Go standard library 'crypto/*' with GODEBUG=fips140=only (Go 1.24+) or BoringCrypto rather than unvalidated golang.org/x/crypto packages.",
       "nist_controls": ["SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },
@@ -183,6 +199,7 @@
       "fips_status": "CAPABLE_IF_CONFIGURED",
       "fips_note": "Rust 'openssl' crate delegates to the linked OpenSSL library; avoid 'vendored' builds unless explicitly building and activating the CMVP-validated FIPS provider.",
       "remediation": "Ensure openssl crate >= 0.10.55 dynamically links against a host OpenSSL 3.x installation with the FIPS provider activated.",
+      "fips_remediation": "Confirm the openssl crate dynamically links against a host OpenSSL 3.x installation with the FIPS provider activated.",
       "nist_controls": ["SI-7", "SC-13"],
       "aoc": "AOC-09: Crypto Dependencies on Unsupported Libraries"
     },

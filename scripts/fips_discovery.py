@@ -29,7 +29,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 try:
@@ -81,7 +81,7 @@ except ImportError:
     )
 
 ENGINE_NAME = "FIPSDiscovery"
-ENGINE_VERSION = "1.5.1"
+ENGINE_VERSION = "1.5.2"
 CRYPTO_CATALOG_PATH = RULES_DIR / "crypto_catalog.json"
 PROVENANCE_FILENAMES = frozenset({"bundle_provenance.json", "ami_provenance.json", "fips_provenance.json"})
 
@@ -1540,10 +1540,35 @@ class WorkspaceCryptoScanner:
         text = self._read_text(fpath)
         if text is None:
             return
+
+        # Reconstruct logical backslash-continued commands alongside raw per-line directives
+        logical_cmds: List[Tuple[int, str]] = []
+        buf_parts: List[str] = []
+        buf_start = 1
         for idx, raw_line in enumerate(text.splitlines(), start=1):
-            line = raw_line.split("#", 1)[0].strip()
-            if not line:
+            stripped_comment = raw_line.split("#", 1)[0].strip()
+            if not stripped_comment:
+                if buf_parts:
+                    logical_cmds.append((buf_start, " ".join(buf_parts)))
+                    buf_parts = []
                 continue
+            if not buf_parts:
+                buf_start = idx
+            if stripped_comment.endswith("\\"):
+                buf_parts.append(stripped_comment[:-1].strip())
+            else:
+                buf_parts.append(stripped_comment)
+                logical_cmds.append((buf_start, " ".join(buf_parts)))
+                buf_parts = []
+        if buf_parts:
+            logical_cmds.append((buf_start, " ".join(buf_parts)))
+
+        has_sys_openssl_py = False
+        sys_py_line = 1
+        has_pypi_wheel_py = False
+        pypi_wheel_line = 1
+
+        for idx, line in logical_cmds:
             m_from = re.match(r'^FROM\s+(?:--platform=[^\s]+\s+)?([^\s]+)', line, re.IGNORECASE)
             if m_from:
                 self.config_signals.append({
@@ -1551,16 +1576,40 @@ class WorkspaceCryptoScanner:
                     "path": rel,
                     "line": idx,
                     "image": m_from.group(1),
-                    "snippet": raw_line.strip(),
+                    "snippet": line,
                 })
             if re.search(r'GODEBUG\s*=\s*["\']?[^"\']*fips140=(on|only)', line):
-                self.config_signals.append({"kind": "go_fips_enabled", "path": rel, "line": idx, "snippet": raw_line.strip()})
+                self.config_signals.append({"kind": "go_fips_enabled", "path": rel, "line": idx, "snippet": line})
             elif re.search(r'GODEBUG\s*=\s*["\']?[^"\']*fips140=off', line):
-                self.config_signals.append({"kind": "go_fips_disabled", "path": rel, "line": idx, "snippet": raw_line.strip()})
+                self.config_signals.append({"kind": "go_fips_disabled", "path": rel, "line": idx, "snippet": line})
             if "GOEXPERIMENT=boringcrypto" in line:
-                self.config_signals.append({"kind": "go_boringcrypto_enabled", "path": rel, "line": idx, "snippet": raw_line.strip()})
+                self.config_signals.append({"kind": "go_boringcrypto_enabled", "path": rel, "line": idx, "snippet": line})
             if "--enable-fips" in line or "--force-fips" in line:
-                self.config_signals.append({"kind": "node_fips_enabled", "path": rel, "line": idx, "snippet": raw_line.strip()})
+                self.config_signals.append({"kind": "node_fips_enabled", "path": rel, "line": idx, "snippet": line})
+
+            if re.search(r'\b(dnf|yum|microdnf|apt-get|apt|apk|zypper)\b.*\b(python3?-cryptography|py3-cryptography)\b', line, re.IGNORECASE) or (
+                re.search(r'--no-binary(?:\s+|=)(?::all:|.*\bcryptography\b)', line, re.IGNORECASE)
+            ) or re.search(r'\bPIP_NO_BINARY\s*=\s*["\']?(?::all:|[^"\']*\bcryptography\b)', line, re.IGNORECASE):
+                has_sys_openssl_py = True
+                sys_py_line = idx
+            elif re.search(r'\bpip3?\s+install\b', line, re.IGNORECASE):
+                has_pypi_wheel_py = True
+                pypi_wheel_line = idx
+
+        if has_sys_openssl_py:
+            self.config_signals.append({
+                "kind": "dockerfile_python_system_openssl",
+                "path": rel,
+                "line": sys_py_line,
+                "evidence_tag": f"{rel}:system-openssl-linked",
+            })
+        elif has_pypi_wheel_py:
+            self.config_signals.append({
+                "kind": "dockerfile_python_pypi_wheel",
+                "path": rel,
+                "line": pypi_wheel_line,
+                "evidence_tag": f"{rel}:pypi-wheel-install",
+            })
 
     def _scan_iac_hcl(self, fpath: Path, rel: str) -> None:
         text = self._read_text(fpath)
@@ -1682,21 +1731,38 @@ class FIPSAssessmentEngine:
         self.cmvp_mappings: List[Dict[str, Any]] = []
         self.mode_flags: Set[str] = set()
         self.mode_evidence_by_flag: Dict[str, List[str]] = {}
+        self.mode_signal_records: List[Dict[str, str]] = []
 
     def run(self) -> Dict[str, Any]:
         self.ws_scanner.scan()
         self.dependencies = DependencyExtractor.extract_from_workspace(self.workspace_root)
         self.cargo_features = DependencyExtractor.extract_cargo_features(self.workspace_root)
 
+        cargo_files = [
+            p.relative_to(self.workspace_root).as_posix()
+            for p in sorted(self.workspace_root.rglob("Cargo.toml"))
+            if not (set(p.relative_to(self.workspace_root).parts) & SKIP_DIRS)
+        ]
+        cargo_path = cargo_files[0] if len(cargo_files) == 1 else "Cargo.toml"
+
         # Register Cargo 'fips' feature signals
         for crate, feats in self.cargo_features.items():
             if crate in ("aws-lc-rs", "aws-lc-fips-sys", "rustls", "boring") and "fips" in feats:
+                c_match = cargo_path
+                if len(cargo_files) > 1:
+                    for cand_rel in cargo_files:
+                        try:
+                            if crate in (self.workspace_root / cand_rel).read_text(encoding="utf-8", errors="ignore").lower():
+                                c_match = cand_rel
+                                break
+                        except OSError:
+                            pass
                 self.ws_scanner.config_signals.append({
                     "kind": "rust_fips_feature",
-                    "path": "Cargo.toml",
+                    "path": c_match,
                     "line": 1,
                     "snippet": f'{crate} features = {sorted(feats)}',
-                    "evidence_tag": f"Cargo.toml:{crate}[fips]",
+                    "evidence_tag": f"{c_match}:{crate}[fips]",
                 })
 
         self._evaluate_config_signals()
@@ -1716,9 +1782,14 @@ class FIPSAssessmentEngine:
         )
         return self.build_envelope()
 
-    def _record_mode_flag(self, flag: str, tag: str) -> None:
+    def _record_mode_flag(self, flag: str, tag: str, path: str = "") -> None:
         self.mode_flags.add(flag)
         self.mode_evidence_by_flag.setdefault(flag, []).append(tag)
+        self.mode_signal_records.append({
+            "flag": flag,
+            "tag": tag,
+            "path": path.replace("\\", "/").lstrip("./"),
+        })
 
     # ------------------------------------------------------------------
     # Phase 4 Approved-Mode Config Evaluation (AOC-12)
@@ -1735,7 +1806,7 @@ class FIPSAssessmentEngine:
             tag = sig.get("evidence_tag", f"{path}:{line}")
 
             if kind == "kernel_fips_disabled":
-                self._record_mode_flag("kernel_fips_disabled", tag)
+                self._record_mode_flag("kernel_fips_disabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:kernel-fips-disabled",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1754,7 +1825,7 @@ class FIPSAssessmentEngine:
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
             elif kind == "kernel_fips_missing":
-                self._record_mode_flag("kernel_fips_disabled", tag)
+                self._record_mode_flag("kernel_fips_disabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:kernel-fips-missing",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1773,7 +1844,7 @@ class FIPSAssessmentEngine:
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
             elif kind == "kernel_fips_enabled":
-                self._record_mode_flag("kernel_fips_enabled", tag)
+                self._record_mode_flag("kernel_fips_enabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:kernel-fips-enabled",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1791,7 +1862,7 @@ class FIPSAssessmentEngine:
 
             elif kind == "crypto_policy_non_fips":
                 pol = sig.get("policy", "DEFAULT")
-                self._record_mode_flag("crypto_policy_disabled", tag)
+                self._record_mode_flag("crypto_policy_disabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:crypto-policy-non-fips",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1810,7 +1881,7 @@ class FIPSAssessmentEngine:
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
             elif kind == "crypto_policy_fips":
-                self._record_mode_flag("openssl_fips_enabled", tag)
+                self._record_mode_flag("openssl_fips_enabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:crypto-policy-fips",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1827,7 +1898,7 @@ class FIPSAssessmentEngine:
                 )
 
             elif kind == "openssl_fips_disabled":
-                self._record_mode_flag("openssl_fips_disabled", tag)
+                self._record_mode_flag("openssl_fips_disabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:openssl-fips-not-activated",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1846,7 +1917,7 @@ class FIPSAssessmentEngine:
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
             elif kind == "openssl_fips_enabled":
-                self._record_mode_flag("openssl_fips_enabled", tag)
+                self._record_mode_flag("openssl_fips_enabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:openssl-fips-activated",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1882,7 +1953,7 @@ class FIPSAssessmentEngine:
 
             elif kind == "java_fips_disabled":
                 prov = sig.get("provider", "sun.security.provider.Sun")
-                self._record_mode_flag("java_fips_disabled", tag)
+                self._record_mode_flag("java_fips_disabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:java-security-non-fips-provider",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1901,7 +1972,7 @@ class FIPSAssessmentEngine:
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
             elif kind == "java_fips_enabled":
-                self._record_mode_flag("java_fips_enabled", tag)
+                self._record_mode_flag("java_fips_enabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:java-security-fips-provider",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1937,7 +2008,7 @@ class FIPSAssessmentEngine:
                 )
 
             elif kind in ("go_fips_enabled", "go_boringcrypto_enabled"):
-                self._record_mode_flag(kind, tag)
+                self._record_mode_flag(kind, tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:go-fips-enabled",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -1971,7 +2042,7 @@ class FIPSAssessmentEngine:
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
             elif kind == "node_fips_enabled":
-                self._record_mode_flag("node_fips_enabled", tag)
+                self._record_mode_flag("node_fips_enabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:node-fips-enabled",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -2004,7 +2075,7 @@ class FIPSAssessmentEngine:
                     references=["NIST SP 800-53 Rev. 5 SC-13"],
                 )
             elif kind == "rust_fips_feature":
-                self._record_mode_flag("rust_fips_feature", tag)
+                self._record_mode_flag("rust_fips_feature", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:rust-fips-feature",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -2037,7 +2108,7 @@ class FIPSAssessmentEngine:
                     references=["NIST SP 800-53 Rev. 5 SC-13"],
                 )
             elif kind == "dotnet_fips_enabled":
-                self._record_mode_flag("dotnet_fips_enabled", tag)
+                self._record_mode_flag("dotnet_fips_enabled", tag, path=path)
                 self._add_finding(
                     rule_id="fips-cfg:dotnet-fips-enabled",
                     aoc_str="AOC-12: Lack of FIPS Mode",
@@ -2052,6 +2123,8 @@ class FIPSAssessmentEngine:
                     snippet=snippet,
                     fips_ext={"approved_mode_evidence": [tag]},
                 )
+            elif kind in ("dockerfile_python_system_openssl", "dockerfile_python_pypi_wheel"):
+                self._record_mode_flag(kind, tag, path=path)
             elif kind == "dockerfile_base_image":
                 img = sig.get("image", "")
                 matched_img = None
@@ -2062,7 +2135,7 @@ class FIPSAssessmentEngine:
                 if matched_img:
                     cert_no = matched_img["cert_number"]
                     cert = certs_db.get(cert_no, {})
-                    self._record_mode_flag("os_fips_image", f"{path}:FROM {img}")
+                    self._record_mode_flag("os_fips_image", f"{path}:FROM {img}", path=path)
                     self._add_finding(
                         rule_id="fips-cfg:container-fips-base-image",
                         aoc_str="AOC-12: Lack of FIPS Mode",
@@ -2556,6 +2629,47 @@ class FIPSAssessmentEngine:
     # ------------------------------------------------------------------
     # Phase 4 Dependency -> CMVP Module Mapping
     # ------------------------------------------------------------------
+    def _scoped_signals_for_manifest(self, manifest_path: str) -> List[Dict[str, str]]:
+        """
+        Scopes approved-mode and container linkage evidence to the component directory tree
+        owning `manifest_path`, while allowing appliance/host `/etc/` OS configs to act as
+        deployment-level Operational Environment evidence across components (`H7`).
+        """
+        m_dir = PurePosixPath(manifest_path.replace("\\", "/").lstrip("./")).parent
+        has_local_dockerfile = False
+        if m_dir != PurePosixPath("."):
+            for r in self.mode_signal_records:
+                if r["flag"].startswith("dockerfile_") or r["flag"] == "os_fips_image":
+                    s_dir = PurePosixPath(r["path"]).parent if r["path"] else PurePosixPath(".")
+                    if s_dir == m_dir or m_dir in s_dir.parents:
+                        has_local_dockerfile = True
+                        break
+
+        in_scope: List[Dict[str, str]] = []
+        for r in self.mode_signal_records:
+            flg = r["flag"]
+            s_path = PurePosixPath(r["path"]) if r["path"] else PurePosixPath(".")
+            s_dir = s_path.parent
+            is_container_sig = (
+                flg in ("os_fips_image", "dockerfile_python_system_openssl", "dockerfile_python_pypi_wheel")
+                or "dockerfile" in s_path.name.lower()
+            )
+            is_etc_os_sig = ("etc" in s_path.parts) and not is_container_sig
+
+            if is_etc_os_sig:
+                in_scope.append(r)
+            elif is_container_sig:
+                if m_dir == PurePosixPath("."):
+                    if s_dir == PurePosixPath("."):
+                        in_scope.append(r)
+                else:
+                    if s_dir == m_dir or m_dir in s_dir.parents or (s_dir == PurePosixPath(".") and not has_local_dockerfile):
+                        in_scope.append(r)
+            else:
+                if m_dir == PurePosixPath(".") or s_dir == m_dir or m_dir in s_dir.parents or s_dir == PurePosixPath("."):
+                    in_scope.append(r)
+        return in_scope
+
     def _evaluate_dependencies_and_cmvp(self) -> None:
         certs_db = self.cmvp.get("certificates", {})
         mappings = self.cmvp.get("module_mappings", [])
@@ -2581,20 +2695,38 @@ class FIPSAssessmentEngine:
                 active_140_3 = [c for c in cert_objs if c.get("standard") == "FIPS 140-3" and c.get("status") == "Active"]
                 hist_140_2 = [c for c in cert_objs if c.get("standard") == "FIPS 140-2" or c.get("status") == "Historical"]
 
+                scoped_recs = self._scoped_signals_for_manifest(loc["path"])
+                scoped_flags = {r["flag"] for r in scoped_recs}
+                scoped_evid_by_flag: Dict[str, List[str]] = {}
+                for r in scoped_recs:
+                    scoped_evid_by_flag.setdefault(r["flag"], []).append(r["tag"])
+
                 req_signals = set(matched_mapping.get("required_mode_signals", []))
-                matched_pos = req_signals & self.mode_flags
+                matched_pos = req_signals & scoped_flags
                 evid_tags: List[str] = []
                 for flg in sorted(matched_pos):
-                    evid_tags.extend(self.mode_evidence_by_flag.get(flg, []))
+                    for t in scoped_evid_by_flag.get(flg, []):
+                        if t not in evid_tags:
+                            evid_tags.append(t)
 
-                # Check if explicit disabled signal contradicts this module
+                # For PyCA cryptography, require dynamic/system OpenSSL linkage rather than static PyPI wheels
+                if matched_mapping.get("id") == "cryptography-pyca":
+                    if "dockerfile_python_pypi_wheel" in scoped_flags and "dockerfile_python_system_openssl" not in scoped_flags:
+                        matched_pos = set()
+                        evid_tags = []
+                    elif "dockerfile_python_system_openssl" in scoped_flags and matched_pos:
+                        for t in scoped_evid_by_flag.get("dockerfile_python_system_openssl", []):
+                            if t not in evid_tags:
+                                evid_tags.append(t)
+
+                # Check if explicit disabled signal contradicts this module in scope
                 explicitly_disabled = False
-                if "openssl_fips_enabled" in req_signals and "openssl_fips_disabled" in self.mode_flags:
+                if "openssl_fips_enabled" in req_signals and "openssl_fips_disabled" in scoped_flags:
                     explicitly_disabled = True
-                    evid_tags.extend(self.mode_evidence_by_flag.get("openssl_fips_disabled", []))
-                if "java_fips_enabled" in req_signals and "java_fips_disabled" in self.mode_flags:
+                    evid_tags.extend(scoped_evid_by_flag.get("openssl_fips_disabled", []))
+                if "java_fips_enabled" in req_signals and "java_fips_disabled" in scoped_flags:
                     explicitly_disabled = True
-                    evid_tags.extend(self.mode_evidence_by_flag.get("java_fips_disabled", []))
+                    evid_tags.extend(scoped_evid_by_flag.get("java_fips_disabled", []))
 
                 if not active_140_3 and hist_140_2:
                     c0 = hist_140_2[0]
@@ -2809,7 +2941,7 @@ class FIPSAssessmentEngine:
     # Deliverable Builders (Schema JSON, CycloneDX 1.6 CBOM, SARIF, Markdown)
     # ------------------------------------------------------------------
     def _target_metadata(self) -> Dict[str, str]:
-        for pname in ("fips_provenance.json", "bundle_provenance.json", "ami_provenance.json"):
+        for pname in ("bundle_provenance.json", "ami_provenance.json"):
             p = self.workspace_root / pname
             if p.is_file():
                 try:
@@ -2819,10 +2951,36 @@ class FIPSAssessmentEngine:
                     c = d.get("commit_sha") or d.get("commit_metadata", {}).get("commit_hash")
                     if c and c != "UNKNOWN":
                         res["commit"] = str(c)
+                    ref = d.get("checked_out_ref")
+                    if isinstance(ref, str) and ref.strip():
+                        res["checked_out_ref"] = ref.strip()
                     return res
                 except Exception:
                     pass
         return {"identifier": self.workspace_root.name or "workspace"}
+
+    def _default_evidence_slug(self) -> str:
+        """
+        Builds a deterministic human-readable evidence folder slug:
+        `<bundle-stem>@<ref>` when `bundle_provenance.json` identifies the bundle and checked-out ref.
+        """
+        bp = self.workspace_root / "bundle_provenance.json"
+        if bp.is_file():
+            try:
+                d = json.loads(bp.read_text(encoding="utf-8"))
+                src_path = str(d.get("bundle_source_path") or "").strip()
+                checked_ref = str(d.get("checked_out_ref") or "").strip()
+                stem = re.sub(r"\.bundle$", "", Path(src_path).name, flags=re.IGNORECASE) if src_path else ""
+                if stem and checked_ref:
+                    raw_slug = f"{stem}@{checked_ref}"
+                elif stem:
+                    raw_slug = stem
+                else:
+                    raw_slug = self._target_metadata()["identifier"]
+                return re.sub(r"[^A-Za-z0-9.@_-]+", "_", raw_slug).strip("_") or "fips"
+            except Exception:
+                pass
+        return re.sub(r"[^A-Za-z0-9.@_-]+", "_", self._target_metadata()["identifier"]).strip("_") or "fips"
 
     def _limitations_list(self) -> List[str]:
         lims = [
@@ -3366,7 +3524,37 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return exit code 0 even when 0 assessable files are found in the workspace.",
     )
+    parser.add_argument(
+        "--fail-on",
+        choices=["FAIL", "NEEDS_REVIEW", "never"],
+        default="never",
+        help="Exit non-zero when matching findings exist ('FAIL', 'NEEDS_REVIEW', or 'never' [default]).",
+    )
     return parser
+
+
+def _compute_exit_code(envelope: Dict[str, Any], allow_empty: bool, fail_on: str) -> int:
+    fi_total = envelope.get("scope", {}).get("files_inspected", {}).get("total", 0)
+    if fi_total == 0 and not allow_empty:
+        return 2
+    dets = {str(f.get("determination") or "") for f in envelope.get("findings", [])}
+    if fail_on == "FAIL" and (dets & {"FAIL", "WARN"}):
+        return 1
+    if fail_on == "NEEDS_REVIEW" and (dets & {"FAIL", "WARN", "NEEDS_REVIEW", "CANNOT_DETERMINE_STATICALLY"}):
+        return 1
+    return 0
+
+
+def _next_available_evidence_dir(base_dir: Path) -> Path:
+    """Appends `_2`, `_3`, ... if an auto-generated evidence folder already exists (`M8`)."""
+    if not base_dir.exists():
+        return base_dir
+    suffix = 2
+    while True:
+        cand = base_dir.parent / f"{base_dir.name}_{suffix}"
+        if not cand.exists():
+            return cand
+        suffix += 1
 
 
 def main() -> None:
@@ -3404,6 +3592,8 @@ def main() -> None:
             file=sys.stderr,
         )
 
+    rc = _compute_exit_code(envelope, allow_empty=args.allow_empty, fail_on=args.fail_on)
+
     if args.format != "all":
         if args.format == "json":
             rendered = json.dumps(envelope, indent=2)
@@ -3425,30 +3615,30 @@ def main() -> None:
             print(f"[SUCCESS] FIPS deliverable written to: {out_p}")
         else:
             print(rendered)
-        if fi_total == 0 and not args.allow_empty:
-            sys.exit(2)
+        if rc != 0:
+            sys.exit(rc)
         return
 
     if args.dry_run:
         print(engine.build_terminal_preview(dry_run=True))
-        if fi_total == 0 and not args.allow_empty:
-            sys.exit(2)
+        if rc != 0:
+            sys.exit(rc)
         return
 
     if args.evidence:
         ev_dir = Path(args.evidence).resolve()
     else:
         ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H%M%S")
-        tgt_slug = re.sub(r"[^A-Za-z0-9._-]+", "_", engine._target_metadata()["identifier"]).strip("_") or "fips"
-        ev_dir = REPO_ROOT / "artifacts" / "pick-up" / f"{ts}_{tgt_slug}_fips"
+        tgt_slug = engine._default_evidence_slug()
+        ev_dir = _next_available_evidence_dir(REPO_ROOT / "artifacts" / "pick-up" / f"{ts}_{tgt_slug}_fips")
 
     written = engine.write_deliverables(ev_dir)
     print(engine.build_terminal_preview(evidence_dir=ev_dir, dry_run=False))
     print(f"[SUCCESS] Wrote {len(written)} FIPS assessment deliverables to: {ev_dir}")
     for fname in written:
         print(f"    - {fname}")
-    if fi_total == 0 and not args.allow_empty:
-        sys.exit(2)
+    if rc != 0:
+        sys.exit(rc)
 
 
 if __name__ == "__main__":

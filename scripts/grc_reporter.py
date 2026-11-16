@@ -223,7 +223,7 @@ def normalize_severity_and_cat(raw_sev: str) -> Tuple[str, str]:
 
 
 _CONFIDENCE_RANK = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
-_NATIVE_ENGINE_RANK = {"FIPSDiscovery": 2, "CryptoScan": 2}
+_NATIVE_ENGINE_RANK = {"FIPSDiscovery": 3, "CryptoScan": 2}
 
 
 def _infer_semgrep_subject(
@@ -422,6 +422,7 @@ class GRCComplianceReporter:
         self.scoped_scanners: Set[str] = set()
         self.scanner_files_inspected: Dict[str, int] = {}
         self.scanner_workspace_totals: Dict[str, int] = {}
+        self.fips_resolved_dependencies: Set[Tuple[str, str]] = set()
         self.sbom_stig_evidence: Optional[Dict[str, Any]] = None
         self._seen_vuln_keys: Set[Tuple[str, str]] = set()
         self._finding_counter = 1
@@ -481,7 +482,7 @@ class GRCComplianceReporter:
                 prov_file = cand
                 break
         if prov_file is None and self.workspace_dir:
-            for name in prov_names:
+            for name in ("bundle_provenance.json", "ami_provenance.json"):
                 cand = self.workspace_dir / name
                 if cand.exists():
                     prov_file = cand
@@ -766,10 +767,6 @@ class GRCComplianceReporter:
                 det = str(item.get("determination") or "FAIL").strip().upper()
                 det_detail = str(item.get("determination_detail") or "").strip()
 
-                # Positive evidence (`PASS`) is retained in CBOM/FIPS artifacts, never in POA&Ms
-                if det == "PASS":
-                    continue
-
                 subj = item.get("subject") if isinstance(item.get("subject"), dict) else {}
                 subj_kind = str(subj.get("kind") or "")
                 subj_name = str(subj.get("name") or "Unknown")
@@ -778,6 +775,19 @@ class GRCComplianceReporter:
 
                 loc_obj = item.get("location") if isinstance(item.get("location"), dict) else {}
                 clean_file = self.clean_path(str(loc_obj.get("path") or "N/A"))
+
+                if (
+                    tool_name == "FIPSDiscovery"
+                    and det in ("PASS", "FAIL")
+                    and subj_kind.lower() in ("module", "package")
+                    and subj.get("name")
+                ):
+                    self.fips_resolved_dependencies.add((clean_file, subj_name.strip().lower()))
+
+                # Positive evidence (`PASS`) is retained in CBOM/FIPS artifacts, never in POA&Ms
+                if det == "PASS":
+                    continue
+
                 line_start = loc_obj.get("line_start") if isinstance(loc_obj.get("line_start"), int) else None
                 loc_str = f"{clean_file}:{line_start}" if line_start is not None else clean_file
 
@@ -1250,7 +1260,10 @@ class GRCComplianceReporter:
                 deduped.append(f)
                 continue
 
-            key = (f.clean_file_only, f.line_number, f.aoc_id, skind, sname)
+            is_dep = f.line_number is None and skind in ("module", "package")
+            norm_skind = "module" if is_dep else skind
+            norm_aoc = "AOC-09" if (is_dep and f.aoc_id in ("AOC-09", "AOC-12")) else f.aoc_id
+            key = (f.clean_file_only, f.line_number, norm_aoc, norm_skind, sname)
             if key not in by_key:
                 by_key[key] = len(deduped)
                 deduped.append(f)
@@ -1281,6 +1294,53 @@ class GRCComplianceReporter:
                         existing.nist_controls.append(ctl)
 
         self.findings = deduped
+
+        # Reconcile verification items: concrete FIPSDiscovery PASS/FAIL decisions supersede
+        # manifest-only CryptoScan CANNOT_DETERMINE_STATICALLY/NEEDS_REVIEW items for the
+        # same dependency + manifest location, and identical cross-engine items collapse once.
+        confirmed_dep_keys: Set[Tuple[str, str]] = set(self.fips_resolved_dependencies)
+        for f in self.findings:
+            skind = str(f.subject.get("kind") or "").strip().lower()
+            sname = str(f.subject.get("name") or "").strip().lower()
+            if skind in ("module", "package") and sname:
+                confirmed_dep_keys.add((f.clean_file_only, sname))
+
+        reconciled_verifs: List[Dict[str, Any]] = []
+        verif_by_key: Dict[Tuple[str, str], int] = {}
+        for item in self.verification_items:
+            raw_fp = str(item.get("file_path") or "")
+            clean_vp = re.sub(r":\d+$", "", self.clean_path(raw_fp))
+            lib_key = str(item.get("library_name") or "").strip().lower()
+            src_tool = str(item.get("source_tool") or "")
+            dep_key = (clean_vp, lib_key)
+            if src_tool == "CryptoScan" and dep_key in confirmed_dep_keys:
+                continue
+            if not lib_key:
+                reconciled_verifs.append(item)
+                continue
+            if dep_key not in verif_by_key:
+                verif_by_key[dep_key] = len(reconciled_verifs)
+                reconciled_verifs.append(item)
+                continue
+            idx = verif_by_key[dep_key]
+            existing = reconciled_verifs[idx]
+            ex_rank = _NATIVE_ENGINE_RANK.get(str(existing.get("source_tool") or ""), 1)
+            new_rank = _NATIVE_ENGINE_RANK.get(src_tool, 1)
+            if new_rank > ex_rank:
+                merged_by = set(existing.get("also_reported_by") or []) | set(item.get("also_reported_by") or [])
+                if existing.get("source_tool") and existing.get("source_tool") != src_tool:
+                    merged_by.add(str(existing["source_tool"]))
+                if merged_by:
+                    item["also_reported_by"] = sorted(merged_by)
+                reconciled_verifs[idx] = item
+            else:
+                merged_by = set(existing.get("also_reported_by") or []) | set(item.get("also_reported_by") or [])
+                if src_tool and src_tool != existing.get("source_tool"):
+                    merged_by.add(src_tool)
+                if merged_by:
+                    existing["also_reported_by"] = sorted(merged_by)
+
+        self.verification_items = reconciled_verifs
 
     def _group_verifications_by_control(self) -> Dict[str, List[Dict[str, Any]]]:
         """Indexes verification items by normalized NIST control ID for rollup reporting."""

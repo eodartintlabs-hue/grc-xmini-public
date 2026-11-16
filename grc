@@ -19,7 +19,7 @@ print_grcfetch() {
 
     echo -e ""
     echo -e "  ${BW}        .--.          .--.          .--.                       ${R}"
-    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.5.1 (Iwakuni Series)${R}"
+    echo -e "  ${BW}  ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp, ,p#G*\"\"TG#Gp,                  ${HP}GRC-xMINI v1.5.2 (Iwakuni Series)${R}"
     echo -e "  ${BW} {GGG'     \`G# {GGG     \`GGG {GGG'     \`G#                   ${D}---------------------------------${R}"
     echo -e "  ${BW} @GGG          @GGG     ,GGG @GGG          ,p#Gp,   ,p#Gp,   ${P}OS:${W} Darwin ARM64 / Linux Bookworm${R}"
     echo -e "  ${BW} 'GGG   ,p#GG# @GGG#**#GGG\"  'GGG           \`GGG, ,GGG'      ${P}Model:${W} Out-of-Band (OOB) / Fail-Open${R}"
@@ -55,6 +55,7 @@ print_scan_help() {
     echo "  crypto (--crypto)    Run static cryptographic library & EOL version scanner (AOC-09)"
     echo "  fips (--fips)        Run FIPS 140-3 conformance, CBOM, SARIF & CMVP assessment engine (AOC-03/05/09/12)"
     echo "  sbom (--sbom)        Run DISA STIG / DoD SRG SBOM applicability mapper"
+    echo "  host-only (--host-only) Run host-native engines only (crypto + fips, plus sbom if sbom.cdx.json exists)"
     echo ""
     echo "Options:"
     echo "  -w, --workspace <dir>  Target ephemeral workspace directory (default: ./ephemeral_workspace)"
@@ -155,7 +156,7 @@ case "${SUBCOMMAND}" in
                     SCAN_ENGINE="all"
                     shift
                     ;;
-                --semgrep|--gitleaks|--checkov|--syft|--grype|--trivy|--oscap|--openscap|--crypto|--fips|--sbom|--stig)
+                --semgrep|--gitleaks|--checkov|--syft|--grype|--trivy|--oscap|--openscap|--crypto|--fips|--sbom|--stig|--host-only)
                     SCAN_ENGINE="$(echo "${1#--}" | tr '[:upper:]' '[:lower:]')"
                     shift
                     ;;
@@ -163,7 +164,7 @@ case "${SUBCOMMAND}" in
                     RUN_REPORT="false"
                     shift
                     ;;
-                all|semgrep|gitleaks|checkov|syft|grype|trivy|oscap|openscap|crypto|fips|sbom|stig)
+                all|semgrep|gitleaks|checkov|syft|grype|trivy|oscap|openscap|crypto|fips|sbom|stig|host-only)
                     SCAN_ENGINE="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
                     shift
                     ;;
@@ -182,29 +183,66 @@ case "${SUBCOMMAND}" in
 
         RESOLVED_WORKSPACE="$(cd "${WORKSPACE_PATH}" 2>/dev/null && pwd || echo "${WORKSPACE_PATH}")"
 
-        # Auto-namespace deliverables/evidence directory under artifacts/pick-up
-        TIMESTAMP="$(date +%Y-%m-%d_%H%M%S 2>/dev/null || true)"
+        # Fail fast before creating any evidence directories when a Docker engine is requested
+        NEEDS_DOCKER="true"
+        case "${SCAN_ENGINE}" in
+            crypto|fips|host-only)
+                NEEDS_DOCKER="false"
+                ;;
+            sbom)
+                if [[ -n "${EVIDENCE_PATH}" && -f "${EVIDENCE_PATH}/sbom.cdx.json" ]] || [[ -f "${RESOLVED_WORKSPACE}/sbom.cdx.json" ]]; then
+                    NEEDS_DOCKER="false"
+                fi
+                ;;
+            all|semgrep|gitleaks|checkov|syft|grype|trivy|oscap)
+                NEEDS_DOCKER="true"
+                ;;
+            *)
+                NEEDS_DOCKER="false"
+                ;;
+        esac
+        if [[ "${NEEDS_DOCKER}" == "true" ]] && ! docker info >/dev/null 2>&1; then
+            echo "[ERROR] Docker daemon is not running. Please start the Docker daemon, or pass --host-only to run host-native engines (crypto, fips, and sbom when sbom.cdx.json is present)." >&2
+            exit 1
+        fi
+
+        # Auto-namespace deliverables/evidence directory under artifacts/pick-up (UTC)
+        TIMESTAMP="$(date -u +%Y-%m-%d_%H%M%S 2>/dev/null || true)"
         if [[ -n "${EVIDENCE_PATH}" ]]; then
             mkdir -p "${EVIDENCE_PATH}"
             RESOLVED_EVIDENCE="$(cd "${EVIDENCE_PATH}" && pwd)"
-        elif [[ -f "${RESOLVED_WORKSPACE}/bundle_provenance.json" ]]; then
-            BUNDLE_SOURCE="$(grep -o '"bundle_source_path": *"[^"]*"' "${RESOLVED_WORKSPACE}/bundle_provenance.json" | cut -d'"' -f4 || true)"
-            if [[ -n "${BUNDLE_SOURCE}" ]]; then
-                BUNDLE_BASE="$(basename "${BUNDLE_SOURCE}" .bundle)"
-                if [[ -n "${TIMESTAMP}" ]]; then
-                    RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}_${BUNDLE_BASE}"
+        else
+            if [[ -f "${RESOLVED_WORKSPACE}/bundle_provenance.json" ]]; then
+                BUNDLE_SOURCE="$(grep -o '"bundle_source_path": *"[^"]*"' "${RESOLVED_WORKSPACE}/bundle_provenance.json" | cut -d'"' -f4 || true)"
+                CHECKED_REF="$(grep -o '"checked_out_ref": *"[^"]*"' "${RESOLVED_WORKSPACE}/bundle_provenance.json" | cut -d'"' -f4 || true)"
+                if [[ -n "${BUNDLE_SOURCE}" ]]; then
+                    BUNDLE_BASE="$(basename "${BUNDLE_SOURCE}" .bundle)"
+                    if [[ -n "${CHECKED_REF}" ]]; then
+                        BUNDLE_SLUG="$(printf '%s@%s' "${BUNDLE_BASE}" "${CHECKED_REF}" | sed 's/[^A-Za-z0-9.@_-]/_/g')"
+                    else
+                        BUNDLE_SLUG="$(printf '%s' "${BUNDLE_BASE}" | sed 's/[^A-Za-z0-9.@_-]/_/g')"
+                    fi
+                    if [[ -n "${TIMESTAMP}" ]]; then
+                        RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}_${BUNDLE_SLUG}"
+                    else
+                        RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${BUNDLE_SLUG}"
+                    fi
+                elif [[ -n "${TIMESTAMP}" ]]; then
+                    RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}"
                 else
-                    RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${BUNDLE_BASE}"
+                    RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up"
                 fi
             elif [[ -n "${TIMESTAMP}" ]]; then
                 RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}"
             else
                 RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up"
             fi
-        elif [[ -n "${TIMESTAMP}" ]]; then
-            RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up/${TIMESTAMP}"
-        else
-            RESOLVED_EVIDENCE="${SCRIPT_DIR}/artifacts/pick-up"
+            BASE_EVIDENCE="${RESOLVED_EVIDENCE}"
+            SUFFIX_IDX=2
+            while [[ -e "${RESOLVED_EVIDENCE}" ]]; do
+                RESOLVED_EVIDENCE="${BASE_EVIDENCE}_${SUFFIX_IDX}"
+                SUFFIX_IDX=$((SUFFIX_IDX + 1))
+            done
         fi
         mkdir -p "${RESOLVED_EVIDENCE}"
 
@@ -215,9 +253,6 @@ case "${SUBCOMMAND}" in
         if [[ -f "${RESOLVED_WORKSPACE}/ami_provenance.json" ]]; then
             cp -f "${RESOLVED_WORKSPACE}/ami_provenance.json" "${RESOLVED_EVIDENCE}/ami_provenance.json"
         fi
-        if [[ -f "${RESOLVED_WORKSPACE}/fips_provenance.json" ]]; then
-            cp -f "${RESOLVED_WORKSPACE}/fips_provenance.json" "${RESOLVED_EVIDENCE}/fips_provenance.json"
-        fi
 
         echo "[*] Target Workspace:   ${RESOLVED_WORKSPACE}"
         echo "[*] Evidence Directory: ${RESOLVED_EVIDENCE}"
@@ -227,7 +262,7 @@ case "${SUBCOMMAND}" in
             local target_eng="$1"
             local IMAGE_NAME="grc-scanner:local"
             if ! docker info >/dev/null 2>&1; then
-                echo "[ERROR] Docker daemon is not running. Please start Docker for Mac."
+                echo "[ERROR] Docker daemon is not running. Please start the Docker daemon." >&2
                 exit 1
             fi
             if ! docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
@@ -265,6 +300,9 @@ case "${SUBCOMMAND}" in
 
         run_sbom_engine() {
             echo ""
+            if [[ ! -f "${RESOLVED_EVIDENCE}/sbom.cdx.json" && -f "${RESOLVED_WORKSPACE}/sbom.cdx.json" ]]; then
+                cp -f "${RESOLVED_WORKSPACE}/sbom.cdx.json" "${RESOLVED_EVIDENCE}/sbom.cdx.json"
+            fi
             if [[ ! -f "${RESOLVED_EVIDENCE}/sbom.cdx.json" ]]; then
                 echo "[*] Prerequisite sbom.cdx.json not found in evidence directory; generating via Syft first..."
                 run_container_engine "syft"
@@ -290,6 +328,19 @@ case "${SUBCOMMAND}" in
                 run_crypto_engine
                 run_fips_engine
                 run_sbom_engine
+                ;;
+            host-only)
+                run_crypto_engine
+                run_fips_engine
+                if [[ ! -f "${RESOLVED_EVIDENCE}/sbom.cdx.json" && -f "${RESOLVED_WORKSPACE}/sbom.cdx.json" ]]; then
+                    cp -f "${RESOLVED_WORKSPACE}/sbom.cdx.json" "${RESOLVED_EVIDENCE}/sbom.cdx.json"
+                fi
+                if [[ -f "${RESOLVED_EVIDENCE}/sbom.cdx.json" ]]; then
+                    run_sbom_engine
+                else
+                    echo ""
+                    echo "[*] Skipping SBOM STIG mapper (--host-only: no existing sbom.cdx.json found; Syft requires Docker)."
+                fi
                 ;;
             semgrep|gitleaks|checkov|syft|grype|trivy|oscap)
                 run_container_engine "${SCAN_ENGINE}"
