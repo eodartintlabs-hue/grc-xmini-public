@@ -29,6 +29,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,18 +75,31 @@ class CommitMetadata:
         return dataclasses.asdict(self)
 
 
+GIT_HARDENING_FLAGS: List[str] = [
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "protocol.file.allow=never",
+    "-c",
+    "safe.directory=*",
+]
+
+
 def _git(
     *args: str,
     cwd: Optional[Path] = None,
     error_prefix: str = "Git command failed",
 ) -> subprocess.CompletedProcess:
-    """Executes a Git command, combining stdout/stderr on failure into a clean RuntimeError."""
-    cmd = ["git"]
+    """Executes a hardened Git command (hooks disabled, file protocol blocked, LFS smudge skipped)."""
+    cmd = ["git", *GIT_HARDENING_FLAGS]
     if cwd is not None:
         cmd.extend(["-C", str(cwd)])
     cmd.extend(args)
+    git_env = dict(os.environ)
+    git_env["GIT_LFS_SKIP_SMUDGE"] = "1"
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return subprocess.run(cmd, capture_output=True, text=True, check=True, env=git_env)
     except subprocess.CalledProcessError as e:
         combined = f"{e.stdout or ''}\n{e.stderr or ''}".strip() or str(e)
         raise RuntimeError(f"{error_prefix}: {combined}") from e
@@ -178,13 +192,24 @@ class GRCBundleManager:
             checksum_status = "MATCH"
             print("    -> Cryptographic checksum verified against session baseline: MATCH")
 
-        # Execute git bundle verify via _git helper
-        result = _git(
-            "bundle",
-            "verify",
-            str(self.bundle_path),
-            error_prefix="Git bundle verification failed",
-        )
+        # Execute git bundle verify inside an ephemeral bare Git directory so verification
+        # succeeds even when the caller's working directory (/opt/grcx in containers) has no .git/
+        with tempfile.TemporaryDirectory(prefix="grc_bundle_verify_") as verify_tmp:
+            verify_repo = Path(verify_tmp)
+            _git(
+                "init",
+                "--bare",
+                "-q",
+                cwd=verify_repo,
+                error_prefix="Failed to initialize temporary Git verification context",
+            )
+            result = _git(
+                "bundle",
+                "verify",
+                str(self.bundle_path),
+                cwd=verify_repo,
+                error_prefix="Git bundle verification failed",
+            )
         raw_verify_output = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
         print("    -> Git bundle object verification: VALID")
 
@@ -238,16 +263,48 @@ class GRCBundleManager:
         self.workspace_root.mkdir(parents=True, exist_ok=True)
         print(f"[*] Extracting bundle into ephemeral workspace: {self.workspace_root}")
 
-        # Step 3: Clone from bundle file
+        # Step 3: Unbundle packfile objects directly without enabling 'file://' transport
         _git(
-            "clone",
+            "init",
+            "-q",
+            cwd=self.workspace_root,
+            error_prefix="Failed to initialize ephemeral Git workspace",
+        )
+        _git(
+            "bundle",
+            "unbundle",
             str(self.bundle_path),
-            str(self.workspace_root),
+            cwd=self.workspace_root,
             error_prefix="Failed to extract Git bundle",
         )
-        print("    -> Cloned bundle repository successfully.")
+        contained_refs = verification.get("contained_references", [])
+        head_sha: Optional[str] = None
+        head_branch: Optional[str] = None
+        first_branch: Optional[str] = None
+        for r in contained_refs:
+            raw_ref = str(r.get("ref", ""))
+            sha = str(r.get("commit", ""))
+            if not sha:
+                continue
+            if raw_ref == "HEAD":
+                head_sha = sha
+            elif raw_ref.startswith("refs/"):
+                _git(
+                    "update-ref",
+                    raw_ref,
+                    sha,
+                    cwd=self.workspace_root,
+                    error_prefix=f"Failed to register bundle ref '{raw_ref}'",
+                )
+                if raw_ref.startswith("refs/heads/"):
+                    short_branch = raw_ref[len("refs/heads/"):]
+                    if first_branch is None:
+                        first_branch = short_branch
+                    if head_sha and sha == head_sha and head_branch is None:
+                        head_branch = short_branch
+        print("    -> Unbundled repository objects and references successfully.")
 
-        # Step 4: Checkout target tag/branch if specified
+        # Step 4: Checkout target tag/branch if specified (or default HEAD/branch if present)
         if target_ref:
             _git(
                 "checkout",
@@ -258,6 +315,18 @@ class GRCBundleManager:
                 error_prefix=f"Failed to checkout ref '{target_ref}'",
             )
             print(f"    -> Checked out reference: {target_ref}")
+        else:
+            default_target = head_branch or first_branch or head_sha
+            if default_target:
+                checkout_args = ["checkout", "-f"]
+                if default_target == head_sha and not (head_branch or first_branch):
+                    checkout_args.append("--detach")
+                checkout_args.extend([default_target, "--"])
+                _git(
+                    *checkout_args,
+                    cwd=self.workspace_root,
+                    error_prefix=f"Failed to checkout default bundle ref '{default_target}'",
+                )
 
         # Step 5: Gather commit metadata & verify non-empty checkout
         commit_info = self._get_commit_metadata(self.workspace_root)
@@ -303,7 +372,14 @@ class GRCBundleManager:
         print(f"    -> Author: {commit_info['author_name']} <{commit_info['author_email']}>")
         print(f"    -> Subject: {commit_info['subject']}")
 
-        # Step 6: Create Bundle Provenance Manifest
+        # Step 6: Create Bundle Provenance Manifest (R8: overwrite any untrusted pre-existing file)
+        manifest_path = self.workspace_root / "bundle_provenance.json"
+        provenance_collision = bool(
+            manifest_path.exists() or "bundle_provenance.json" in tracked_files
+        )
+        if manifest_path.exists() or manifest_path.is_symlink():
+            manifest_path.unlink()
+
         clean_ref = self._normalize_checked_out_ref(
             target_ref=target_ref,
             raw_decorations=commit_info["ref"],
@@ -322,12 +398,18 @@ class GRCBundleManager:
             "restored_at": utc_now_iso(),
             "status": "RESTORED",
             "ephemeral": True,
+            "provenance_collision": provenance_collision,
             "verification": verification,
         }
 
-        manifest_path = self.workspace_root / "bundle_provenance.json"
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(provenance, f, indent=2)
+        if provenance_collision:
+            print(
+                "[WARN] Pre-existing bundle_provenance.json detected in repository tree; "
+                "overwritten with authentic packfile provenance (provenance_collision=True).",
+                file=sys.stderr,
+            )
         print(f"[*] Provenance manifest generated: {manifest_path.name}")
 
         # Optional: Set read-only permissions on source files to prevent scanner mutation

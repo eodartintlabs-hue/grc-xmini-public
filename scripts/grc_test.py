@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GRC-xMINI (The GRC eXperience) — Unified Compliance Test & Verification Engine
-Engine: scripts/grc_test.py (v1.5.2 — Iwakuni)
+Engine: scripts/grc_test.py (v1.5.3 — Iwakuni)
 
 Classification: Internal Compliance & Engineering Specification
 Pipeline Role: Engine #7 — Test, Mock & Invariant Verification Orchestrator
@@ -571,7 +571,7 @@ class TestEngine:
     def run_all(self) -> bool:
         """Executes all engine checks and unit test suites with per-suite crash isolation."""
         print("==================================================================")
-        print("  GRC-xMINI (v1.5.2 — Iwakuni) · COMPREHENSIVE TEST SUITE")
+        print("  GRC-xMINI (v1.5.3 — Iwakuni) · COMPREHENSIVE TEST SUITE")
         print("==================================================================")
 
         suite_runners: Dict[str, Callable[[], bool]] = {

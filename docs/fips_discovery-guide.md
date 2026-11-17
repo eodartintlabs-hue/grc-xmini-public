@@ -20,7 +20,7 @@
   <a href="grc-xtest-guide.md"><b>🎯 GRC-xTEST Guide</b></a>
 </p>
 
-> **Engine**: [`scripts/fips_discovery.py`](../scripts/fips_discovery.py) (`FIPSDiscovery` v1.5.2 — Pipeline Engine #8)  
+> **Engine**: [`scripts/fips_discovery.py`](../scripts/fips_discovery.py) (`FIPSDiscovery` v1.5.3 — Pipeline Engine #8)  
 > **CLI Entrypoints**: `./grc fips`, `./grc scan fips` (`./grc scan --fips`), `./grc scan all`, `./grc test fips`, and `python3 scripts/fips_discovery.py`  
 > **Governing Standards**: NIST FIPS 140-3 (SP 800-140C/D), NIST SP 800-131A Rev. 2, FIPS 186-5, NIST SP 800-52 Rev. 2, NIST SP 800-53 Rev. 5 (`SC-13`, `SC-12`, `SC-8`, `SC-8(1)`, `SC-28`, `SC-28(1)`, `IA-7`, `SC-23`, `SI-7`, `SI-17`, `CM-6`)  
 > **Assessed Areas of Concern (AOCs)**: `AOC-03` (Weak/Deprecated Crypto), `AOC-05` (Improper TLS), `AOC-09` (EOL/Unvalidated Crypto Libraries), `AOC-12` (Lack of FIPS Mode)  
@@ -75,7 +75,7 @@ Where static analysis alone cannot verify runtime FIPS mode or Operational Envir
 |---|---|---|
 | **`PASS`** | Validated module evidence + component-scoped/appliance approved-mode evidence + approved algorithm/parameters | AES-256-GCM via `secrets`, SHA-384 manifest, source-built/system-linked `cryptography` on UBI 9 CMVP `#4857` (`--no-binary cryptography`), `fips=1` + `FIPS` crypto-policy + active `fips_sect` |
 | **`FAIL`** | Disallowed algorithm/protocol, explicit non-FIPS toggle, or unvalidated/historical crypto module | MD5 security digest, AES-ECB, RSA-1024, TLS 1.0/1.1, `fips=0`, `pycryptodome`, `golang.org/x/crypto`, `bc-fips` 1.0.2.5 (Historical) |
-| **`WARN`** *(reserved in `v1.5.2`)* | Reserved in Finding Schema v1.0.0 and policy engine for transitional or advisory notices (no active rule in `v1.5.2` currently emits `WARN`) | Transitional parameter notice or policy/catalog advisory |
+| **`WARN`** *(reserved in `v1.5.3`)* | Reserved in Finding Schema v1.0.0 and policy engine for transitional or advisory notices (no active rule in `v1.5.3` currently emits `WARN`) | Transitional parameter notice or policy/catalog advisory |
 | **`NEEDS_REVIEW`** | Context-dependent or legacy transition item requiring ISSO/assessor confirmation | `hashlib.md5(..., usedforsecurity=False)` for cache keys (`cache.py`), ECDSA `P-224` legacy partner receipt verification |
 | **`CANNOT_DETERMINE_STATICALLY`** | FIPS-capable wrapper is present, but its owning component/workspace lacks static evidence of approved-mode binding | `cryptography==42.0.5` in `gateway/requirements.txt` installed from a prebuilt PyPI wheel or in a component lacking UBI 9 / OpenSSL FIPS linkage (even if an unrelated `docs-site/Dockerfile` uses UBI 9) |
 
@@ -246,11 +246,11 @@ Inspect the printed path at the bottom (`[SUCCESS] Wrote 7 FIPS assessment deliv
 
 ### 4.2 Use Case 2: `GRC-xBOT` & `GRC-xMINI` (Co-Pilot Guided Assessment of Staged Bundles)
 
-**Scenario**: An analyst or ISSO uses **`GRC-xBOT`** (`v1.5.2 — Tsukuba`) as a guided co-pilot alongside **`GRC-xMINI`** to audit an incoming production `.bundle` staged in `GRC-xMINI/artifacts/drop-off/`. Because `GRC-xBOT` actively watches `../GRC-xMINI/artifacts/drop-off/`, `../GRC-xMINI/artifacts/pick-up/`, and `../GRC-xMINI/ephemeral_workspace`, it tailors exact `GRC-xMINI` commands around your staged files.
+**Scenario**: An analyst or ISSO uses **`GRC-xBOT`** (`v1.5.3 — Tsukuba`) as a guided co-pilot alongside **`GRC-xMINI`** to audit an incoming production `.bundle` staged in `GRC-xMINI/artifacts/drop-off/`. Because `GRC-xBOT` actively watches `../GRC-xMINI/artifacts/drop-off/`, `../GRC-xMINI/artifacts/pick-up/`, and `../GRC-xMINI/ephemeral_workspace`, it tailors exact `GRC-xMINI` commands around your staged files.
 
 > [!IMPORTANT]
 > Two architectural notes when pairing `GRC-xBOT` with `fips_discovery.py`:
-> 1. `GRC-xBOT` (`v1.5.2 — Tsukuba`) routes `"fips"`, `"140-3"`, `"cmvp"`, `"cbom"`, and `"aoc-12"` intents directly to its dedicated **`fips` playbook** (`./grc fips -w <workspace> --dry-run` preview, followed by `./grc fips ... && ./grc report ...`), separates general EOL crypto scans under its **`crypto` playbook**, and routes full multi-engine bundle reviews through its **`bundle` playbook** (`./grc scan -w ./ephemeral_workspace`).
+> 1. `GRC-xBOT` (`v1.5.3 — Tsukuba`) routes `"fips"`, `"140-3"`, `"cmvp"`, `"cbom"`, and `"aoc-12"` intents directly to its dedicated **`fips` playbook** (`./grc fips -w <workspace> --dry-run` preview, followed by `./grc fips ... && ./grc report ...`), separates general EOL crypto scans under its **`crypto` playbook**, and routes full multi-engine bundle reviews through its **`bundle` playbook** (`./grc scan -w ./ephemeral_workspace`).
 > 2. When `artifacts/drop-off/` contains a `.bundle` and `./ephemeral_workspace` does not yet exist, `GRC-xBOT`'s `fips`, `crypto`, and `bundle` playbooks restore the selected release tag read-only before scanning and disclose any skipped bundles or release tags.
 
 #### Step 1: Stage Your Release Bundle into `GRC-xMINI/artifacts/drop-off/`
@@ -439,7 +439,7 @@ cd ~/Desktop/GRC-xMINI
 
 > **Pre-flight for Docker-based `./grc scan --fips` demos**: If you plan to run `./grc scan --fips` (instead of host-native `./grc fips`), confirm Docker Desktop is up (`docker info >/dev/null 2>&1`) and `grc-scanner:local` is built (`./grc docker-build`) before recording.
 
-**Expected Baseline Progression (`fips_discovery.py` v1.5.2):**
+**Expected Baseline Progression (`fips_discovery.py` v1.5.3):**
 
 | Release | Story | FAIL | NEEDS_REVIEW | CANNOT_DETERMINE_STATICALLY | PASS |
 |---|---|---|---|---|---|

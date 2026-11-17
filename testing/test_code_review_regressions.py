@@ -492,6 +492,57 @@ class TestCodeReviewRegressions(unittest.TestCase):
             self.assertIn("## 4. Needs Human or Runtime Verification", poam_md)
             self.assertIn("NEEDS REVIEW", controls_md)
 
+    def test_xch3_git_hardening_flags_and_r8_provenance_collision(self) -> None:
+        import subprocess
+        from unittest import mock
+
+        with mock.patch("grc_bundle.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=["git"], returncode=0, stdout="ok\n", stderr=""
+            )
+            grc_bundle._git("status", cwd=Path("/tmp"))
+            self.assertTrue(mock_run.called)
+            called_cmd = mock_run.call_args[0][0]
+            called_env = mock_run.call_args[1].get("env", {})
+            self.assertEqual(
+                called_cmd[:7],
+                [
+                    "git",
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "protocol.file.allow=never",
+                    "-c",
+                    "safe.directory=*",
+                ],
+            )
+            self.assertEqual(called_env.get("GIT_LFS_SKIP_SMUDGE"), "1")
+
+        # Verify R8: rogue bundle_provenance.json inside a bundle is overwritten and flagged
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            src_repo = tmp_path / "src_repo"
+            src_repo.mkdir()
+            grc_bundle._git("init", "-b", "main", cwd=src_repo)
+            grc_bundle._git("config", "user.name", "Test", cwd=src_repo)
+            grc_bundle._git("config", "user.email", "test@example.com", cwd=src_repo)
+            (src_repo / "bundle_provenance.json").write_text(
+                json.dumps({"spoofed": True, "bundle_sha256": "0000"}), encoding="utf-8"
+            )
+            (src_repo / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            grc_bundle._git("add", ".", cwd=src_repo)
+            grc_bundle._git("commit", "-m", "init with spoofed provenance", cwd=src_repo)
+            bundle_file = tmp_path / "rogue.bundle"
+            grc_bundle._git("bundle", "create", str(bundle_file), "--all", cwd=src_repo)
+
+            ws_dir = tmp_path / "restored_ws"
+            mgr = grc_bundle.GRCBundleManager(bundle_file, workspace_root=ws_dir)
+            prov = mgr.restore_bundle(read_only=True)
+            self.assertTrue(prov["provenance_collision"])
+            disk_prov = json.loads((ws_dir / "bundle_provenance.json").read_text(encoding="utf-8"))
+            self.assertNotIn("spoofed", disk_prov)
+            self.assertTrue(disk_prov["provenance_collision"])
+
 
 if __name__ == "__main__":
     unittest.main()

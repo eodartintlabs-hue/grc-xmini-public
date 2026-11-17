@@ -62,7 +62,7 @@ except ImportError:
         version_matches_prefix,
     )
 
-ENGINE_VERSION = "1.5.2"
+ENGINE_VERSION = "1.5.3"
 SKIP_DIRS = {".git", "node_modules", "vendor", "__pycache__", ".venv", "venv", "target", "bin", "obj"}
 
 

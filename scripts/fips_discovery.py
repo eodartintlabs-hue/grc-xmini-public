@@ -81,7 +81,7 @@ except ImportError:
     )
 
 ENGINE_NAME = "FIPSDiscovery"
-ENGINE_VERSION = "1.5.2"
+ENGINE_VERSION = "1.5.3"
 CRYPTO_CATALOG_PATH = RULES_DIR / "crypto_catalog.json"
 PROVENANCE_FILENAMES = frozenset({"bundle_provenance.json", "ami_provenance.json", "fips_provenance.json"})
 

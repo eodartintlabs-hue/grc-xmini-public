@@ -18,7 +18,7 @@
 </p>
 
 > **Project**: GRCx — The GRC eXperience  
-> **Current release**: `v1.5.2 — Iwakuni` (Restricted Beta / Integration Testing)  
+> **Current release**: `v1.5.3 — Iwakuni` (Restricted Beta / Integration Testing)  
 > **Maintainer**: Byron Turner  
 > This file records **shipped** changes only. Commit and author accountability is tracked in [`PATCH_LOG.md`](PATCH_LOG.md). Planned work lives in [`ROADMAP.md`](ROADMAP.md). Versioning, codenames, and the release procedure live in [`RELEASING.md`](RELEASING.md).
 
@@ -28,6 +28,7 @@
 
 | Version | Codename | Date | Type | Commit | Summary |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| [`v1.5.3`](#v153--iwakuni) | Iwakuni | 2026-11-16 | Bug Fix | `_TBD_` | Git bundle container/security hardening & Quartet sync (`XC-H3`, `R8`, `DR-H2` in `GRC-xMINI`; paired with `GRC-xBOT v1.5.3`, `GRC-xTEST v1.5.3`, `GRC-xCLOUD v0.2.1`): enforced `-c core.hooksPath=/dev/null`, `-c protocol.file.allow=never`, `-c safe.directory=*`, and `GIT_LFS_SKIP_SMUDGE=1` in `scripts/grc_bundle.py`, ran `git bundle verify` inside a container-safe temporary bare repo (`DR-H2`), added `provenance_collision` detection & overwrite for spoofed in-bundle `bundle_provenance.json` (`R8`), added regression tests (`test_xch3_git_hardening_flags_and_r8_provenance_collision`), and renamed `KESTRELBRIDGE_FIPS_REVIEW_v2_RESPONSE.md` -> `KESTRELBRIDGE_FIPS_REVIEW_v2_DEBATE.md` |
 | [`v1.5.2`](#v152--iwakuni) | Iwakuni | 2026-11-15 | Bug Fix | `cae9c90` | Priority 3–5 FIPS reconciliation, component scoping & operational hardening (`H4`, `M6` in `GRC-xBOT v1.5.2`; `H5`, `H7`, `M1`, `M3`, `M4`, `M5`, `M7`, `M8` in `GRC-xMINI` & `GRC-xTEST v1.5.2`): added Historical FIPS 140-2 detection (`FAIL_HISTORICAL_FIPS` / `FAIL_HISTORICAL_CERT`) and `FIPSDiscovery` > `CryptoScan` `verification_items` superseding; scoped OE signals per component sub-tree + Dockerfile Python OpenSSL linkage detection (and rebuilt KestrelBridge `v2.0.0` source-built cryptography bundles); added `--fail-on`, `<bundle-stem>@<ref>` naming + `target.checked_out_ref`, trusted provenance lookup, `checksum_status: "NOT_CHECKED"`, Docker preflight + `--host-only`, same-second `_2` auto-dir collision suffix, `55` unit tests (`8/8` suite runners passing), updated docs, and tracked `KESTRELBRIDGE_FIPS_REVIEW_v3.md` |
 | [`v1.5.1`](#v151--iwakuni) | Iwakuni | 2026-11-15 | Bug Fix | `bf0143d` | Priority 1–2 KestrelBridge & FIPS integrity patch (`H1`, `H2`, `H3`, `M2 v2`, `H6`): rebuilt KestrelBridge bundles with `HEAD` and guarded `grc_bundle.py` against empty `HEAD`-less checkouts (auto-cleanup + multi-tag `--ref` skip warnings); blocked `.bundle` files passed as `-w` in `fips_discovery.py` and `crypto_lib_scan.py`; added `scope.files_inspected` to Schema v1.0.0, `stderr` warnings / `--allow-empty` / exit `2` on `0` inspected files in `fips_discovery.py`, and `NOT ASSESSED (No Assessable Files Found)` posture in `grc_reporter.py`; updated `GRC-xTEST/scripts/verify_pipeline.sh` across all 16 bundles (`18` tag/ref snapshots) with exact KestrelBridge baseline assertions |
 | [`v1.5.0`](#v150--iwakuni) | Iwakuni | 2026-11-15 | Minor | `cdbcfc0` | FIPS 140-3 Static Cryptographic Discovery, Algorithm Policy, Offline NIST CMVP & CBOM Engine (Phases 2–5): `scripts/fips_discovery.py` (`./grc fips` & `./grc scan --fips`), Normalized Finding Schema v1.0.0 (`rules/finding_schema.json`), `rules/fips_algorithm_policy.json`, `rules/cmvp_catalog.json` (Active 140-3 vs. Historical 140-2 + 90-day staleness), CycloneDX 1.6 `cbom.cdx.json`, SARIF 2.1.0 `fips_findings.sarif`, D10 manifest expansion (`Cargo`, `NuGet`, `Gradle`, lockfiles), cross-engine `grc_reporter.py` deduplication, purple `grcfetch` banner keys + Triad companion sync (`GRC-xTEST v1.5.0 — Iwakuni` & `GRC-xBOT v1.5.0 — Tsukuba`), and 49 unit tests + all 8 engine suites passing |
@@ -50,6 +51,22 @@
 | [`v1.0.2`](#v102--yokosuka) | Yokosuka | 2026-10-18 | Docs | `3445ac6` | Docs reorganized into `amplifying-info/`, `testing/`, `hygiene/` |
 | [`v1.0.1`](#v101--yokosuka) | Yokosuka | 2026-10-18 | Docs | `d038e81` | Codename adoption, release tracking files, live demo runbook |
 | [`v1.0.0`](#v100--yokosuka) | Yokosuka | 2026-10-18 | Beta baseline | `9bc27c3` | Initial 5-phase bundle and AMI review pipeline |
+
+---
+
+## v1.5.3 — Iwakuni
+
+**Git Bundle Hardening (`XC-H3`, `R8`, `DR-H2`) & Quartet `v0.2.1` Integration Patch** · November 16, 2026 · Tag `v1.5.3`
+
+This Quartet patch release hardens [`scripts/grc_bundle.py`](../scripts/grc_bundle.py) for unprivileged container execution (`GRC-xCLOUD v0.2.1`) and synchronizes all Quartet companions (`GRC-xBOT v1.5.3 — Tsukuba`, `GRC-xTEST v1.5.3 — Iwakuni`, and `GRC-xCLOUD v0.2.1 — Himawari`):
+
+1. **Git Protocol, Hook & Safe-Directory Hardening (`XC-H3`, `DR-H2`)**:
+   - Consolidated Git execution in [`scripts/grc_bundle.py`](../scripts/grc_bundle.py) with `GIT_HARDENING_FLAGS` (`-c core.hooksPath=/dev/null`, `-c protocol.file.allow=never`, `-c safe.directory=*`) and `GIT_LFS_SKIP_SMUDGE=1` to neutralize hook, transport, LFS smudge, and container UID `65532` ownership failures.
+   - Wrapped `git bundle verify` inside a clean `tempfile.TemporaryDirectory()` bare repository (`git init --bare -q`) so container stages (such as `GRC-xCLOUD` `WORKDIR /opt/grcx`) verify bundles cleanly without needing a host `.git` directory.
+2. **Rogue `bundle_provenance.json` Collision Overwrite (`R8`)**:
+   - Updated `GRCBundleManager.restore_bundle()` to detect pre-existing tracked `bundle_provenance.json` files inside restored bundles, overwrite them with authentic packfile provenance, and stamp `"provenance_collision": true`.
+3. **Regression Testing & Hygiene**:
+   - Added `test_xch3_git_hardening_flags_and_r8_provenance_collision` in [`testing/test_code_review_regressions.py`](../testing/test_code_review_regressions.py) and aligned Priority 6 debate artifact naming (`KESTRELBRIDGE_FIPS_REVIEW_v2_RESPONSE.md` -> `KESTRELBRIDGE_FIPS_REVIEW_v2_DEBATE.md`).
 
 ---
 

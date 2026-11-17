@@ -20,7 +20,7 @@
 </p>
 
 > **Engine**: [`scripts/transform_scans.py`](../scripts/transform_scans.py) · **CLI Command**: `./grc transform`  
-> **Release Series**: `v1.5.2 — Iwakuni` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`, unified 2-tab `FedRAMP-POAM.xlsx` + 5-sheet template ingestion in `v1.4.3 — Yokota`, and Qualys VMDR + Wiz Cloud Security adapters in `v1.4.4 — Yokota`)*  
+> **Release Series**: `v1.5.3 — Iwakuni` *(Introduced in `v1.2.0 — Misawa`, enhanced with `artifacts/drop-off/` drop-in folder in `v1.3.0 — Sasebo`, multi-scan ingestion in `v1.3.2 — Sasebo`, dynamic `YYYY-MMM-#####` POA&M IDs in `v1.3.3 — Sasebo`, unified 2-tab `FedRAMP-POAM.xlsx` + 5-sheet template ingestion in `v1.4.3 — Yokota`, and Qualys VMDR + Wiz Cloud Security adapters in `v1.4.4 — Yokota`)*  
 > **Execution Mode**: **100% Standalone** *(Requires only Python 3.9+ Standard Library — no Docker container, no `.bundle` file, and no `pip install` needed)*
 
 ---
@@ -286,7 +286,7 @@ Running a transformation outputs the itemized SLA Breach & Aging table directly 
 [+] Drafted 5 Remediation Plans with official TENABLE remediation URLs.
 
 ================================================================================================
-  GRC-xMINI (v1.5.2 — Iwakuni) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
+  GRC-xMINI (v1.5.3 — Iwakuni) · FEDRAMP POA&M TRANSFORMATION & SLA AGING REPORT
 ================================================================================================
   Analysis Reference Date : 2026-10-31
   Source Scan File(s)     : tenable_monthly_scan.csv (1 file)
